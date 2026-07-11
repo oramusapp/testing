@@ -4913,7 +4913,13 @@
     if(!state.wpServer||!state.wpChannel){ alert(t("wp_test_fail")); return; }
     fetch(wpUrl("test"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:t("ntfy_test_msg")})})
       .then(function(r){ return r.ok?r.json():null; })
-      .then(function(j){ alert((j&&j.delivered>0)?(t("wp_test_sent")+" ["+j.delivered+"/"+j.devices+"]"):t("wp_test_fail")); })
+      .then(function(j){
+        if(j&&j.delivered>0){ alert(t("wp_test_sent")+" ["+j.delivered+"/"+j.devices+"]"); return; }
+        // diagnoza: pokaż liczbę urządzeń na kanale i statusy odpowiedzi serwera push Apple/Google
+        var det="\n\nurządzenia: "+(j?j.devices:"?")
+               +(j&&j.results&&j.results.length?("\nstatusy: "+j.results.join(" | ")):"");
+        alert(t("wp_test_fail")+det);
+      })
       .catch(function(){ alert(t("wp_test_fail")); });
   });
   // ntfy: konfiguracja dostarczania w tle
