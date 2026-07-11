@@ -1636,6 +1636,9 @@
         </div>
         <!-- Web Push (własny serwer) działa w pełni automatycznie — adres serwera jest
              wbudowany w stronę (WP_DEFAULT_SERVER), steruje nim główny suwak powyżej. -->
+        <button class="btn-ghost" id="notifDiagBtn" style="margin-top:10px;" data-i18n="diag_btn">🩺 Sprawdź i napraw powiadomienia</button>
+        <button class="btn-ghost" id="wpDiagTestBtn" style="margin-top:10px;margin-left:8px;" data-i18n="diag_test">Wyślij test z serwera</button>
+        <pre id="notifDiagOut" style="display:none;font-family:var(--font-mono);font-size:0.7rem;line-height:1.8;color:var(--text);background:var(--bg-input);border:1px solid var(--border-soft);border-radius:8px;padding:10px;white-space:pre-wrap;word-break:break-word;margin:10px 0 0;"></pre>
         <!-- ntfy: dostarczanie w tle — działa przy zamkniętej aplikacji i zgaszonym ekranie -->
         <div class="toggle-line" style="margin-top:14px;">
           <span data-i18n="ntfy_toggle">Powiadomienia w tle (ntfy)</span>
@@ -1920,7 +1923,19 @@
       wp_sub_ok:"Urządzenie połączone! Powiadomienia będą przychodzić bezpośrednio do tej aplikacji.",
       wp_sub_fail:"Nie udało się połączyć. Sprawdź adres serwera, połączenie i zgodę na powiadomienia.",
       wp_test_sent:"Wysłano test przez serwer push — powiadomienie powinno pojawić się za chwilę.",
-      wp_test_fail:"Test nie powiódł się. Najpierw kliknij „Połącz to urządzenie”."
+      wp_test_fail:"Test nie powiódł się. Najpierw uruchom „Sprawdź i napraw powiadomienia”.",
+      /* --- diagnostyka powiadomień --- */
+      diag_btn:"🩺 Sprawdź i napraw powiadomienia",
+      diag_test:"Wyślij test z serwera",
+      diag_pwa:"Aplikacja z ekranu głównego (PWA)",
+      diag_pwa_hint:"otwórz z ikony na ekranie głównym",
+      diag_perm:"Zgoda na powiadomienia",
+      diag_sw:"Service Worker (sw.js)",
+      diag_sw_hint:"wymagany plik sw.js obok index.html na hostingu HTTPS",
+      diag_sub:"Subskrypcja push tego urządzenia",
+      diag_fixed:"naprawiono ✔",
+      diag_srv:"Serwer push",
+      diag_running:"Sprawdzanie..."
     },
     en:{
       clock_title:"Clock & date", upcoming_title:"Upcoming event",
@@ -2081,7 +2096,19 @@
       wp_sub_ok:"Device connected! Notifications will arrive directly in this app.",
       wp_sub_fail:"Connection failed. Check the server address, your connection and notification permission.",
       wp_test_sent:"Test sent via the push server — the notification should appear shortly.",
-      wp_test_fail:"Test failed. Click “Connect this device” first."
+      wp_test_fail:"Test failed. Run “Check & fix notifications” first.",
+      /* --- notification diagnostics --- */
+      diag_btn:"🩺 Check & fix notifications",
+      diag_test:"Send test from server",
+      diag_pwa:"App from home screen (PWA)",
+      diag_pwa_hint:"open from the home screen icon",
+      diag_perm:"Notification permission",
+      diag_sw:"Service Worker (sw.js)",
+      diag_sw_hint:"sw.js must sit next to index.html on HTTPS hosting",
+      diag_sub:"Push subscription of this device",
+      diag_fixed:"fixed ✔",
+      diag_srv:"Push server",
+      diag_running:"Checking..."
     }
   };
   function t(k){ var d=I18N[state.lang]||I18N.pl; return d[k]!==undefined?d[k]:(I18N.pl[k]!==undefined?I18N.pl[k]:k); }
@@ -4828,6 +4855,67 @@
   // Web Push (własny serwer): w pełni automatyczny — bez opcji w ustawieniach.
   // Adres serwera jest wbudowany (WP_DEFAULT_SERVER), a włączaniem/wyłączaniem
   // steruje główny suwak "Włącz powiadomienia PUSH" (state.pushEnabled).
+  /* --- Diagnostyka powiadomień: sprawdza i od razu naprawia, co się da
+     (prośba o zgodę, ponowna subskrypcja urządzenia, re-synchronizacja planu) --- */
+  function diagLine(label, ok, extra){ return (ok?"✅ ":"❌ ")+label+(extra?(" — "+extra):""); }
+  if($("notifDiagBtn")) $("notifDiagBtn").addEventListener("click", function(){
+    var out=$("notifDiagOut"); out.style.display="block"; out.textContent=t("diag_running");
+    var lines=[];
+    function render(){ out.textContent=lines.join("\n"); }
+    // 1. PWA z ekranu głównego?
+    var standalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
+    lines.push(diagLine(t("diag_pwa"), standalone, standalone?"":t("diag_pwa_hint")));
+    // 2. Zgoda na powiadomienia (kliknięcie = gest użytkownika, więc można poprosić)
+    var permIdx=lines.length;
+    lines.push(diagLine(t("diag_perm"), ("Notification" in window)&&Notification.permission==="granted", ("Notification" in window)?Notification.permission:"brak API"));
+    var chain=Promise.resolve();
+    if(("Notification" in window)&&Notification.permission==="default"){
+      chain=Notification.requestPermission().then(function(){
+        lines[permIdx]=diagLine(t("diag_perm"), Notification.permission==="granted", Notification.permission);
+        refreshNotifBanner();
+      });
+    }
+    chain.then(function(){
+      // 3. Service Worker
+      if(!("serviceWorker" in navigator)){ lines.push(diagLine(t("diag_sw"), false, t("diag_sw_hint"))); return null; }
+      return navigator.serviceWorker.getRegistration().then(function(reg){
+        var swOk=!!(reg&&reg.active);
+        var src=swOk?((reg.active.scriptURL||"").indexOf("blob:")===0?"inline":"sw.js"):t("diag_sw_hint");
+        lines.push(diagLine(t("diag_sw"), swOk, src));
+        // 4. Subskrypcja push tego urządzenia (spróbuj naprawić od ręki)
+        if(!reg||!reg.pushManager){ lines.push(diagLine(t("diag_sub"), false)); return null; }
+        return reg.pushManager.getSubscription().then(function(sub){
+          if(sub){
+            lines.push(diagLine(t("diag_sub"), true));
+            // dopisz urządzenie na serwerze na wszelki wypadek
+            if(state.wpServer&&state.wpChannel){
+              return fetch(wpUrl("subscribe"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({subscription:(sub.toJSON?sub.toJSON():sub)})}).catch(function(){});
+            }
+            return null;
+          }
+          if(canNotify()&&state.wpServer){
+            return wpSubscribe().then(function(r){ lines.push(diagLine(t("diag_sub"), !!(r&&r.ok), (r&&r.ok)?t("diag_fixed"):(r&&r.reason)||"")); });
+          }
+          lines.push(diagLine(t("diag_sub"), false));
+          return null;
+        });
+      });
+    }).then(function(){
+      // 5. Serwer push
+      if(!state.wpServer){ lines.push(diagLine(t("diag_srv"), false)); render(); return; }
+      return fetch(wpBase()+"/vapid").then(function(r){ lines.push(diagLine(t("diag_srv"), r.ok, wpBase().replace(/^https?:\/\//,""))); })
+        .catch(function(){ lines.push(diagLine(t("diag_srv"), false, wpBase().replace(/^https?:\/\//,""))); })
+        .then(function(){ doWpSync(); render(); });
+    }).catch(function(){ render(); });
+    render();
+  });
+  if($("wpDiagTestBtn")) $("wpDiagTestBtn").addEventListener("click", function(){
+    if(!state.wpServer||!state.wpChannel){ alert(t("wp_test_fail")); return; }
+    fetch(wpUrl("test"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:t("ntfy_test_msg")})})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(j){ alert((j&&j.delivered>0)?(t("wp_test_sent")+" ["+j.delivered+"/"+j.devices+"]"):t("wp_test_fail")); })
+      .catch(function(){ alert(t("wp_test_fail")); });
+  });
   // ntfy: konfiguracja dostarczania w tle
   function syncNtfyUI(){
     if(!$("ntfyEnabledChk")) return;
@@ -5174,7 +5262,7 @@
      - notificationclick: kliknięcie powiadomienia otwiera / fokusuje aplikację. */
   if("serviceWorker" in navigator){
     var swSource=[
-      "const CACHE_NAME='futureapp-cache-v14';",
+      "const CACHE_NAME='futureapp-cache-v15';",
       "self.addEventListener('install',function(event){",
       "  self.skipWaiting();",
       "  event.waitUntil(caches.open(CACHE_NAME).then(function(cache){",
@@ -5182,15 +5270,13 @@
       "  }));",
       "});",
       "self.addEventListener('activate',function(event){ event.waitUntil(self.clients.claim()); });",
+      "/* NETWORK-FIRST: świeża wersja strony z sieci, cache tylko offline */",
       "self.addEventListener('fetch',function(event){",
       "  if(event.request.method!=='GET') return;",
       "  if(event.request.mode!=='navigate') return;",
       "  event.respondWith(caches.open(CACHE_NAME).then(function(cache){",
-      "    return cache.match(event.request).then(function(cached){",
-      "      if(cached) return cached;",
-      "      return fetch(event.request).then(function(resp){ if(resp&&resp.ok) cache.put(event.request,resp.clone()); return resp; })",
-      "        .catch(function(){ return cache.match(self.registration.scope); });",
-      "    });",
+      "    return fetch(event.request).then(function(resp){ if(resp&&resp.ok) cache.put(event.request,resp.clone()); return resp; })",
+      "      .catch(function(){ return cache.match(event.request).then(function(cached){ return cached||cache.match(self.registration.scope); }); });",
       "  }));",
       "});",
       "/* Harmonogram powiadomień ze strony: anuluj wszystkie zaplanowane i zaplanuj od nowa */",
