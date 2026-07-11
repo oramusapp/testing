@@ -51,6 +51,18 @@ self.addEventListener('message', function (event) {
   if (event.waitUntil) event.waitUntil(run);
 });
 
+/* Web Push z własnego serwera (Cloudflare Worker): wyświetl powiadomienie systemowe.
+   Dzięki temu powiadomienia docierają przy ZAMKNIĘTEJ aplikacji i zgaszonym ekranie —
+   bez żadnej dodatkowej aplikacji. */
+self.addEventListener('push', function (event) {
+  var data = {};
+  try { data = event.data ? event.data.json() : {}; }
+  catch (e) { data = { body: (event.data && event.data.text && event.data.text()) || '' }; }
+  event.waitUntil(self.registration.showNotification(data.title || 'FutureApp', {
+    body: data.body || '', tag: data.key || undefined, data: { futureapp: true }
+  }));
+});
+
 /* Kliknięcie powiadomienia: fokus na otwartą aplikację lub otwarcie nowej karty */
 self.addEventListener('notificationclick', function (event) {
   event.notification.close();

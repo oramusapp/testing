@@ -482,6 +482,26 @@
   .order-row .or-colreset:hover{color:var(--danger);}
   .toggle-line{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;font-size:0.85rem;}
   .lang-opts,.header-mode-opts{display:flex;gap:8px;}
+  /* ===== SUWAKI (switch) zamiast checkboxów w panelu ustawień ===== */
+  #settingsOverlay .modal input[type=checkbox]{
+    -webkit-appearance:none;appearance:none;
+    width:40px !important;height:22px !important;border-radius:999px;
+    background:var(--bg-input);border:1px solid var(--border);
+    position:relative;cursor:pointer;flex-shrink:0;margin:0;padding:0;
+    transition:background 0.2s ease,border-color 0.2s ease,box-shadow 0.2s ease;
+    vertical-align:middle;
+  }
+  #settingsOverlay .modal input[type=checkbox]::after{
+    content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;
+    background:var(--text-dim);transition:transform 0.2s ease,background 0.2s ease;
+  }
+  #settingsOverlay .modal input[type=checkbox]:checked{
+    background:color-mix(in srgb,var(--accent) 25%,var(--bg-input));
+    border-color:var(--accent);box-shadow:var(--glow);
+  }
+  #settingsOverlay .modal input[type=checkbox]:checked::after{
+    transform:translateX(18px);background:var(--accent);
+  }
 
   /* Footer */
   footer.app-footer{
@@ -1614,6 +1634,22 @@
         <div style="font-size:0.68rem;color:var(--text-dim);margin-top:8px;line-height:1.5;" data-i18n="notif_note">
           Powiadomienia o wydarzeniach i zadaniach działają po udzieleniu zgody w przeglądarce. Aby otrzymywać je również w tle na telefonie, dodaj aplikację do ekranu głównego.
         </div>
+        <!-- Web Push przez własny serwer (Cloudflare Worker) — powiadomienia systemowe
+             bezpośrednio z tej aplikacji (PWA), bez żadnej dodatkowej aplikacji -->
+        <div class="toggle-line" style="margin-top:14px;">
+          <span data-i18n="wp_toggle">Web Push — własny serwer (bez ntfy)</span>
+          <input type="checkbox" id="wpEnabledChk" style="width:18px;height:18px;accent-color:var(--accent);">
+        </div>
+        <div id="wpConfig" style="display:none;">
+          <label for="wpServerInput" data-i18n="wp_server">Adres serwera push (Cloudflare Worker)</label>
+          <input type="text" id="wpServerInput" placeholder="https://futureapp-push.nazwa.workers.dev" autocapitalize="none" autocorrect="off" spellcheck="false">
+          <button class="btn-ghost" id="wpConnectBtn" style="margin-top:10px;" data-i18n="wp_connect">Połącz to urządzenie</button>
+          <button class="btn-ghost" id="wpTestBtn" style="margin-top:10px;margin-left:8px;" data-i18n="wp_test">Wyślij test</button>
+          <div id="wpStatus" style="font-size:0.74rem;font-family:var(--font-mono);color:var(--accent);margin-top:8px;display:none;"></div>
+          <div style="font-size:0.68rem;color:var(--text-dim);margin-top:8px;line-height:1.5;" data-i18n="wp_note">
+            Powiadomienia systemowe bezpośrednio z tej aplikacji — bez aplikacji ntfy. Wymaga: aplikacji hostowanej na HTTPS (np. GitHub Pages) razem z plikiem sw.js oraz wdrożonego darmowego Cloudflare Workera (instrukcja w pliku INSTRUKCJA-POWIADOMIENIA.md). Na iPhone: iOS 16.4+, aplikacja dodana do ekranu głównego i otwierana z ikony.
+          </div>
+        </div>
         <!-- ntfy: dostarczanie w tle — działa przy zamkniętej aplikacji i zgaszonym ekranie -->
         <div class="toggle-line" style="margin-top:14px;">
           <span data-i18n="ntfy_toggle">Powiadomienia w tle (ntfy)</span>
@@ -1647,6 +1683,11 @@
           <input type="checkbox" id="pinCalendarEnabled" style="width:18px;height:18px;accent-color:var(--accent);">
         </div>
         <input type="password" id="pinCalendarInput" inputmode="numeric" maxlength="4" data-i18n-ph="pin_set_ph" placeholder="Ustaw 4-cyfrowy PIN">
+        <div class="toggle-line" style="margin-top:12px;">
+          <span data-i18n="pin_budget">Chroń Zarządzanie budżetem</span>
+          <input type="checkbox" id="pinBudgetEnabled" style="width:18px;height:18px;accent-color:var(--accent);">
+        </div>
+        <input type="password" id="pinBudgetInput" inputmode="numeric" maxlength="4" data-i18n-ph="pin_set_ph" placeholder="Ustaw 4-cyfrowy PIN">
         <button class="btn-primary" id="savePinBtn" data-i18n="save_pin">Zapisz ustawienia PIN</button>
         <div style="font-size:0.68rem;color:var(--text-dim);margin-top:8px;line-height:1.5;" data-i18n="pin_note">
           PIN jest przechowywany lokalnie w formie zaciemnionej (hash), nie jako zwykły tekst. To zabezpieczenie ekranowe, nie kryptograficzna ochrona danych.
@@ -1792,7 +1833,7 @@
       welcome_text:"Twoje centrum organizacji: zadania, kalendarz, fitness, budżet i dziennik — wszystko w jednym miejscu. Dane zapisują się wyłącznie lokalnie w Twojej przeglądarce. Wygląd i układ dostosujesz w ustawieniach (ikona ⚙ w rogu).",
       pin_fixed:"Oznacz jako stałe (nie kasuj przy resecie)", unpin_fixed:"Usuń oznaczenie stałej",
       wk_start_btn:"\u25B6 Rozpocznij trening", wk_total_time:"Czas treningu", wk_rest_time:"Przerwa", wk_duration:"Czas trwania",
-      set_pin:"Zabezpieczenie PIN", pin_journal:"Chroń Dziennik", pin_calendar:"Chroń Kalendarz",
+      set_pin:"Zabezpieczenie PIN", pin_journal:"Chroń Dziennik", pin_calendar:"Chroń Kalendarz", pin_budget:"Chroń Zarządzanie budżetem",
       pin_set_ph:"Ustaw 4-cyfrowy PIN", save_pin:"Zapisz ustawienia PIN",
       pin_note:"PIN jest przechowywany lokalnie w formie zaciemnionej (hash), nie jako zwykły tekst. To zabezpieczenie ekranowe, nie kryptograficzna ochrona danych.",
       pin_enter:"Podaj PIN", pin_wrong:"Nieprawidłowy PIN.", unlock:"Odblokuj",
@@ -1881,7 +1922,19 @@
       ntfy_test_msg:"Test powiadomień FutureApp — działa! 🎉",
       ntfy_test_sent:"Wysłano! Sprawdź aplikację ntfy na telefonie.",
       ntfy_test_fail:"Nie udało się wysłać. Sprawdź połączenie, serwer i nazwę tematu.",
-      ntfy_note:"Zainstaluj darmową aplikację „ntfy” (App Store / Google Play) i zasubskrybuj w niej dokładnie ten temat. Powiadomienia będą przychodzić także przy zamkniętej aplikacji i zgaszonym ekranie. Temat działa jak hasło — nie udostępniaj go nikomu. Treść powiadomień przechodzi przez wybrany serwer ntfy."
+      ntfy_note:"Zainstaluj darmową aplikację „ntfy” (App Store / Google Play) i zasubskrybuj w niej dokładnie ten temat. Powiadomienia będą przychodzić także przy zamkniętej aplikacji i zgaszonym ekranie. Temat działa jak hasło — nie udostępniaj go nikomu. Treść powiadomień przechodzi przez wybrany serwer ntfy.",
+      /* --- Web Push przez własny serwer (bez ntfy) --- */
+      wp_toggle:"Web Push — własny serwer (bez ntfy)",
+      wp_server:"Adres serwera push (Cloudflare Worker)",
+      wp_connect:"Połącz to urządzenie",
+      wp_test:"Wyślij test",
+      wp_note:"Powiadomienia systemowe bezpośrednio z tej aplikacji — bez aplikacji ntfy. Wymaga: aplikacji hostowanej na HTTPS (np. GitHub Pages) razem z plikiem sw.js oraz wdrożonego darmowego Cloudflare Workera (instrukcja w pliku INSTRUKCJA-POWIADOMIENIA.md). Na iPhone: iOS 16.4+, aplikacja dodana do ekranu głównego i otwierana z ikony.",
+      wp_need_server:"Najpierw podaj adres serwera push (Cloudflare Worker).",
+      wp_need_sw:"Brak aktywnego Service Workera. Aplikacja musi być otwarta z hostingu HTTPS z plikiem sw.js obok index.html (np. GitHub Pages), a na iPhone — z ikony na ekranie głównym.",
+      wp_sub_ok:"Urządzenie połączone! Powiadomienia będą przychodzić bezpośrednio do tej aplikacji.",
+      wp_sub_fail:"Nie udało się połączyć. Sprawdź adres serwera, połączenie i zgodę na powiadomienia.",
+      wp_test_sent:"Wysłano test przez serwer push — powiadomienie powinno pojawić się za chwilę.",
+      wp_test_fail:"Test nie powiódł się. Najpierw kliknij „Połącz to urządzenie”."
     },
     en:{
       clock_title:"Clock & date", upcoming_title:"Upcoming event",
@@ -1941,7 +1994,7 @@
       welcome_text:"Your organization hub: tasks, calendar, fitness, budget and journal — all in one place. Data is stored only locally in your browser. Customize the look and layout in settings (the ⚙ icon in the corner).",
       pin_fixed:"Mark as fixed (keep on reset)", unpin_fixed:"Unmark fixed",
       wk_start_btn:"\u25B6 Start workout", wk_total_time:"Workout time", wk_rest_time:"Rest", wk_duration:"Duration",
-      set_pin:"PIN protection", pin_journal:"Protect Journal", pin_calendar:"Protect Calendar",
+      set_pin:"PIN protection", pin_journal:"Protect Journal", pin_calendar:"Protect Calendar", pin_budget:"Protect Budget management",
       pin_set_ph:"Set a 4-digit PIN", save_pin:"Save PIN settings",
       pin_note:"The PIN is stored locally in an obfuscated (hashed) form, not as plain text. This is a screen lock, not cryptographic data protection.",
       pin_enter:"Enter PIN", pin_wrong:"Wrong PIN.", unlock:"Unlock",
@@ -2030,7 +2083,19 @@
       ntfy_test_msg:"FutureApp notification test — it works! 🎉",
       ntfy_test_sent:"Sent! Check the ntfy app on your phone.",
       ntfy_test_fail:"Sending failed. Check your connection, server and topic name.",
-      ntfy_note:"Install the free “ntfy” app (App Store / Google Play) and subscribe to exactly this topic in it. Notifications will arrive even with the app closed and the screen off. The topic works like a password — don't share it. Notification content passes through the chosen ntfy server."
+      ntfy_note:"Install the free “ntfy” app (App Store / Google Play) and subscribe to exactly this topic in it. Notifications will arrive even with the app closed and the screen off. The topic works like a password — don't share it. Notification content passes through the chosen ntfy server.",
+      /* --- Web Push via own server (no ntfy) --- */
+      wp_toggle:"Web Push — own server (no ntfy)",
+      wp_server:"Push server address (Cloudflare Worker)",
+      wp_connect:"Connect this device",
+      wp_test:"Send test",
+      wp_note:"System notifications directly from this app — no ntfy app needed. Requires: the app hosted on HTTPS (e.g. GitHub Pages) together with sw.js, and a deployed free Cloudflare Worker (see INSTRUKCJA-POWIADOMIENIA.md). On iPhone: iOS 16.4+, app added to the home screen and opened from its icon.",
+      wp_need_server:"Enter the push server address (Cloudflare Worker) first.",
+      wp_need_sw:"No active Service Worker. The app must be opened from HTTPS hosting with sw.js next to index.html (e.g. GitHub Pages), and on iPhone — from the home screen icon.",
+      wp_sub_ok:"Device connected! Notifications will arrive directly in this app.",
+      wp_sub_fail:"Connection failed. Check the server address, your connection and notification permission.",
+      wp_test_sent:"Test sent via the push server — the notification should appear shortly.",
+      wp_test_fail:"Test failed. Click “Connect this device” first."
     }
   };
   function t(k){ var d=I18N[state.lang]||I18N.pl; return d[k]!==undefined?d[k]:(I18N.pl[k]!==undefined?I18N.pl[k]:k); }
@@ -2063,8 +2128,10 @@
     headerMode: settings.headerMode || "quote",
     pinJournalEnabled: !!settings.pinJournalEnabled,
     pinCalendarEnabled: !!settings.pinCalendarEnabled,
+    pinBudgetEnabled: !!settings.pinBudgetEnabled,
     pinJournalHash: settings.pinJournalHash || "",
     pinCalendarHash: settings.pinCalendarHash || "",
+    pinBudgetHash: settings.pinBudgetHash || "",
     tickerPairs: (settings.tickerPairs && settings.tickerPairs.length) ? settings.tickerPairs.slice(0,5) : DEFAULT_PAIRS.slice(),
     tickerEnabled: settings.tickerEnabled!==false,   // widget kursów walут: domyślnie włączony
     fontSize: settings.fontSize || "default",   // small | default | large (legacy, mapowane na fontPx)
@@ -2075,6 +2142,10 @@
     ntfyEnabled: !!settings.ntfyEnabled,
     ntfyTopic: settings.ntfyTopic || "",
     ntfyServer: settings.ntfyServer || "https://ntfy.sh",
+    // --- Web Push przez własny serwer (Cloudflare Worker) — bez aplikacji ntfy ---
+    wpEnabled: !!settings.wpEnabled,
+    wpServer: settings.wpServer || "",
+    wpChannel: settings.wpChannel || "",
     // --- rozbudowana personalizacja wyglądu ---
     colorMode: settings.colorMode || "dark",    // dark | light | system
     pageBg: settings.pageBg || "default",        // default | gradient | pattern
@@ -2100,10 +2171,12 @@
       theme:state.theme, lang:state.lang, order:state.order, hidden:state.hidden,
       tzPrimary:state.tzPrimary, tzSecondEnabled:state.tzSecondEnabled, tzSecondary:state.tzSecondary,
       headerMode:state.headerMode, pinJournalEnabled:state.pinJournalEnabled,
-      pinCalendarEnabled:state.pinCalendarEnabled, pinJournalHash:state.pinJournalHash, pinCalendarHash:state.pinCalendarHash,
+      pinCalendarEnabled:state.pinCalendarEnabled, pinBudgetEnabled:state.pinBudgetEnabled,
+      pinJournalHash:state.pinJournalHash, pinCalendarHash:state.pinCalendarHash, pinBudgetHash:state.pinBudgetHash,
       tickerPairs:state.tickerPairs, tickerEnabled:state.tickerEnabled,
       fontSize:state.fontSize, density:state.density, timeFormat:state.timeFormat, pushEnabled:state.pushEnabled,
       ntfyEnabled:state.ntfyEnabled, ntfyTopic:state.ntfyTopic, ntfyServer:state.ntfyServer,
+      wpEnabled:state.wpEnabled, wpServer:state.wpServer, wpChannel:state.wpChannel,
       colorMode:state.colorMode, pageBg:state.pageBg, settingsBg:state.settingsBg, fontFamily:state.fontFamily,
       fontPx:state.fontPx, radius:state.radius, customColors:state.customColors, tileGlow:state.tileGlow
     });
@@ -2258,7 +2331,8 @@
   }
   function showView(name){
     var needsPin = (name==="journal" && state.pinJournalEnabled && state.pinJournalHash) ||
-                   (name==="calendar" && state.pinCalendarEnabled && state.pinCalendarHash);
+                   (name==="calendar" && state.pinCalendarEnabled && state.pinCalendarHash) ||
+                   (name==="budget" && state.pinBudgetEnabled && state.pinBudgetHash);
     if(needsPin && !unlocked[name]){
       openPinPrompt(name);
       return;
@@ -2291,7 +2365,9 @@
   }
   $("pinUnlockBtn").addEventListener("click", function(){
     var pin=$("pinUnlockInput").value.trim();
-    var hash = pinTargetView==="journal"?state.pinJournalHash:state.pinCalendarHash;
+    var hash = pinTargetView==="journal" ? state.pinJournalHash
+             : pinTargetView==="budget"  ? state.pinBudgetHash
+             : state.pinCalendarHash;
     if(hashPin(pin)===hash){
       unlocked[pinTargetView]=true;
       $("pinOverlay").classList.remove("active");
@@ -2307,7 +2383,7 @@
     todo:{icon:"\u2630", titleKey:"tile_todo", subKey:"tile_todo_sub"},
     calendar:{icon:"\uD83D\uDCC5", titleKey:"tile_calendar", subKey:"tile_calendar_sub", pin:"calendar"},
     fitness:{icon:"\uD83D\uDCAA", titleKey:"tile_fitness", subKey:"tile_fitness_sub"},
-    budget:{icon:"\uD83D\uDCB0", titleKey:"tile_budget", subKey:"tile_budget_sub"},
+    budget:{icon:"\uD83D\uDCB0", titleKey:"tile_budget", subKey:"tile_budget_sub", pin:"budget"},
     journal:{icon:"\uD83D\uDCD3", titleKey:"tile_journal", subKey:"tile_journal_sub", pin:"journal"},
     ebooks:{icon:"\uD83D\uDCDA", titleKey:"tile_ebooks", subKey:"tile_ebooks_sub"}
   };
@@ -2317,7 +2393,8 @@
       if(state.hidden[id]) return;
       var def=TILE_DEFS[id]; if(!def) return;
       var locked = (def.pin==="journal" && state.pinJournalEnabled && state.pinJournalHash) ||
-                   (def.pin==="calendar" && state.pinCalendarEnabled && state.pinCalendarHash);
+                   (def.pin==="calendar" && state.pinCalendarEnabled && state.pinCalendarHash) ||
+                   (def.pin==="budget" && state.pinBudgetEnabled && state.pinBudgetHash);
       var btn=document.createElement("button");
       btn.className="tile";
       // Global tile highlight colour (applies to all tiles; unset => theme default pink).
@@ -4483,8 +4560,50 @@
     })(0);
   }
 
-  /* Harmonogram: precyzyjne timery na najbliższe 48 h + synchronizacja z Service Workerem i ntfy.
-     Wywołanie anuluje WSZYSTKIE wcześniejsze timery i planuje od nowa (używane po każdej edycji). */
+  /* ---- Web Push przez własny serwer (Cloudflare Worker) — bez aplikacji ntfy ----
+     Aplikacja subskrybuje systemowy push (pushManager.subscribe) i wysyła harmonogram
+     na Workera; Worker co minutę wysyła zaległe powiadomienia przez kanał push
+     Apple/Google — docierają przy ZAMKNIĘTEJ aplikacji i ZGASZONYM ekranie.
+     Wysłanie nowego harmonogramu ZASTĘPUJE stary — edycja automatycznie anuluje
+     wcześniej zaplanowane powiadomienia. Wymaga hostingu HTTPS z sw.js (patrz instrukcja). */
+  function wpReady(){ return state.wpEnabled && !!state.wpServer && !!state.wpChannel; }
+  function wpBase(){ return (state.wpServer||"").replace(/\/+$/,""); }
+  function wpUrl(p){ return wpBase()+"/c/"+encodeURIComponent(state.wpChannel)+"/"+p; }
+  function urlB64ToU8(s){
+    s=(s+"===".slice((s.length+3)%4)).replace(/-/g,"+").replace(/_/g,"/");
+    var raw=atob(s), out=new Uint8Array(raw.length);
+    for(var i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
+    return out;
+  }
+  // Subskrypcja tego urządzenia na serwerze push. Zwraca Promise<{ok,reason}>.
+  function wpSubscribe(){
+    if(!state.wpServer) return Promise.resolve({ok:false,reason:"server"});
+    if(!("serviceWorker" in navigator)||!("PushManager" in window)) return Promise.resolve({ok:false,reason:"sw"});
+    return navigator.serviceWorker.getRegistration().then(function(reg){
+      if(!reg) return {ok:false,reason:"sw"};
+      return fetch(wpBase()+"/vapid").then(function(r){ return r.json(); }).then(function(v){
+        if(!v||!v.publicKey) return {ok:false,reason:"net"};
+        return reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:urlB64ToU8(v.publicKey)})
+          .then(function(sub){
+            var payload=JSON.stringify({subscription:(sub.toJSON?sub.toJSON():sub)});
+            return fetch(wpUrl("subscribe"),{method:"POST",headers:{"Content-Type":"application/json"},body:payload})
+              .then(function(r){ return {ok:r.ok, reason:r.ok?"":"net"}; });
+          });
+      });
+    }).catch(function(){ return {ok:false,reason:"net"}; });
+  }
+  var wpSyncTimer=null;
+  function syncWebPushSchedule(){ clearTimeout(wpSyncTimer); wpSyncTimer=setTimeout(doWpSync, 800); }
+  function doWpSync(){
+    if(!wpReady()) return;
+    var plan=plannedNotifications().map(function(n){ return {key:n.key, at:n.at, title:n.title, body:n.body}; });
+    fetch(wpUrl("schedule"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plan:plan})})
+      .catch(function(){});
+  }
+
+  /* Harmonogram: precyzyjne timery na najbliższe 48 h + synchronizacja z Service Workerem,
+     ntfy i własnym serwerem Web Push. Wywołanie anuluje WSZYSTKIE wcześniejsze timery
+     i planuje od nowa (używane po każdej edycji). */
   var notifTimers=[];
   function rescheduleNotifications(){
     notifTimers.forEach(clearTimeout); notifTimers=[];
@@ -4499,7 +4618,8 @@
       }, delay));
     });
     syncSWSchedule(plan);
-    syncNtfySchedule(); // ntfy działa niezależnie od zgody przeglądarki na Notification
+    syncNtfySchedule();     // ntfy działa niezależnie od zgody przeglądarki na Notification
+    syncWebPushSchedule();  // własny serwer push (pełny plan, zastępowany przy każdej zmianie)
   }
   // Przekazuje plan do Service Workera — gdy przeglądarka wspiera Notification Triggers,
   // powiadomienia wyświetli system nawet bez aktywnej karty aplikacji.
@@ -4603,8 +4723,9 @@
     fillTzSelects(); renderTileConfig(); syncSettingChips(); renderCurrencyGrid(); syncAppearanceControls();
     $("pinJournalEnabled").checked=state.pinJournalEnabled;
     $("pinCalendarEnabled").checked=state.pinCalendarEnabled;
+    if($("pinBudgetEnabled")) $("pinBudgetEnabled").checked=state.pinBudgetEnabled;
     if($("pushNotifChk")) $("pushNotifChk").checked=state.pushEnabled;
-    syncNtfyUI();
+    syncNtfyUI(); syncWpUI();
     $("settingsOverlay").classList.add("active");
   }
   $("gearBtn").addEventListener("click", openSettings);
@@ -4689,6 +4810,54 @@
     }
     refreshNotifBanner(); rescheduleNotifications();
   });
+  // Web Push przez własny serwer: konfiguracja
+  function syncWpUI(){
+    if(!$("wpEnabledChk")) return;
+    $("wpEnabledChk").checked=state.wpEnabled;
+    $("wpConfig").style.display=state.wpEnabled?"block":"none";
+    $("wpServerInput").value=state.wpServer;
+  }
+  function wpStatus(msg){
+    var el=$("wpStatus"); if(!el) return;
+    el.textContent=msg; el.style.display=msg?"block":"none";
+  }
+  function wpConnectFlow(){
+    if(!state.wpServer){ alert(t("wp_need_server")); return; }
+    if(!state.wpChannel){ state.wpChannel="fa-"+uid()+Math.random().toString(36).slice(2,10); persistSettings(); }
+    var doSub=function(){
+      wpSubscribe().then(function(res){
+        if(res.ok){ wpStatus(t("wp_sub_ok")); doWpSync(); }
+        else if(res.reason==="sw") alert(t("wp_need_sw"));
+        else alert(t("wp_sub_fail"));
+      });
+    };
+    if("Notification" in window && Notification.permission==="default"){
+      Notification.requestPermission().then(function(p){ refreshNotifBanner(); if(p==="granted") doSub(); else alert(t("wp_sub_fail")); });
+    } else if("Notification" in window && Notification.permission==="denied"){ alert(t("notif_denied")); }
+    else doSub();
+  }
+  if($("wpEnabledChk")) $("wpEnabledChk").addEventListener("change", function(){
+    state.wpEnabled=this.checked; persistSettings(); syncWpUI();
+    if(state.wpEnabled){ if(state.wpServer) wpConnectFlow(); }
+    else if(state.wpServer&&state.wpChannel){
+      // wyłączenie: wyślij pusty plan (anuluje wszystko zaplanowane na serwerze)
+      fetch(wpUrl("schedule"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plan:[]})}).catch(function(){});
+      wpStatus("");
+    }
+  });
+  if($("wpServerInput")) $("wpServerInput").addEventListener("change", function(){
+    var v=this.value.trim();
+    if(v&&!/^https?:\/\//i.test(v)) v="https://"+v;
+    state.wpServer=v.replace(/\/+$/,""); this.value=state.wpServer; persistSettings();
+  });
+  if($("wpConnectBtn")) $("wpConnectBtn").addEventListener("click", wpConnectFlow);
+  if($("wpTestBtn")) $("wpTestBtn").addEventListener("click", function(){
+    if(!state.wpServer||!state.wpChannel){ alert(t("wp_test_fail")); return; }
+    fetch(wpUrl("test"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:t("ntfy_test_msg")})})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(j){ alert(j&&j.delivered>0?t("wp_test_sent"):t("wp_test_fail")); })
+      .catch(function(){ alert(t("wp_test_fail")); });
+  });
   // ntfy: konfiguracja dostarczania w tle
   function syncNtfyUI(){
     if(!$("ntfyEnabledChk")) return;
@@ -4725,15 +4894,17 @@
   $("tzSecondEnabled").addEventListener("change", function(){ state.tzSecondEnabled=$("tzSecondEnabled").checked; persistSettings(); tickClock(); });
 
   $("savePinBtn").addEventListener("click", function(){
-    var je=$("pinJournalEnabled").checked, ce=$("pinCalendarEnabled").checked;
-    var jp=$("pinJournalInput").value.trim(), cp=$("pinCalendarInput").value.trim();
+    var je=$("pinJournalEnabled").checked, ce=$("pinCalendarEnabled").checked, be=$("pinBudgetEnabled").checked;
+    var jp=$("pinJournalInput").value.trim(), cp=$("pinCalendarInput").value.trim(), bp=$("pinBudgetInput").value.trim();
     if(je && jp){ if(!/^\d{4}$/.test(jp)){ alert(t("fill_pin")); return; } state.pinJournalHash=hashPin(jp); }
     if(ce && cp){ if(!/^\d{4}$/.test(cp)){ alert(t("fill_pin")); return; } state.pinCalendarHash=hashPin(cp); }
-    state.pinJournalEnabled=je; state.pinCalendarEnabled=ce;
+    if(be && bp){ if(!/^\d{4}$/.test(bp)){ alert(t("fill_pin")); return; } state.pinBudgetHash=hashPin(bp); }
+    state.pinJournalEnabled=je; state.pinCalendarEnabled=ce; state.pinBudgetEnabled=be;
     if(!je) unlocked.journal=false;
     if(!ce) unlocked.calendar=false;
+    if(!be) unlocked.budget=false;
     persistSettings();
-    $("pinJournalInput").value=""; $("pinCalendarInput").value="";
+    $("pinJournalInput").value=""; $("pinCalendarInput").value=""; $("pinBudgetInput").value="";
     renderTiles();
     alert(t("saved"));
   });
@@ -4993,7 +5164,11 @@
   // Po powrocie do karty (np. odblokowanie telefonu) natychmiast nadrób zaległe i przelicz timery
   document.addEventListener("visibilitychange", function(){ if(!document.hidden){ checkUpcoming(); rescheduleNotifications(); } });
   // Ponowna synchronizacja planu po zarejestrowaniu Service Workera (rejestracja startuje przy "load")
-  window.addEventListener("load", function(){ setTimeout(rescheduleNotifications, 2500); });
+  window.addEventListener("load", function(){ setTimeout(function(){
+    rescheduleNotifications();
+    // Web Push: ciche odświeżenie subskrypcji tego urządzenia (subskrypcje push mogą rotować)
+    if(wpReady() && "Notification" in window && Notification.permission==="granted"){ wpSubscribe(); }
+  }, 2500); });
 
   /* ===== Welcome pop-up — first visit only (point 1) ===== */
   (function initWelcome(){
@@ -5065,6 +5240,14 @@
       "  }).catch(function(){});",
       "  if(event.waitUntil) event.waitUntil(run);",
       "});",
+      "/* Web Push z własnego serwera (Cloudflare Worker): wyświetl powiadomienie systemowe */",
+      "self.addEventListener('push',function(event){",
+      "  var data={};",
+      "  try{ data=event.data?event.data.json():{}; }catch(e){ data={body:(event.data&&event.data.text&&event.data.text())||''}; }",
+      "  event.waitUntil(self.registration.showNotification(data.title||'FutureApp',{",
+      "    body:data.body||'', tag:data.key||undefined, data:{futureapp:true}",
+      "  }));",
+      "});",
       "self.addEventListener('notificationclick',function(event){",
       "  event.notification.close();",
       "  event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(function(list){",
@@ -5073,13 +5256,16 @@
       "  }));",
       "});"
     ].join("\n");
-    var swBlob=new Blob([swSource],{type:"application/javascript"});
-    var swUrl=URL.createObjectURL(swBlob);
+    var swUrl=null;
+    try{
+      var swBlob=new Blob([swSource],{type:"application/javascript"});
+      swUrl=URL.createObjectURL(swBlob);
+    }catch(e){ /* środowisko bez Blob/createObjectURL — zostaje rejestracja sw.js */ }
     window.addEventListener("load", function(){
       // Najpierw plik sw.js obok index.html (pełne wsparcie tła na hostingu),
       // w razie braku — rejestracja inline (blob) jako fallback.
       navigator.serviceWorker.register("sw.js").catch(function(){
-        return navigator.serviceWorker.register(swUrl);
+        if(swUrl) return navigator.serviceWorker.register(swUrl);
       }).catch(function(){});
     });
   }
