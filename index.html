@@ -1634,22 +1634,8 @@
         <div style="font-size:0.68rem;color:var(--text-dim);margin-top:8px;line-height:1.5;" data-i18n="notif_note">
           Powiadomienia o wydarzeniach i zadaniach działają po udzieleniu zgody w przeglądarce. Aby otrzymywać je również w tle na telefonie, dodaj aplikację do ekranu głównego.
         </div>
-        <!-- Web Push przez własny serwer (Cloudflare Worker) — powiadomienia systemowe
-             bezpośrednio z tej aplikacji (PWA), bez żadnej dodatkowej aplikacji -->
-        <div class="toggle-line" style="margin-top:14px;">
-          <span data-i18n="wp_toggle">Web Push — własny serwer (bez ntfy)</span>
-          <input type="checkbox" id="wpEnabledChk" style="width:18px;height:18px;accent-color:var(--accent);">
-        </div>
-        <div id="wpConfig" style="display:none;">
-          <label for="wpServerInput" data-i18n="wp_server">Adres serwera push (Cloudflare Worker)</label>
-          <input type="text" id="wpServerInput" placeholder="https://futureapp-push.nazwa.workers.dev" autocapitalize="none" autocorrect="off" spellcheck="false">
-          <button class="btn-ghost" id="wpConnectBtn" style="margin-top:10px;" data-i18n="wp_connect">Połącz to urządzenie</button>
-          <button class="btn-ghost" id="wpTestBtn" style="margin-top:10px;margin-left:8px;" data-i18n="wp_test">Wyślij test</button>
-          <div id="wpStatus" style="font-size:0.74rem;font-family:var(--font-mono);color:var(--accent);margin-top:8px;display:none;"></div>
-          <div style="font-size:0.68rem;color:var(--text-dim);margin-top:8px;line-height:1.5;" data-i18n="wp_note">
-            Powiadomienia systemowe bezpośrednio z tej aplikacji — bez aplikacji ntfy. Wymaga: aplikacji hostowanej na HTTPS (np. GitHub Pages) razem z plikiem sw.js oraz wdrożonego darmowego Cloudflare Workera (instrukcja w pliku INSTRUKCJA-POWIADOMIENIA.md). Na iPhone: iOS 16.4+, aplikacja dodana do ekranu głównego i otwierana z ikony.
-          </div>
-        </div>
+        <!-- Web Push (własny serwer) działa w pełni automatycznie — adres serwera jest
+             wbudowany w stronę (WP_DEFAULT_SERVER), steruje nim główny suwak powyżej. -->
         <!-- ntfy: dostarczanie w tle — działa przy zamkniętej aplikacji i zgaszonym ekranie -->
         <div class="toggle-line" style="margin-top:14px;">
           <span data-i18n="ntfy_toggle">Powiadomienia w tle (ntfy)</span>
@@ -2114,6 +2100,14 @@
   }
 
   /* ================= STATE / SETTINGS ================= */
+  /* --- KONFIGURACJA WBUDOWANA (Web Push) ---------------------------------------
+     Wklej poniżej adres swojego Cloudflare Workera, a powiadomienia Web Push
+     skonfigurują się AUTOMATYCZNIE dla każdego użytkownika strony — bez wchodzenia
+     w ustawienia: kanał generuje się sam, a urządzenie łączy się samo zaraz po
+     wyrażeniu zgody na powiadomienia (zgody wymaga system — jedno dotknięcie).
+     Przykład:  var WP_DEFAULT_SERVER="https://futureapp-push.twoja-nazwa.workers.dev"; */
+  var WP_DEFAULT_SERVER="https://futureapp-push.notnattybum.workers.dev";
+
   var DEFAULT_ORDER = ["todo","calendar","fitness","budget","journal","ebooks"];
   var DEFAULT_PAIRS = ["USDPLN","EURPLN","BTCUSD"];
   var settings = loadJSON("settings", {});
@@ -2143,8 +2137,9 @@
     ntfyTopic: settings.ntfyTopic || "",
     ntfyServer: settings.ntfyServer || "https://ntfy.sh",
     // --- Web Push przez własny serwer (Cloudflare Worker) — bez aplikacji ntfy ---
-    wpEnabled: !!settings.wpEnabled,
-    wpServer: settings.wpServer || "",
+    // W pełni automatyczne (bez opcji w ustawieniach): działa, gdy WP_DEFAULT_SERVER
+    // jest ustawiony i główny suwak "Powiadomienia PUSH" jest włączony.
+    wpServer: settings.wpServer || WP_DEFAULT_SERVER,
     wpChannel: settings.wpChannel || "",
     // --- rozbudowana personalizacja wyglądu ---
     colorMode: settings.colorMode || "dark",    // dark | light | system
@@ -2162,6 +2157,11 @@
   // ensure order integrity (in case of new tiles)
   DEFAULT_ORDER.forEach(function(id){ if(state.order.indexOf(id)===-1) state.order.push(id); });
   state.order = state.order.filter(function(id){ return DEFAULT_ORDER.indexOf(id)!==-1; });
+  // Web Push: automatyczna konfiguracja kanału, gdy adres serwera jest wbudowany w stronę
+  if(state.wpServer && !state.wpChannel){
+    state.wpChannel="fa-"+uid()+Math.random().toString(36).slice(2,10);
+    persistSettings();
+  }
 
   // Maps the legacy 3-step fontSize onto a concrete px value (backwards compatibility with older saved settings)
   function legacyFontPx(fs){ return fs==="small"?14.5:(fs==="large"?18:16); }
@@ -2176,7 +2176,7 @@
       tickerPairs:state.tickerPairs, tickerEnabled:state.tickerEnabled,
       fontSize:state.fontSize, density:state.density, timeFormat:state.timeFormat, pushEnabled:state.pushEnabled,
       ntfyEnabled:state.ntfyEnabled, ntfyTopic:state.ntfyTopic, ntfyServer:state.ntfyServer,
-      wpEnabled:state.wpEnabled, wpServer:state.wpServer, wpChannel:state.wpChannel,
+      wpServer:state.wpServer, wpChannel:state.wpChannel,
       colorMode:state.colorMode, pageBg:state.pageBg, settingsBg:state.settingsBg, fontFamily:state.fontFamily,
       fontPx:state.fontPx, radius:state.radius, customColors:state.customColors, tileGlow:state.tileGlow
     });
@@ -4433,7 +4433,7 @@
   }
   $("enableNotifBtn").addEventListener("click", function(){
     state.pushEnabled=true; persistSettings();
-    if("Notification" in window) Notification.requestPermission().then(function(){ refreshNotifBanner(); rescheduleNotifications(); });
+    if("Notification" in window) Notification.requestPermission().then(function(){ refreshNotifBanner(); rescheduleNotifications(); wpAutoConnect(); });
   });
   function sendNotification(title,body,tag){
     if(!canNotify()) return;
@@ -4566,7 +4566,7 @@
      Apple/Google — docierają przy ZAMKNIĘTEJ aplikacji i ZGASZONYM ekranie.
      Wysłanie nowego harmonogramu ZASTĘPUJE stary — edycja automatycznie anuluje
      wcześniej zaplanowane powiadomienia. Wymaga hostingu HTTPS z sw.js (patrz instrukcja). */
-  function wpReady(){ return state.wpEnabled && !!state.wpServer && !!state.wpChannel; }
+  function wpReady(){ return state.pushEnabled && !!state.wpServer && !!state.wpChannel; }
   function wpBase(){ return (state.wpServer||"").replace(/\/+$/,""); }
   function wpUrl(p){ return wpBase()+"/c/"+encodeURIComponent(state.wpChannel)+"/"+p; }
   function urlB64ToU8(s){
@@ -4592,10 +4592,25 @@
       });
     }).catch(function(){ return {ok:false,reason:"net"}; });
   }
-  var wpSyncTimer=null;
+  // Automatyczne połączenie urządzenia (bez klikania w ustawieniach) — wywoływane
+  // po każdym udzieleniu zgody na powiadomienia oraz przy starcie aplikacji.
+  function wpAutoConnect(){
+    if(wpReady() && "Notification" in window && Notification.permission==="granted"){
+      wpSubscribe().then(function(res){ if(res&&res.ok) doWpSync(); });
+    }
+  }
+  var wpSyncTimer=null, wpWasActive=false;
   function syncWebPushSchedule(){ clearTimeout(wpSyncTimer); wpSyncTimer=setTimeout(doWpSync, 800); }
   function doWpSync(){
-    if(!wpReady()) return;
+    if(!wpReady()){
+      // wyłączenie głównego suwaka: jednorazowo wyczyść plan na serwerze (anuluje wszystko)
+      if(wpWasActive && state.wpServer && state.wpChannel){
+        wpWasActive=false;
+        fetch(wpUrl("schedule"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plan:[]})}).catch(function(){});
+      }
+      return;
+    }
+    wpWasActive=true;
     var plan=plannedNotifications().map(function(n){ return {key:n.key, at:n.at, title:n.title, body:n.body}; });
     fetch(wpUrl("schedule"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plan:plan})})
       .catch(function(){});
@@ -4725,7 +4740,7 @@
     $("pinCalendarEnabled").checked=state.pinCalendarEnabled;
     if($("pinBudgetEnabled")) $("pinBudgetEnabled").checked=state.pinBudgetEnabled;
     if($("pushNotifChk")) $("pushNotifChk").checked=state.pushEnabled;
-    syncNtfyUI(); syncWpUI();
+    syncNtfyUI();
     $("settingsOverlay").classList.add("active");
   }
   $("gearBtn").addEventListener("click", openSettings);
@@ -4801,7 +4816,7 @@
       }
       state.pushEnabled=true; persistSettings();
       if(Notification.permission==="default"){
-        Notification.requestPermission().then(function(){ refreshNotifBanner(); rescheduleNotifications(); });
+        Notification.requestPermission().then(function(){ refreshNotifBanner(); rescheduleNotifications(); wpAutoConnect(); });
       } else if(Notification.permission==="denied"){
         alert(t("notif_denied"));
       }
@@ -4810,54 +4825,9 @@
     }
     refreshNotifBanner(); rescheduleNotifications();
   });
-  // Web Push przez własny serwer: konfiguracja
-  function syncWpUI(){
-    if(!$("wpEnabledChk")) return;
-    $("wpEnabledChk").checked=state.wpEnabled;
-    $("wpConfig").style.display=state.wpEnabled?"block":"none";
-    $("wpServerInput").value=state.wpServer;
-  }
-  function wpStatus(msg){
-    var el=$("wpStatus"); if(!el) return;
-    el.textContent=msg; el.style.display=msg?"block":"none";
-  }
-  function wpConnectFlow(){
-    if(!state.wpServer){ alert(t("wp_need_server")); return; }
-    if(!state.wpChannel){ state.wpChannel="fa-"+uid()+Math.random().toString(36).slice(2,10); persistSettings(); }
-    var doSub=function(){
-      wpSubscribe().then(function(res){
-        if(res.ok){ wpStatus(t("wp_sub_ok")); doWpSync(); }
-        else if(res.reason==="sw") alert(t("wp_need_sw"));
-        else alert(t("wp_sub_fail"));
-      });
-    };
-    if("Notification" in window && Notification.permission==="default"){
-      Notification.requestPermission().then(function(p){ refreshNotifBanner(); if(p==="granted") doSub(); else alert(t("wp_sub_fail")); });
-    } else if("Notification" in window && Notification.permission==="denied"){ alert(t("notif_denied")); }
-    else doSub();
-  }
-  if($("wpEnabledChk")) $("wpEnabledChk").addEventListener("change", function(){
-    state.wpEnabled=this.checked; persistSettings(); syncWpUI();
-    if(state.wpEnabled){ if(state.wpServer) wpConnectFlow(); }
-    else if(state.wpServer&&state.wpChannel){
-      // wyłączenie: wyślij pusty plan (anuluje wszystko zaplanowane na serwerze)
-      fetch(wpUrl("schedule"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({plan:[]})}).catch(function(){});
-      wpStatus("");
-    }
-  });
-  if($("wpServerInput")) $("wpServerInput").addEventListener("change", function(){
-    var v=this.value.trim();
-    if(v&&!/^https?:\/\//i.test(v)) v="https://"+v;
-    state.wpServer=v.replace(/\/+$/,""); this.value=state.wpServer; persistSettings();
-  });
-  if($("wpConnectBtn")) $("wpConnectBtn").addEventListener("click", wpConnectFlow);
-  if($("wpTestBtn")) $("wpTestBtn").addEventListener("click", function(){
-    if(!state.wpServer||!state.wpChannel){ alert(t("wp_test_fail")); return; }
-    fetch(wpUrl("test"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:t("ntfy_test_msg")})})
-      .then(function(r){ return r.ok?r.json():null; })
-      .then(function(j){ alert(j&&j.delivered>0?t("wp_test_sent"):t("wp_test_fail")); })
-      .catch(function(){ alert(t("wp_test_fail")); });
-  });
+  // Web Push (własny serwer): w pełni automatyczny — bez opcji w ustawieniach.
+  // Adres serwera jest wbudowany (WP_DEFAULT_SERVER), a włączaniem/wyłączaniem
+  // steruje główny suwak "Włącz powiadomienia PUSH" (state.pushEnabled).
   // ntfy: konfiguracja dostarczania w tle
   function syncNtfyUI(){
     if(!$("ntfyEnabledChk")) return;
@@ -5154,7 +5124,7 @@
   refreshNotifBanner();
   // Zgoda przy pierwszym uruchomieniu funkcji powiadomień — powiadomienia działają tylko po jej udzieleniu
   if(state.pushEnabled && "Notification" in window && Notification.permission==="default"){
-    try{ Notification.requestPermission().then(function(){ refreshNotifBanner(); rescheduleNotifications(); }); }catch(e){}
+    try{ Notification.requestPermission().then(function(){ refreshNotifBanner(); rescheduleNotifications(); wpAutoConnect(); }); }catch(e){}
   }
   checkUpcoming();
   rescheduleNotifications();
@@ -5166,8 +5136,8 @@
   // Ponowna synchronizacja planu po zarejestrowaniu Service Workera (rejestracja startuje przy "load")
   window.addEventListener("load", function(){ setTimeout(function(){
     rescheduleNotifications();
-    // Web Push: ciche odświeżenie subskrypcji tego urządzenia (subskrypcje push mogą rotować)
-    if(wpReady() && "Notification" in window && Notification.permission==="granted"){ wpSubscribe(); }
+    // Web Push: automatyczne połączenie / ciche odświeżenie subskrypcji tego urządzenia
+    wpAutoConnect();
   }, 2500); });
 
   /* ===== Welcome pop-up — first visit only (point 1) ===== */
