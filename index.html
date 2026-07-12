@@ -82,6 +82,14 @@
     color:var(--accent);text-shadow:var(--glow);animation:flicker 6s infinite;white-space:nowrap;
   }
   .site-name span{color:var(--accent2);text-shadow:var(--glow2);}
+  /* Streak (dni z rzędu): na desktopie POD nazwą strony, na telefonie (≤600px) OBOK niej */
+  .brand{display:flex;flex-direction:column;gap:3px;}
+  .streak{
+    display:flex;align-items:center;gap:5px;white-space:nowrap;
+    font-family:var(--font-mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:0.04em;
+  }
+  .streak .st-fire{font-size:0.9rem;line-height:1;}
+  .streak b{color:var(--accent);font-weight:700;font-size:0.82rem;text-shadow:var(--glow);}
   .ticker{
     display:flex;gap:10px;flex-wrap:wrap;font-family:var(--font-mono);font-size:0.72rem;
   }
@@ -704,6 +712,8 @@
   @media (max-width:600px){
     header.topbar{padding:12px 12px 4px;gap:10px;}
     .site-name{font-size:1.15rem;}
+    /* na telefonie licznik dni z rzędu obok nazwy strony */
+    .brand{flex-direction:row;align-items:baseline;gap:9px;}
     /* horizontally scrollable ticker, thumb-friendly */
     .ticker{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%;padding-bottom:4px;order:3;}
     .tick{min-width:104px;flex:0 0 auto;padding:8px 11px;}
@@ -777,7 +787,13 @@
 <body>
 
 <header class="topbar">
-  <div class="site-name">FUTURE<span>APP</span></div>
+  <div class="brand">
+    <div class="site-name">FUTURE<span>APP</span></div>
+    <!-- Licznik dni z rzędu (streak): wartość liczona w JS ze stanu `streak.days` -->
+    <div class="streak" id="streakBadge">
+      <span class="st-fire" aria-hidden="true">🔥</span><b id="streakDays">0</b><span id="streakUnit">dni</span>
+    </div>
+  </div>
   <div class="ticker" id="ticker"></div>
   <div class="header-info">
     <span class="hi-label" id="hiLabel">Cytat dnia</span>
@@ -1763,6 +1779,7 @@
   var I18N = {
     pl:{
       clock_title:"Zegar i data", upcoming_title:"Nadchodzące wydarzenie",
+      streak_day:"dzień", streak_days:"dni", streak_title:"Dni z rzędu z aplikacją",
       notif_prompt:"Włącz powiadomienia, aby nie przegapić deadline'ów i wydarzeń.", notif_enable:"Włącz powiadomienia",
       back:"Wstecz",
       tile_todo:"Do zrobienia", tile_todo_sub:"Zadania i deadline'y",
@@ -1936,6 +1953,7 @@
     },
     en:{
       clock_title:"Clock & date", upcoming_title:"Upcoming event",
+      streak_day:"day", streak_days:"days", streak_title:"Consecutive days with the app",
       notif_prompt:"Enable notifications so you don't miss deadlines and events.", notif_enable:"Enable notifications",
       back:"Back",
       tile_todo:"To-do", tile_todo_sub:"Tasks & deadlines",
@@ -4096,6 +4114,30 @@
     $("dailyAddInput").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); $("dailyAddBtn").click(); } });
   })();
 
+  /* ================= STREAK (dni z rzędu, nagłówek) =================
+     Zlicza kolejne dni, w których użytkownik otworzył aplikację.
+     Doba liczona wg strefy głównego zegara (jak zadania dzienne).
+     Jeśli ostatnia wizyta była wczoraj — streak rośnie o 1,
+     jeśli dziś — bez zmian, w każdym innym wypadku zaczyna od 1. */
+  var streak=loadJSON("streak",{last:"",days:0}); // {last:"YYYY-MM-DD", days:liczba}
+  function updateStreak(){
+    var today=isoDateInZone(state.tzPrimary);
+    if(streak.last!==today){
+      streak.days=(streak.last===shiftISO(today,-1)) ? num(streak.days)+1 : 1;
+      streak.last=today;
+      saveJSON("streak",streak);
+    }
+    renderStreak();
+  }
+  function renderStreak(){
+    var elDays=$("streakDays"), elUnit=$("streakUnit"), badge=$("streakBadge");
+    if(!elDays) return;
+    var streakDays=num(streak.days);
+    elDays.textContent=streakDays;
+    if(elUnit) elUnit.textContent=t(streakDays===1?"streak_day":"streak_days");
+    if(badge) badge.title=t("streak_title");
+  }
+
   /* ================= CLOCK ================= */
   function timeInZone(tz){
     try{
@@ -5126,7 +5168,7 @@
     renderMealDay(); renderMealHistory(); renderJournal(); renderEbooks();
     renderUpcomingBig(); renderHeaderInfo(); tickClock();
     refreshExerciseDatalist(); refreshFoodList(); renderRecent();
-    renderDaily(); renderBudget(); renderExerciseDb();
+    renderDaily(); renderBudget(); renderExerciseDb(); renderStreak();
     renderTicker(); renderCurrencyGrid();
     renderRuns(); renderCombats();
   }
@@ -5140,6 +5182,8 @@
   var _rd=$("runDate"); if(_rd) _rd.value=todayISO();
   var _cd=$("cbtDate"); if(_cd) _cd.value=todayISO();
   addExerciseBlock();
+  updateStreak();
+  setInterval(updateStreak, 60000); // odśwież streak po przejściu przez północ (otwarta karta)
   renderAll();
   fetchRates();
   setInterval(fetchRates, 60000);
