@@ -477,6 +477,9 @@
   .set-section{border-top:1px solid var(--border-soft);padding:14px 0;}
   .set-section:first-of-type{border-top:none;padding-top:0;}
   .set-section h4{font-family:var(--font-mono);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent2);margin:0 0 10px;}
+  /* Sub-section heading inside a merged settings accordion */
+  .set-subhead{font-family:var(--font-mono);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent2);margin:18px 0 10px;padding-top:14px;border-top:1px solid var(--border-soft);}
+  .set-subhead.first{margin-top:2px;padding-top:0;border-top:none;}
   .theme-opts{display:flex;gap:8px;flex-wrap:wrap;}
   .theme-chip{border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:0.78rem;color:var(--text-dim);background:transparent;}
   .theme-chip.active{border-color:var(--accent);color:var(--accent);box-shadow:var(--glow);}
@@ -1247,6 +1250,19 @@
           </div>
           <button class="btn-ghost" id="setGoalBtn" style="margin-top:14px;" data-i18n="set_as_goal">Ustaw jako dzienny cel kalorii</button>
         </div>
+
+        <div class="db-section" id="calcManual">
+          <h4 data-i18n="calc_manual_title">Ręczna edycja celów</h4>
+          <div class="mini-label" data-i18n="calc_manual_hint">Wpisz własne dzienne cele — bez używania kalkulatora.</div>
+          <label for="goalKcal" data-i18n="kcal">Kalorie (kcal)</label>
+          <input type="number" id="goalKcal" min="0" step="1" placeholder="np. 2500">
+          <div class="row">
+            <div><label for="goalProtein" data-i18n="protein">Białko (g)</label><input type="number" id="goalProtein" min="0" step="0.1"></div>
+            <div><label for="goalCarbs" data-i18n="carbs">Węglow. (g)</label><input type="number" id="goalCarbs" min="0" step="0.1"></div>
+            <div><label for="goalFat" data-i18n="fat">Tłuszcze (g)</label><input type="number" id="goalFat" min="0" step="0.1"></div>
+          </div>
+          <button class="btn-primary" id="setManualGoalBtn" data-i18n="save_manual_goal">Zapisz własne cele</button>
+        </div>
         <div class="calc-note" data-i18n="calc_formula_note">Obliczenia wg wzoru Mifflina-St Jeora (BMR × współczynnik aktywności). Wyniki są orientacyjne i nie zastępują porady dietetyka.</div>
       </div>
     </div>
@@ -1474,20 +1490,17 @@
     </div>
 
     <div class="set-section">
-      <button class="acc-head" data-acc="set_themes" data-acc-open aria-controls="accThemes">
-        <h4 data-i18n="acc_themes">Motywy</h4><span class="db-arrow" aria-hidden="true">&#9660;</span>
+      <button class="acc-head" data-acc="set_appearance" data-acc-open aria-controls="accAppearance">
+        <h4 data-i18n="acc_appearance">Motyw, kolory i język</h4><span class="db-arrow" aria-hidden="true">&#9660;</span>
       </button>
-      <div class="db-collapse" id="accThemes">
+      <div class="db-collapse" id="accAppearance">
+        <!-- Motyw / tło -->
+        <div class="set-subhead first" data-i18n="acc_themes">Motywy</div>
         <div class="mini-label" data-i18n="set_colormode">Tryb</div>
         <div class="theme-opts" id="colorModeOpts">
           <button class="theme-chip" data-cm-opt="dark" data-i18n="cm_dark">Ciemny</button>
           <button class="theme-chip" data-cm-opt="light" data-i18n="cm_light">Jasny</button>
           <button class="theme-chip" data-cm-opt="system" data-i18n="cm_system">Systemowy</button>
-        </div>
-        <div class="mini-label" style="margin-top:12px;" data-i18n="set_theme">Wygląd strony</div>
-        <div class="theme-opts" id="themeOpts">
-          <button class="theme-chip" data-theme-opt="cyber" data-i18n="theme_cyber">Cyberpunk</button>
-          <button class="theme-chip" data-theme-opt="synth" data-i18n="theme_synth">Synthwave</button>
         </div>
         <div class="mini-label" style="margin-top:12px;" data-i18n="set_bg">Tło strony</div>
         <div class="theme-opts" id="pageBgOpts">
@@ -1500,27 +1513,17 @@
           <button class="theme-chip" data-sbg-opt="blur" data-i18n="sbg_blur">Rozmyte</button>
           <button class="theme-chip" data-sbg-opt="solid" data-i18n="sbg_solid">Statyczny kolor</button>
         </div>
-      </div>
-    </div>
 
-    <div class="set-section">
-      <button class="acc-head" data-acc="set_colors" aria-controls="accColors">
-        <h4 data-i18n="acc_colors">Kolory</h4><span class="db-arrow" aria-hidden="true">&#9660;</span>
-      </button>
-      <div class="db-collapse" id="accColors">
+        <!-- Kolory -->
+        <div class="set-subhead" data-i18n="acc_colors">Kolory</div>
         <div class="color-row"><span data-i18n="col_accent">Kolor akcentu</span><input type="color" id="colAccent" data-col="accent"></div>
         <div class="color-row"><span data-i18n="col_bg">Kolor tła</span><input type="color" id="colBg" data-col="bg"></div>
         <div class="color-row"><span data-i18n="col_text">Kolor tekstu</span><input type="color" id="colText" data-col="text"></div>
         <div class="color-row"><span data-i18n="col_panel">Kolor kart/paneli</span><input type="color" id="colPanel" data-col="panel"></div>
         <button class="btn-ghost" id="colorResetBtn" style="margin-top:6px;" data-i18n="col_reset">Przywróć kolory motywu</button>
-      </div>
-    </div>
 
-    <div class="set-section">
-      <button class="acc-head" data-acc="set_typo" aria-controls="accTypo">
-        <h4 data-i18n="acc_typo">Typografia</h4><span class="db-arrow" aria-hidden="true">&#9660;</span>
-      </button>
-      <div class="db-collapse" id="accTypo">
+        <!-- Typografia -->
+        <div class="set-subhead" data-i18n="acc_typo">Typografia</div>
         <label for="fontFamilySel" data-i18n="set_font">Czcionka</label>
         <select id="fontFamilySel">
           <option value="default" data-i18n="font_default">Domyślna (motyw)</option>
@@ -1534,14 +1537,9 @@
           <input type="range" id="fontSizeRange" min="13" max="20" step="0.5">
           <span class="slider-val" id="fontSizeVal"></span>
         </div>
-      </div>
-    </div>
 
-    <div class="set-section">
-      <button class="acc-head" data-acc="set_layout" aria-controls="accLayout">
-        <h4 data-i18n="acc_layout">Układ</h4><span class="db-arrow" aria-hidden="true">&#9660;</span>
-      </button>
-      <div class="db-collapse" id="accLayout">
+        <!-- Układ -->
+        <div class="set-subhead" data-i18n="acc_layout">Układ</div>
         <div class="mini-label" data-i18n="set_density">Gęstość układu</div>
         <div class="theme-opts" id="densityOpts">
           <button class="theme-chip" data-den-opt="compact" data-i18n="den_compact">Kompaktowy</button>
@@ -1553,56 +1551,9 @@
           <input type="range" id="radiusRange" min="0" max="24" step="1">
           <span class="slider-val" id="radiusVal"></span>
         </div>
-      </div>
-    </div>
 
-    <div class="set-section">
-      <button class="acc-head" data-acc="set_tiles" data-acc-open aria-controls="accTiles">
-        <h4 data-i18n="set_tiles">Kafelki: kolejność, widoczność i kolor</h4><span class="db-arrow" aria-hidden="true">&#9660;</span>
-      </button>
-      <div class="db-collapse" id="accTiles">
-        <div class="color-row">
-          <span data-i18n="tile_color">Kolor podświetlenia kafelków</span>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <input type="color" id="tileGlowColor" class="tile-col" title="">
-            <button class="or-colreset" id="tileGlowReset" title="" data-i18n-title="tile_color_reset">&#8634;</button>
-          </div>
-        </div>
-        <div id="tileConfigList"></div>
-      </div>
-    </div>
-
-    <div class="set-section">
-      <button class="acc-head" data-acc="set_currency" data-acc-open aria-controls="accCurrency">
-        <h4 data-i18n="set_currency">Personalizacja kursów walut</h4><span class="db-arrow" aria-hidden="true">&#9660;</span>
-      </button>
-      <div class="db-collapse" id="accCurrency">
-        <div class="toggle-line" style="margin-bottom:10px;">
-          <span data-i18n="ticker_enable">Pokazuj widget kursów walut</span>
-          <input type="checkbox" id="tickerEnabledChk" style="width:18px;height:18px;accent-color:var(--accent);">
-        </div>
-        <div class="currency-grid" id="currencyGrid"></div>
-        <div class="cur-note" data-i18n="currency_note">Zaznacz maksymalnie 5 par. Wybór pojawi się w pasku w nagłówku.</div>
-      </div>
-    </div>
-
-    <div class="set-section">
-      <button class="acc-head" data-acc="set_timefmt" data-acc-open aria-controls="accTimefmt">
-        <h4 data-i18n="set_timefmt">Format godziny</h4><span class="db-arrow" aria-hidden="true">&#9660;</span>
-      </button>
-      <div class="db-collapse" id="accTimefmt">
-        <div class="theme-opts" id="timeFmtOpts">
-          <button class="theme-chip" data-tf-opt="24" data-i18n="tf_24">24-godzinny</button>
-          <button class="theme-chip" data-tf-opt="12" data-i18n="tf_12">12-godzinny</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="set-section">
-      <button class="acc-head" data-acc="set_lang" data-acc-open aria-controls="accLang">
-        <h4 data-i18n="set_lang">Język strony</h4><span class="db-arrow" aria-hidden="true">&#9660;</span>
-      </button>
-      <div class="db-collapse" id="accLang">
+        <!-- Język -->
+        <div class="set-subhead" data-i18n="set_lang">Język strony</div>
         <div class="lang-opts" id="langOpts">
           <button class="theme-chip" data-lang-opt="pl">Polski</button>
           <button class="theme-chip" data-lang-opt="en">English</button>
@@ -1611,10 +1562,39 @@
     </div>
 
     <div class="set-section">
-      <button class="acc-head" data-acc="set_clock" data-acc-open aria-controls="accClock">
-        <h4 data-i18n="set_clock">Strefa czasowa zegara</h4><span class="db-arrow" aria-hidden="true">&#9660;</span>
+      <button class="acc-head" data-acc="set_widgets" data-acc-open aria-controls="accWidgets">
+        <h4 data-i18n="acc_widgets">Kafelki, waluty i zegar</h4><span class="db-arrow" aria-hidden="true">&#9660;</span>
       </button>
-      <div class="db-collapse" id="accClock">
+      <div class="db-collapse" id="accWidgets">
+        <!-- Kafelki -->
+        <div class="set-subhead first" data-i18n="set_tiles">Kafelki: kolejność, widoczność i kolor</div>
+        <div class="color-row">
+          <span data-i18n="tile_color">Kolor podświetlenia kafelków</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="color" id="tileGlowColor" class="tile-col" title="">
+            <button class="or-colreset" id="tileGlowReset" title="" data-i18n-title="tile_color_reset">&#8634;</button>
+          </div>
+        </div>
+        <div id="tileConfigList"></div>
+
+        <!-- Kursy walut -->
+        <div class="set-subhead" data-i18n="set_currency">Personalizacja kursów walut</div>
+        <div class="toggle-line" style="margin-bottom:10px;">
+          <span data-i18n="ticker_enable">Pokazuj widget kursów walut</span>
+          <input type="checkbox" id="tickerEnabledChk" style="width:18px;height:18px;accent-color:var(--accent);">
+        </div>
+        <div class="currency-grid" id="currencyGrid"></div>
+        <div class="cur-note" data-i18n="currency_note">Zaznacz maksymalnie 5 par. Wybór pojawi się w pasku w nagłówku.</div>
+
+        <!-- Format godziny -->
+        <div class="set-subhead" data-i18n="set_timefmt">Format godziny</div>
+        <div class="theme-opts" id="timeFmtOpts">
+          <button class="theme-chip" data-tf-opt="24" data-i18n="tf_24">24-godzinny</button>
+          <button class="theme-chip" data-tf-opt="12" data-i18n="tf_12">12-godzinny</button>
+        </div>
+
+        <!-- Strefa czasowa zegara -->
+        <div class="set-subhead" data-i18n="set_clock">Strefa czasowa zegara</div>
         <label data-i18n="tz_primary">Strefa główna</label>
         <select id="tzPrimary"></select>
         <div class="toggle-line" style="margin-top:12px;">
@@ -1622,14 +1602,9 @@
           <input type="checkbox" id="tzSecondEnabled" style="width:18px;height:18px;accent-color:var(--accent);">
         </div>
         <select id="tzSecondary"></select>
-      </div>
-    </div>
 
-    <div class="set-section">
-      <button class="acc-head" data-acc="set_header" data-acc-open aria-controls="accHeader">
-        <h4 data-i18n="set_header">Pole informacyjne (nagłówek)</h4><span class="db-arrow" aria-hidden="true">&#9660;</span>
-      </button>
-      <div class="db-collapse" id="accHeader">
+        <!-- Pole informacyjne -->
+        <div class="set-subhead" data-i18n="set_header">Pole informacyjne (nagłówek)</div>
         <div class="header-mode-opts" id="headerModeOpts">
           <button class="theme-chip" data-header-opt="quote" data-i18n="header_quote">Cytat z NT</button>
           <button class="theme-chip" data-header-opt="fact" data-i18n="header_fact">Ciekawostka</button>
@@ -1823,6 +1798,7 @@
       tz_primary:"Strefa główna", tz_second_enable:"Drugi zegar",
       set_header:"Pole informacyjne (nagłówek)", header_quote:"Cytat z NT", header_fact:"Ciekawostka", header_motiv:"Cytat motywacyjny",
       acc_themes:"Motywy", acc_colors:"Kolory", acc_typo:"Typografia", acc_layout:"Układ",
+      acc_appearance:"Motyw, kolory i język", acc_widgets:"Kafelki, waluty i zegar",
       set_colormode:"Tryb", cm_dark:"Ciemny", cm_light:"Jasny", cm_system:"Systemowy",
       set_bg:"Tło strony", bg_default:"Domyślne", bg_gradient:"Gradient", bg_pattern:"Wzór",
       set_settingsbg:"Tło panelu ustawień", sbg_blur:"Rozmyte", sbg_solid:"Statyczny kolor",
@@ -1861,7 +1837,7 @@
       tab_calc:"Zapotrzebowanie", today:"Dziś",
       tpl_title:"Szablony", tpl_save:"\uD83D\uDCBE Zapisz jako szablon",
       tpl_empty:"Brak szablonów. Wypełnij trening poniżej i kliknij \u201EZapisz jako szablon\u201D.",
-      tpl_name_q:"Nazwa szablonu:", tpl_load:"Wczytaj", tpl_del_q:"Usunąć ten szablon?",
+      tpl_name_q:"Nazwa szablonu:", tpl_name_default:"Nazwa szablonu", tpl_load:"Wczytaj", tpl_del_q:"Usunąć ten szablon?",
       tpl_need_ex:"Najpierw wpisz poniżej nazwę przynajmniej jednego ćwiczenia.",
       wk_repeat:"Powtórz trening",
       from_base:"Z bazy produktów", manual_entry:"Ręcznie", food_search:"Wybierz produkt",
@@ -1875,6 +1851,7 @@
       act_moderate:"Umiarkowany (3–5 treningów/tydz.)", act_active:"Aktywny (6–7 treningów/tydz.)",
       act_very:"Bardzo aktywny (praca fiz. / 2× dziennie)", calc_run:"Oblicz zapotrzebowanie",
       kcal_day:"kcal / dzień", set_as_goal:"Ustaw jako dzienny cel kalorii",
+      calc_manual_title:"Ręczna edycja celów", calc_manual_hint:"Wpisz własne dzienne cele — bez używania kalkulatora.", save_manual_goal:"Zapisz własne cele",
       calc_formula_note:"Obliczenia wg wzoru Mifflina-St Jeora (BMR × współczynnik aktywności). Wyniki są orientacyjne i nie zastępują porady dietetyka.",
       fill_calc:"Uzupełnij wiek, wzrost i wagę.", goal_set_done:"Ustawiono dzienny cel kalorii.",
       bmr_label:"BMR (spoczynkowe)", tdee_label:"TDEE (utrzymanie)",
@@ -1997,6 +1974,7 @@
       tz_primary:"Primary zone", tz_second_enable:"Second clock",
       set_header:"Header info box", header_quote:"NT quote", header_fact:"Fun fact", header_motiv:"Motivational quote",
       acc_themes:"Themes", acc_colors:"Colors", acc_typo:"Typography", acc_layout:"Layout",
+      acc_appearance:"Theme, colors & language", acc_widgets:"Tiles, currency & clock",
       set_colormode:"Mode", cm_dark:"Dark", cm_light:"Light", cm_system:"System",
       set_bg:"Page background", bg_default:"Default", bg_gradient:"Gradient", bg_pattern:"Pattern",
       set_settingsbg:"Settings panel backdrop", sbg_blur:"Blurred", sbg_solid:"Solid color",
@@ -2035,7 +2013,7 @@
       tab_calc:"Needs", today:"Today",
       tpl_title:"Templates", tpl_save:"\uD83D\uDCBE Save as template",
       tpl_empty:"No templates yet. Fill in a workout below and tap \u201CSave as template\u201D.",
-      tpl_name_q:"Template name:", tpl_load:"Load", tpl_del_q:"Delete this template?",
+      tpl_name_q:"Template name:", tpl_name_default:"Template name", tpl_load:"Load", tpl_del_q:"Delete this template?",
       tpl_need_ex:"First enter the name of at least one exercise below.",
       wk_repeat:"Repeat workout",
       from_base:"From food base", manual_entry:"Manual", food_search:"Choose product",
@@ -2049,6 +2027,7 @@
       act_moderate:"Moderate (3–5 workouts/week)", act_active:"Active (6–7 workouts/week)",
       act_very:"Very active (physical job / 2×/day)", calc_run:"Calculate needs",
       kcal_day:"kcal / day", set_as_goal:"Set as daily calorie goal",
+      calc_manual_title:"Manual target editing", calc_manual_hint:"Enter your own daily targets — without using the calculator.", save_manual_goal:"Save custom targets",
       calc_formula_note:"Calculated with the Mifflin-St Jeor equation (BMR × activity factor). Results are estimates and don't replace a dietitian's advice.",
       fill_calc:"Fill in age, height and weight.", goal_set_done:"Daily calorie goal set.",
       bmr_label:"BMR (resting)", tdee_label:"TDEE (maintenance)",
@@ -2261,6 +2240,15 @@
       root.style.removeProperty("--glow2");
     }
   }
+  // Font colour follows the active mode automatically: white text in dark mode,
+  // dark text in light mode. Overrides any saved custom "col_text" so the text
+  // always matches the current theme. Call on every theme/mode switch.
+  var AUTO_TEXT_DARK="#ffffff", AUTO_TEXT_LIGHT="#1a2230";
+  function syncTextColorToMode(){
+    state.customColors = state.customColors || {};
+    state.customColors.text = (resolveTheme()==="light") ? AUTO_TEXT_LIGHT : AUTO_TEXT_DARK;
+    applyCustomColors();
+  }
   var FONT_STACKS={
     "default":"", // empty => inherit theme's --font-sans (handled by not overriding)
     "system":"-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif",
@@ -2289,7 +2277,7 @@
   }
   // React to OS theme changes live when in "system" mode.
   try{
-    var _mqHandler=function(){ if(state.colorMode==="system"){ applyTheme(); } };
+    var _mqHandler=function(){ if(state.colorMode==="system"){ applyTheme(); syncTextColorToMode(); persistSettings(); if(typeof syncAppearanceControls==="function") syncAppearanceControls(); } };
     if(prefersDark.addEventListener) prefersDark.addEventListener("change",_mqHandler);
     else if(prefersDark.addListener) prefersDark.addListener(_mqHandler); // older browsers
   }catch(e){ /* matchMedia not supported — ignore */ }
@@ -3041,10 +3029,11 @@
   $("saveTplBtn").addEventListener("click", function(){
     var exercises=collectExercises(true);
     if(exercises.length===0){ alert(t("tpl_need_ex")); return; }
-    var suggested=exercises.map(function(ex){return ex.name;}).slice(0,3).join(" + ");
-    var name=prompt(t("tpl_name_q"), suggested);
+    // Static pre-filled name (no longer derived from the first exercises).
+    var defaultName=t("tpl_name_default");
+    var name=prompt(t("tpl_name_q"), defaultName);
     if(name===null) return;
-    name=name.trim(); if(!name) name=suggested;
+    name=name.trim(); if(!name) name=defaultName;
     wkTemplates.push({id:uid(), name:name, ts:Date.now(), exercises:exercises});
     saveWkTemplates(); renderTemplates();
     // upewnij się, że sekcja Szablony jest rozwinięta, żeby nowy wpis był od razu widoczny
@@ -3560,8 +3549,29 @@
       // Persist full daily requirement (kcal + macros) so the calorie tiles can show it.
       saveJSON("calorieTargets", {kcal:lastCalcTarget, p:lastCalcP, c:lastCalcC, f:lastCalcF});
       localStorage.setItem("calorieGoal", lastCalcTarget); // backward compatibility
-      renderMealDay(); alert(t("goal_set_done"));
+      renderMealDay(); fillManualGoalInputs(); alert(t("goal_set_done"));
     }
+  });
+
+  // Prefill the manual-target inputs from the currently stored daily requirement.
+  function fillManualGoalInputs(){
+    var tg=calorieTargets();
+    if($("goalKcal"))    $("goalKcal").value    = (tg&&tg.kcal>0) ? Math.round(tg.kcal) : "";
+    if($("goalProtein")) $("goalProtein").value = (tg&&tg.p>0)    ? tg.p : "";
+    if($("goalCarbs"))   $("goalCarbs").value   = (tg&&tg.c>0)    ? tg.c : "";
+    if($("goalFat"))     $("goalFat").value     = (tg&&tg.f>0)    ? tg.f : "";
+  }
+  fillManualGoalInputs();
+  // Manually save custom daily kcal + macro targets (same storage as the calculator's "set as goal").
+  if($("setManualGoalBtn")) $("setManualGoalBtn").addEventListener("click", function(){
+    var kcal=num($("goalKcal").value);
+    if(kcal<=0){ alert(t("fill_calc")); return; }
+    var p=$("goalProtein").value===""?0:num($("goalProtein").value);
+    var c=$("goalCarbs").value===""?0:num($("goalCarbs").value);
+    var f=$("goalFat").value===""?0:num($("goalFat").value);
+    saveJSON("calorieTargets", {kcal:kcal, p:p, c:c, f:f});
+    localStorage.setItem("calorieGoal", kcal); // backward compatibility
+    renderMealDay(); fillManualGoalInputs(); alert(t("goal_set_done"));
   });
 
   /* ================= TRENING: nawigacja podmodułów ================= */
@@ -4760,7 +4770,6 @@
     }
   }
   function syncSettingChips(){
-    document.querySelectorAll("[data-theme-opt]").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-theme-opt")===state.theme); });
     document.querySelectorAll("[data-lang-opt]").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-lang-opt")===state.lang); });
     document.querySelectorAll("[data-header-opt]").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-header-opt")===state.headerMode); });
     document.querySelectorAll("[data-den-opt]").forEach(function(b){ b.classList.toggle("active", b.getAttribute("data-den-opt")===state.density); });
@@ -4812,16 +4821,14 @@
   $("gearBtn").addEventListener("click", openSettings);
   document.querySelector("[data-close-settings]").addEventListener("click", function(){ $("settingsOverlay").classList.remove("active"); });
 
-  document.querySelectorAll("[data-theme-opt]").forEach(function(b){
-    b.addEventListener("click", function(){
-      state.theme=b.getAttribute("data-theme-opt");
-      // Choosing a specific dark theme implies dark/system rendering; keep colorMode unless it's forcing light.
-      if(state.colorMode==="light") state.colorMode="dark";
-      applyTheme(); persistSettings(); syncSettingChips(); syncAppearanceControls();
-    });
-  });
   document.querySelectorAll("[data-cm-opt]").forEach(function(b){
-    b.addEventListener("click", function(){ state.colorMode=b.getAttribute("data-cm-opt"); applyTheme(); persistSettings(); syncSettingChips(); syncAppearanceControls(); });
+    b.addEventListener("click", function(){
+      state.colorMode=b.getAttribute("data-cm-opt");
+      applyTheme();
+      // Font colour automatically follows the mode (overrides any saved custom text colour).
+      syncTextColorToMode();
+      persistSettings(); syncSettingChips(); syncAppearanceControls();
+    });
   });
   document.querySelectorAll("[data-bg-opt]").forEach(function(b){
     b.addEventListener("click", function(){ state.pageBg=b.getAttribute("data-bg-opt"); applyAppearance(); persistSettings(); syncSettingChips(); });
