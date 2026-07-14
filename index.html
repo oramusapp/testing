@@ -953,6 +953,86 @@
   html[data-theme="aurora"] select,html[data-theme="aurora"] .seg-btn,
   html[data-theme="aurora"] .db-tab{transition:all 0.18s ease;}
   html[data-theme="aurora"] .view.active{animation:viewIn 0.22s ease;}
+
+  /* ============================================================
+     MOTYW: nordic  (minimalistyczny · jasny · spokojny)
+     Pełne przeciwieństwo cyberpunku — zero neonów, glow i scanline.
+     • Cała kolorystyka sterowana zmiennymi (reszta UI ubiera się sama).
+     • Efekty retro (flicker, scan, text-shadow-neon) jawnie wyłączone.
+     • Monospace wyłącznie dla liczb (zegar, statystyki, kwoty, kursy).
+     • Nie wymaga żadnych zmian w JavaScript.
+     ============================================================ */
+  html[data-theme="nordic"]{
+    color-scheme: light;                 /* natywne kontrolki (date/time, scrollbar) w trybie jasnym */
+    --radius: 14px;                      /* większe, miękkie zaokrąglenia */
+
+    /* ---- Paleta ---- */
+    --bg:       #f7f8fa;
+    --bg-panel: #ffffff;
+    --bg-input: #eef1f5;
+    --accent:   #2f6df6;                 /* stonowany niebieski */
+    --accent2:  #7c3aed;
+    --danger:   #dc2626;                 /* wymagane: :root nie ma domyślnego --danger */
+    --text:     #1b2430;
+    --text-dim: #6b7684;
+    --border:      rgba(20,30,50,0.12);  /* cienkie, delikatne obramowania */
+    --border-soft: rgba(20,30,50,0.06);
+
+    /* ---- Efekty: zero neonu ---- */
+    /* glow → miękki, subtelny cień (jako box-shadow na panelach wygląda spokojnie); scan wyłączony */
+    --glow:  0 1px 2px rgba(20,30,50,0.06), 0 8px 24px rgba(20,30,50,0.06);
+    --glow2: 0 1px 2px rgba(20,30,50,0.06), 0 8px 24px rgba(20,30,50,0.06);
+    --scan:  transparent;
+
+    /* ---- Typografia ---- */
+    /* Interfejs w całości bezszeryfowy. --font-mono celowo wskazuje na sans,
+       co jednym ruchem neutralizuje ~90 miejsc używających monospace.
+       Realny krój o stałej szerokości (--font-num) przywracamy niżej — tylko liczbom. */
+    --font-sans: system-ui, -apple-system, sans-serif;
+    --font-mono: system-ui, -apple-system, sans-serif;
+    --font-num:  ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  /* ---- Wyłączenie animacji i neonu nazwy aplikacji (flicker + text-shadow) ---- */
+  html[data-theme="nordic"] .site-name{ animation: none; text-shadow: none; letter-spacing: 0.01em; }
+  html[data-theme="nordic"] .site-name span{ text-shadow: none; }
+
+  /* ---- Całkowite usunięcie nakładki scanline (kasuje też animację scan) ---- */
+  html[data-theme="nordic"] body::before{ content: none; }
+
+  /* ---- Zdjęcie neonu z tekstu (miękki cień pod drobnym tekstem byłby rozmyty) ---- */
+  html[data-theme="nordic"] .streak b,
+  html[data-theme="nordic"] .cbt-count,
+  html[data-theme="nordic"] .cbt-timer.rest .cbt-count,
+  html[data-theme="nordic"] .stat.kcal .st-num,
+  html[data-theme="nordic"] .calc-hero-num,
+  html[data-theme="nordic"] .bud-summary .bs-final .bf-val{ text-shadow: none; }
+
+  /* ---- Monospace TYLKO dla liczb: zegar, statystyki, timery, kwoty, kursy ---- */
+  html[data-theme="nordic"] .clock-main,
+  html[data-theme="nordic"] .clock-second .cs-time,
+  html[data-theme="nordic"] .tick .tk-val,
+  html[data-theme="nordic"] .stat .st-num,
+  html[data-theme="nordic"] .calc-hero-num,
+  html[data-theme="nordic"] .wk-timer-val,
+  html[data-theme="nordic"] .cbt-count,
+  html[data-theme="nordic"] .bud-line .bl-amt,
+  html[data-theme="nordic"] .bud-summary .bs-final .bf-val,
+  html[data-theme="nordic"] .hist-summary .bs-final .bf-val,
+  html[data-theme="nordic"] .piggy-amounts,
+  html[data-theme="nordic"] .piggy-pct,
+  html[data-theme="nordic"] .meal-kcal,
+  html[data-theme="nordic"] .slider-val,
+  html[data-theme="nordic"] .reader-page{
+    font-family: var(--font-num);
+    font-variant-numeric: tabular-nums;  /* równa szerokość cyfr — ładne wyrównanie liczb */
+  }
+
+  /* ---- „Oddech": więcej whitespace'u, zgodnie z minimalistycznym charakterem ---- */
+  html[data-theme="nordic"] .card{ padding: 22px; }
+  html[data-theme="nordic"] .subcard{ padding: 20px 22px; }
+  html[data-theme="nordic"] .tile{ min-height: 124px; padding: 22px 18px; }
+  html[data-theme="nordic"] .tile-grid{ gap: 16px; }
 </style>
 </head>
 <body>
