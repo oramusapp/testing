@@ -1,5 +1,14 @@
 export const CHANGELOG = [
   {
+    v: '1.3.0', date: '2026-10-04',
+    items: [
+      'RSPS przeliczony na danych Binance (35 tokenów bez memów, w tym SOL, AVAX, NEAR, SUI)',
+      'Codzienny przegląd po zamknięciu 00:00 UTC, siła względem BTC jako średnia z 30/60/90 dni',
+      'Bramka szerokości z histerezą: wejście ≥ 70%, wyjście < 60%',
+      'Logo i nazwa w nagłówku, stopka © @thenotoriousg'
+    ]
+  },
+  {
     v: '1.2.0', date: '2026-10-04',
     items: [
       'Stały podział SDCA 60% / RSPS 40% (najwyższy Sharpe w backteście, lepszy Calmar przy remisie)',

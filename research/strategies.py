@@ -44,7 +44,12 @@ def btc_trend_adf_lev(ctx, lev=2.0):
     return W_single(ctx, 'btc', w)
 
 def rs_scores(ctx, d, lookback):
-    """Relative strength vs BTC, volatility-adjusted (VAMS on the BTC ratio)."""
+    """Relative strength vs BTC, volatility-adjusted (VAMS on the BTC ratio).
+    lookback may be a tuple: the score is then the average over those lookbacks (ensemble)."""
+    if isinstance(lookback, (tuple, list)):
+        parts = [rs_scores(ctx, d, L) for L in lookback]
+        keys = set.intersection(*[set(p) for p in parts]) if all(parts) else set()
+        return {k: float(np.mean([p[k] for p in parts])) for k in keys}
     P = ctx.P
     i = ctx.idx.get_loc(d)
     if i < lookback + 1:
@@ -74,12 +79,14 @@ def breadth(ctx, d, sma=50):
             vals.append(ratio.iloc[-1] > ratio.iloc[:-1].mean())
     return np.mean(vals) if vals else np.nan
 
-def rsps(ctx, lookback=30, top=3, cap=0.5, conf=0.0, every=7, fallback='trend', short_k=0, short_gross=0.0):
+def rsps(ctx, lookback=30, top=3, cap=0.5, conf=0.0, every=7, fallback='trend', short_k=0, short_gross=0.0, buffer=0, sticky=False, exit_conf=None):
     """Relative-strength rotation among point-in-time large caps.
     Active only when breadth ≥ conf; picks must also be in their own uptrend (ensemble ≥ 0.5).
     Weights ∝ score / vol, capped; unfilled weight goes to BTC scaled by BTC trend (fallback).
     Optional short sleeve: when BTC trend ensemble ≤ 0.25, short the k weakest alts in downtrend."""
     reb = {}
+    held, prev_w, prev_key = [], None, None
+    active = False
     for d in sorted(weekly_dates(ctx.idx, every)):
         bt = ctx.trend['btc'].get(d, np.nan)
         if not np.isfinite(bt):
@@ -88,9 +95,18 @@ def rsps(ctx, lookback=30, top=3, cap=0.5, conf=0.0, every=7, fallback='trend', 
         sc = rs_scores(ctx, d, lookback)
         br = breadth(ctx, d)
         btc_w = bt if fallback == 'trend' else 1.0
-        if sc and np.isfinite(br) and br >= conf and bt >= 0.5:
-            picks = [a for a, s in sorted(sc.items(), key=lambda x: -x[1])
-                     if s > 0 and ctx.trend[a].get(d, 0) >= 0.5][:top]
+        if exit_conf is None:
+            active = np.isfinite(br) and br >= conf
+        else:   # hysteresis: enter at conf, leave only below exit_conf
+            active = np.isfinite(br) and (br >= exit_conf if active else br >= conf)
+        if sc and active and bt >= 0.5:
+            ranked = [a for a, s in sorted(sc.items(), key=lambda x: -x[1]) if s > 0 and ctx.trend[a].get(d, 0) >= 0.5]
+            if buffer:
+                # rank buffer: keep a held name while it stays within top+buffer, fill the rest by rank
+                keep = [a for a in held if a in ranked[:top + buffer]][:top]
+                picks = keep + [a for a in ranked if a not in keep][:top - len(keep)]
+            else:
+                picks = ranked[:top]
             if picks:
                 raw = [sc[a] / ctx.vol[a][d] for a in picks]
                 cw = cap_weights(raw, cap)
@@ -105,6 +121,12 @@ def rsps(ctx, lookback=30, top=3, cap=0.5, conf=0.0, every=7, fallback='trend', 
                       if s < 0 and ctx.trend[a].get(d, 1) <= 0.25][:short_k]
             for a in losers:
                 w[a] = w.get(a, 0) - short_gross / len(losers)
+        key = (tuple(sorted(a for a in w if a != 'btc')), round(w.get('btc', 0), 2))
+        if sticky and prev_key is not None and key[0] == prev_key[0] and abs(key[1] - prev_key[1]) < 0.25:
+            w = prev_w          # same holdings and similar BTC share: no re-weighting trade
+        else:
+            prev_w, prev_key = w, key
+        held = [a for a in w if a != 'btc' and w[a] > 0]
         reb[d] = w
     return hold_between(reb, ctx.idx, ctx.P.columns)
 

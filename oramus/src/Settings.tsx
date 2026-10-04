@@ -62,7 +62,7 @@ export default function Settings({ open, onClose }: { open: boolean; onClose: ()
       <Card className="tight">
         {CHANGELOG.map((c) => <div key={c.v} className="row" style={{ alignItems: 'flex-start' }}><div className="grow"><b>{c.v}</b> <span className="faint">· {c.date}</span><ul className="note-text" style={{ margin: '4px 0 0', paddingLeft: 18 }}>{c.items.map((i) => <li key={i}>{i}</li>)}</ul></div></div>)}
       </Card>
-      <div className="note-text center mt12">Oramus · narzędzie analityczne, nie porada inwestycyjna.</div>
+      <div className="note-text center mt12">Oramus · narzędzie analityczne, nie porada inwestycyjna.<br />© {new Date().getFullYear()} @thenotoriousg · Wszelkie prawa zastrzeżone</div>
     </Sheet>
   );
 }

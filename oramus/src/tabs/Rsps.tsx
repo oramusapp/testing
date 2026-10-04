@@ -11,20 +11,19 @@ import { pct, signed, usd } from '../lib/format';
 import type { LtpiState } from './Sdca';
 
 // Large-cap, non-meme candidates (Binance <SYMBOL>USDT). The scanner keeps the 10 most liquid.
-export const DEFAULT_TOKENS = ['ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'TRX', 'LINK', 'AVAX', 'DOT', 'LTC', 'BCH', 'XLM', 'ATOM', 'NEAR', 'UNI', 'AAVE', 'ETC', 'ICP'];
+export const DEFAULT_TOKENS = ['ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'TRX', 'LINK', 'AVAX', 'DOT', 'LTC', 'BCH', 'XLM', 'ATOM', 'NEAR', 'UNI', 'AAVE', 'ETC', 'ICP',
+  'FIL', 'POL', 'ALGO', 'XTZ', 'VET', 'HBAR', 'APT', 'SUI', 'TON', 'ARB', 'OP', 'INJ', 'MANA'];
 export const MEME = ['DOGE', 'SHIB', 'PEPE', 'WIF', 'BONK', 'FLOKI', 'TRUMP', 'MEME', 'BOME', 'POPCAT'];
 
-// Parameters chosen on 2020–2023 data and confirmed out of sample (research/run3.py, run4.py).
-export interface RspsSettings {
-  tokens: string[]; universeSize: number; lookback: number; topN: number; cap: number; breadthMin: number; capital: number;
-}
-export const RSPS_DEF: RspsSettings = {
-  tokens: DEFAULT_TOKENS, universeSize: 10, lookback: 90, topN: 3, cap: 50, breadthMin: 0.7, capital: 10000
-};
+// Parameters chosen on 2020–2023 data, tested out of sample 2024-01…2026-10 on Binance data (research/run9–13.py).
+export interface RspsSettings { tokens: string[]; universeSize: number; topN: number; cap: number; capital: number; }
+export const RSPS_DEF: RspsSettings = { tokens: DEFAULT_TOKENS, universeSize: 10, topN: 3, cap: 50, capital: 10000 };
+export const LOOKBACKS = [30, 60, 90];          // relative-strength ensemble
+export const BREADTH_ENTER = 0.7, BREADTH_EXIT = 0.6;   // gate hysteresis
 // Split with the highest Sharpe (1.52, tie 40/50%) and the better Calmar of the two (research/run8.py).
 export const SPLIT_SDCA = 60;
 interface ScanRow { sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; }
-interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; }
+interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; gateOpen: boolean; }
 interface LogEntry { time: number; regime: string; lev?: number; }
 
 const REGIMES = {
@@ -57,7 +56,7 @@ export default function Rsps() {
   const scanFresh = !!scan && scan.closeDate >= lastClosedDay();
   const breadth = scan?.breadth ?? NaN;
   const btcTrend = a?.trendEnsemble ?? scan?.btcTrend ?? 0;
-  const rspsActive = scanFresh && breadth >= s.breadthMin && btcTrend >= 0.5 && ltpi >= 0;
+  const rspsActive = scanFresh && !!scan?.gateOpen && btcTrend >= 0.5 && ltpi >= 0;
 
   const gate = leverageGate({
     trendEnsemble: a?.trendEnsemble ?? 0, adfTrending: !!a?.adfTrending, ltpi, sdcaRisk: a?.sdcaRisk ?? 100,
@@ -85,14 +84,14 @@ export default function Rsps() {
         try {
           const k = closed(await klines(sym + 'USDT', 400));
           const c = k.map((x) => x.c);
-          if (c.length < s.lookback + 60) throw new Error('za krótka historia');
+          if (c.length < 150) throw new Error('za krótka historia');
           const ratio = k.filter((x) => btcMap.has(x.t)).map((x) => x.c / btcMap.get(x.t)!);
           const r50 = ratio.slice(-51, -1).reduce((p, v) => p + v, 0) / 50;
           const vol = annVol(c, 30);
           rows.push({
-            sym, price: c.at(-1)!, ret: (c.at(-1)! / c[c.length - 1 - s.lookback] - 1) * 100, vol: vol * 100,
+            sym, price: c.at(-1)!, ret: (c.at(-1)! / c[c.length - 31] - 1) * 100, vol: vol * 100,
             liq: k.slice(-30).reduce((p, x) => p + (x.q ?? 0), 0) / 30, ratioUp: ratio.at(-1)! > r50, trend: trendOf(c),
-            score: vams(ratio, s.lookback, 30)
+            score: LOOKBACKS.map((L) => vams(ratio, L, 30)).reduce((p, v) => p + v, 0) / LOOKBACKS.length
           });
         } catch (e) { rows.push({ sym, price: NaN, ret: NaN, vol: NaN, liq: 0, ratioUp: false, trend: 0, score: NaN, error: (e as Error).message }); }
       }));
@@ -102,7 +101,10 @@ export default function Rsps() {
       const uni = ok.filter((r) => r.inUniverse);
       const br = uni.length ? uni.filter((r) => r.ratioUp).length / uni.length : NaN;
       rows.sort((x, y) => (y.inUniverse ? 1 : 0) - (x.inUniverse ? 1 : 0) || (y.score || -99) - (x.score || -99));
-      setScan({ time: Date.now(), closeDate: lastClosedDay(), rows, breadth: br, btcTrend: trendOf(btc.map((x) => x.c)) });
+      // hysteresis: open at ≥ 70%, stay open until breadth falls below 60%
+      const wasOpen = !!scan?.gateOpen;
+      const gateOpen = Number.isFinite(br) && (wasOpen ? br >= BREADTH_EXIT : br >= BREADTH_ENTER);
+      setScan({ time: Date.now(), closeDate: lastClosedDay(), rows, breadth: br, btcTrend: trendOf(btc.map((x) => x.c)), gateOpen });
       if (!silent) toast('Skan zakończony');
     } catch (e) {
       if (!silent) toast('Brak połączenia z Binance: ' + (e as Error).message);
@@ -148,7 +150,7 @@ export default function Rsps() {
         </div>
         <div className="hr" />
         <div className="stat-grid">
-          <div className="stat"><div className="k">Szerokość rynku</div><div className="v">{Number.isFinite(breadth) ? pct(breadth * 100, 0) : '—'}<span className="dim" style={{ fontSize: 13 }}> / {pct(s.breadthMin * 100, 0)}</span></div><div className="s">{scanFresh ? `skan ${scan?.closeDate}` : 'skan nieaktualny'}</div></div>
+          <div className="stat"><div className="k">Szerokość rynku</div><div className="v">{Number.isFinite(breadth) ? pct(breadth * 100, 0) : '—'}<span className="dim" style={{ fontSize: 13 }}> {scan?.gateOpen ? '· otwarta' : '· zamknięta'}</span></div><div className="s">{scanFresh ? `wejście ≥ 70%, wyjście < 60%` : 'skan nieaktualny'}</div></div>
           <div className="stat" onClick={() => setLevOpen(true)} style={{ cursor: 'pointer' }}><div className="k">Propozycje</div><div className="v">{(gate.allowed ? 1 : 0) + (shortProposal ? 1 : 0)}</div><div className="s">dźwignia {gate.checks.filter((c) => c.ok).length}/{gate.checks.length} · short {shortProposal ? 'tak' : 'nie'}</div></div>
         </div>
       </Card>
@@ -196,7 +198,7 @@ export default function Rsps() {
           <>
             <div className="scroll-x">
               <table className="data">
-                <thead><tr><th style={{ paddingLeft: 16 }}>Token</th><th>Ratio</th><th>Siła</th><th>Trend</th><th>{s.lookback}d</th><th>Vol</th><th style={{ paddingRight: 16 }}>Waga</th></tr></thead>
+                <thead><tr><th style={{ paddingLeft: 16 }}>Token</th><th>Ratio</th><th>Siła</th><th>Trend</th><th>30d</th><th>Vol</th><th style={{ paddingRight: 16 }}>Waga</th></tr></thead>
                 <tbody>
                   {scan.rows.map((r) => {
                     const w = regime === 'rsps' ? picks.sel.find((x) => x.sym === r.sym)?.w : undefined;
@@ -213,16 +215,18 @@ export default function Rsps() {
                 </tbody>
               </table>
             </div>
-            <div className="note-text" style={{ padding: '10px 16px 14px' }}>Zamknięcie {scan.closeDate} UTC. Siła = momentum ratio do BTC z {s.lookback} dni / zmienność. Wybór: siła &gt; 0 i trend tokena ≥ 0,5; maks. {s.topN} pozycje, limit {s.cap}% na token. Wyszarzone = poza top {s.universeSize}.</div>
+            <div className="note-text" style={{ padding: '10px 16px 14px' }}>Zamknięcie {scan.closeDate} UTC. Siła = średnia z momentum ratio do BTC z 30/60/90 dni podzielonego przez zmienność. Przegląd codziennie po zamknięciu 00:00 UTC. Wybór: siła &gt; 0 i trend tokena ≥ 0,5; maks. {s.topN} pozycje, limit {s.cap}% na token. Wyszarzone = poza top {s.universeSize}.</div>
           </>
         )}
       </Card>
 
       <div className="section-title">Parametry</div>
       <Card className="tight">
-        <div className="row"><span>Próg szerokości</span><Seg value={String(s.breadthMin)} onChange={(v) => upd({ breadthMin: +v })} options={[{ v: '0.6', l: '60%' }, { v: '0.7', l: '70% ★' }, { v: '0.8', l: '80%' }]} /></div>
-        <div className="row"><span>Lookback siły</span><Seg value={String(s.lookback)} onChange={(v) => upd({ lookback: +v })} options={[{ v: '30', l: '30d' }, { v: '60', l: '60d' }, { v: '90', l: '90d ★' }]} /></div>
-        <div className="note-text" style={{ padding: '4px 16px 14px' }}>★ = wartości wybrane w backteście 2020–2023 i potwierdzone w teście 2024–2026.</div>
+        <Row label="Przegląd" value="codziennie, 00:00 UTC" />
+        <Row label="Siła względem BTC" value="średnia 30/60/90 dni" />
+        <Row label="Bramka szerokości" value="wejście ≥ 70%, wyjście < 60%" />
+        <Row label="Pozycje / limit" value={`maks. ${s.topN} · ${s.cap}% na token`} />
+        <div className="note-text" style={{ padding: '4px 16px 14px' }}>Wybrane na danych 2020–2023, sprawdzone poza próbą 01.2024–10.2026 (Binance, 35 tokenów bez memów). Strategia jest wrażliwa na koszty: przy dziennym przeglądzie używaj zleceń z niską prowizją (≤ 0,1%).</div>
       </Card>
 
       <div className="section-title">Historia reżimów</div>
@@ -241,7 +245,7 @@ export default function Rsps() {
       <Sheet open={info} onClose={() => setInfo(false)} title="Jak działa RSPS">
         <div className="note-text" style={{ fontSize: 14.5 }}>
           <p><b className="accent">Podział kapitału.</b> SDCA {SPLIT_SDCA}% (zakładka SDCA, krzywa bez zmian) + RSPS {100 - SPLIT_SDCA}%. Rebalans raz w roku. Dźwignia i shorty nie są częścią alokacji, pojawiają się tylko jako propozycje w sygnale.</p>
-          <p><b className="accent">RSPS.</b> Spośród {s.universeSize} najpłynniejszych dużych tokenów (bez memów) wybiera do {s.topN} najsilniejszych względem BTC (momentum ratio z {s.lookback} dni podzielone przez zmienność). Działa tylko gdy ≥ {Math.round(s.breadthMin * 100)}% tokenów ma ratio do BTC nad 50-dniową średnią, trend BTC ≥ 0,5 i LTPI ≥ 0. W przeciwnym razie część RSPS trzyma BTC proporcjonalnie do trendu.</p>
+          <p><b className="accent">RSPS.</b> Codziennie, spośród {s.universeSize} najpłynniejszych dużych tokenów (bez memów), wybiera do {s.topN} najsilniejszych względem BTC (średnia momentum ratio z 30/60/90 dni podzielona przez zmienność). Włącza się, gdy ≥ 70% tokenów ma ratio do BTC nad 50-dniową średnią, i wyłącza dopiero poniżej 60%; trend BTC ≥ 0,5 i LTPI ≥ 0. W przeciwnym razie część RSPS trzyma BTC proporcjonalnie do trendu.</p>
           <p><b className="accent">Piramida.</b> Siedem rodzajów analizy w kolejności ważności, wagi metodą ROC (Barron i Barrett 1996). Systematyzacja, on-chain, istotność statystyczna i sentyment aktualizują się automatycznie po zamknięciu świecy 00:00 UTC; ekonomia fundamentalna, makro i analiza techniczna są ręczne i ważne 7 dni.</p>
           <p><b className="accent">Aktualizacja.</b> iOS nie pozwala aplikacjom webowym działać w tle, więc przeliczenie następuje przy pierwszym otwarciu aplikacji po 00:00 UTC (albo automatycznie, jeśli jest wtedy otwarta).</p>
           <p className="faint">Wyniki z backtestu: research/ w repozytorium. Narzędzie analityczne, nie porada inwestycyjna.</p>

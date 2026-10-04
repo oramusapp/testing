@@ -20,3 +20,19 @@ python3 export.py # dane do raportu
 
 Okres projektowania: 2020-01-01–2023-12-31. Test poza próbą: 2024-01-01–2026-05-23.
 Koszt 0,15% za stronę transakcji. Uniwersum: 21 tokenów bez memów i stablecoinów z prawdziwą ceną w Coin Metrics.
+
+## Aktualizacja: dane Binance (35 tokenów bez memów), test poza próbą do 2026-10-03
+
+```bash
+python3 data_binance.py   # pobiera dzienne świece (tylko zamknięte) do cache
+python3 run9.py           # siatka RSPS: przegląd 1 vs 7 dni × lookback × bramka
+python3 run10.py          # ensemble lookbacków 30/60/90, koszty
+python3 run11.py          # bufor rankingu / brak przeważania
+python3 run12.py          # histereza bramki
+python3 run13.py          # podział SDCA/RSPS, shorty, bramka dźwigni
+```
+
+Top 10 wybierany wg 30-dniowego średniego wolumenu (Binance). Kapitalizacja z Coin Metrics okazała się
+nieprzydatna do rankingu (XRP, XLM, ICP liczone od całkowitej podaży; brak BNB).
+Wybrana konfiguracja (wg okresu 2020–2023): przegląd codzienny, siła = średnia VAMS ratio z 30/60/90 dni,
+bramka wejście ≥ 70% / wyjście < 60%, maks. 3 pozycje, limit 50%, podział SDCA 60 / RSPS 40.

@@ -12,6 +12,7 @@ export function Screen({ title, subtitle, actions, children, flush }: { title: s
   return (
     <div className={'screen' + (flush ? ' flush' : '')} ref={ref}>
       <div className={'topbar' + (scrolled ? ' scrolled' : '')}>
+        <div className="brand" aria-label="Oramus"><img src="icon-192.png" alt="" /><span>ORAMUS</span></div>
         <div className="small-title">{title}</div>
         <div className="actions">{actions}</div>
       </div>
@@ -20,9 +21,14 @@ export function Screen({ title, subtitle, actions, children, flush }: { title: s
         {subtitle && <div className="subtitle">{subtitle}</div>}
       </div>
       {children}
+      <Footer />
     </div>
   );
 }
+
+export const Footer = () => (
+  <footer className="copyright">© {new Date().getFullYear()} @thenotoriousg · Wszelkie prawa zastrzeżone</footer>
+);
 
 export const Card = ({ children, className = '', title }: { children: ReactNode; className?: string; title?: ReactNode }) => (
   <div className={'card ' + className}>{title && <div className="eyebrow">{title}</div>}{children}</div>

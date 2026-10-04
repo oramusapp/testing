@@ -1,0 +1,16 @@
+import { chromium, devices } from 'playwright-core';
+const out = process.argv[2];
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const ctx = await b.newContext({ ...devices['iPhone 14 Pro'], colorScheme: 'dark' });
+const p = await ctx.newPage();
+const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+await p.goto('http://localhost:4173/', { waitUntil: 'networkidle' });
+await p.waitForSelector('.hero', { timeout: 60000 });
+await p.click('.tabbar button:nth-child(2)'); await p.waitForTimeout(25000);
+await p.screenshot({ path: out + '/s1.png' });
+await p.evaluate(() => { const el = [...document.querySelectorAll('.section-title')].find(e => e.textContent.includes('Skaner')); const sc = el.closest('.screen'); sc.scrollTo(0, el.getBoundingClientRect().top + sc.scrollTop - 110); });
+await p.waitForTimeout(400); await p.screenshot({ path: out + '/s2.png' });
+await p.evaluate(() => { const sc = [...document.querySelectorAll('.screen')].find(s => s.getClientRects().length); sc.scrollTo(0, sc.scrollHeight); });
+await p.waitForTimeout(400); await p.screenshot({ path: out + '/s3.png' });
+console.log(errs);
+await b.close();
