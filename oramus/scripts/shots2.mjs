@@ -1,0 +1,20 @@
+import { chromium, devices } from 'playwright-core';
+const out = process.argv[2];
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const ctx = await b.newContext({ ...devices['iPhone 14 Pro'], colorScheme: 'dark' });
+const p = await ctx.newPage();
+await p.goto('http://localhost:4173/', { waitUntil: 'networkidle' });
+await p.waitForSelector('.hero', { timeout: 60000 });
+await p.waitForTimeout(1200);
+const show = async (sel, file, offset = 120) => {
+  await p.evaluate(([s, o]) => { const el = document.querySelector(s); const sc = el.closest('.screen'); sc.scrollTo(0, el.getBoundingClientRect().top + sc.scrollTop - o); }, [sel, offset]);
+  await p.waitForTimeout(500);
+  await p.screenshot({ path: out + '/' + file });
+};
+await p.click('.seg button:has-text("Composite Risk")');
+await show('.seg', '03-sdca-risk.png', 110);
+await p.click('.seg button:has-text("Accum/Dist")');
+await show('.curve-editor', '04-sdca-curve.png', 260);
+await p.click('.tabbar button:nth-child(2)'); await p.waitForTimeout(600);
+await show('.step-list', '07-rsps-inputs.png', 200);
+await b.close();

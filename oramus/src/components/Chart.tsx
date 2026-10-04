@@ -169,7 +169,7 @@ function short(v: number) {
 export function CurveEditor({ curve, onChange, current, yMax = 10 }: { curve: number[]; onChange: (c: number[]) => void; current?: number; yMax?: number }) {
   const ref = useRef<SVGSVGElement>(null);
   const drag = useRef<number | null>(null);
-  const W = 340, H = 220, l = 34, r = 8, t = 10, b = 22;
+  const W = 340, H = 220, l = 34, r = 16, t = 10, b = 22;
   const X = (i: number) => l + (i / 20) * (W - l - r);
   const Y = (v: number) => t + ((yMax - v) / (2 * yMax)) * (H - t - b);
   const fromY = (py: number) => Math.round((yMax - ((py - t) / (H - t - b)) * 2 * yMax) * 2) / 2;
