@@ -21,16 +21,16 @@ async function getJSON(url: string, timeout = 15000) {
 const BINANCE = ['https://api.binance.com', 'https://data-api.binance.vision'];
 
 /** Daily closes from Binance for `symbol` (e.g. BTCUSDT), oldest first. */
-export async function klines(symbol: string, days = 400, startTime?: number): Promise<{ t: number; c: number }[]> {
+export async function klines(symbol: string, days = 400, startTime?: number): Promise<{ t: number; c: number; q: number }[]> {
   let last: unknown;
   for (const host of BINANCE) {
     try {
-      const out: { t: number; c: number }[] = [];
+      const out: { t: number; c: number; q: number }[] = [];
       let from = startTime ?? Date.now() - days * DAY;
       for (let guard = 0; guard < 10; guard++) {
         const j = await getJSON(`${host}/api/v3/klines?symbol=${symbol}&interval=1d&limit=1000&startTime=${from}`);
         if (!Array.isArray(j) || !j.length) break;
-        for (const k of j) out.push({ t: k[0], c: parseFloat(k[4]) });
+        for (const k of j) out.push({ t: k[0], c: parseFloat(k[4]), q: parseFloat(k[7]) });
         if (j.length < 1000) break;
         from = j[j.length - 1][0] + DAY;
       }
@@ -83,7 +83,8 @@ export async function refreshBtcHistory(h: BtcHistory, onProgress?: (msg: string
   } catch { /* fall through */ }
   try {
     onProgress?.('Binance…');
-    const k = await klines('BTCUSDT', 0, Date.parse(lastDate()) + DAY);
+    // only fully closed daily candles (00:00 UTC close) — the running day is excluded
+    const k = (await klines('BTCUSDT', 0, Date.parse(lastDate()) + DAY)).filter((c) => c.t + DAY <= Date.now());
     for (const c of k) {
       const date = iso(c.t);
       if (date > lastDate()) rows.push([date, c.c, null]);
@@ -95,3 +96,16 @@ export async function refreshBtcHistory(h: BtcHistory, onProgress?: (msg: string
   if (sources.length) await set('btc', out, cacheStore);
   return out;
 }
+
+/** Crypto Fear & Greed index (alternative.me), 0 = extreme fear … 100 = extreme greed. */
+export async function fearGreed(): Promise<{ value: number; label: string; time: number } | null> {
+  try {
+    const j = await getJSON('https://api.alternative.me/fng/?limit=1');
+    const d = j?.data?.[0];
+    return d ? { value: +d.value, label: d.value_classification, time: +d.timestamp * 1000 } : null;
+  } catch { return null; }
+}
+
+/** Latest closed daily candle date (UTC) — the candle that closed at the last 00:00 UTC. */
+export const lastClosedDay = (now = Date.now()) => new Date(Math.floor(now / DAY) * DAY - DAY).toISOString().slice(0, 10);
+export const msToNextUtcClose = (now = Date.now()) => (Math.floor(now / DAY) + 1) * DAY - now;
