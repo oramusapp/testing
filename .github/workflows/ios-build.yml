@@ -1,0 +1,71 @@
+# Builds an UNSIGNED iOS .ipa of Oramus on a macOS runner and publishes it as a
+# GitHub Release asset. Install it with Sideloadly / AltStore (they sign it with your
+# Apple ID). The bundle id stays app.oramus.mobile, so installing a newer .ipa over
+# the old one keeps all data on the phone.
+name: iOS build (unsigned IPA)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+    branches: ['main', 'claude/serene-lovelace-p7xw3u']
+    paths: ['oramus/**', '.github/workflows/ios-build.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: oramus
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: oramus/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web bundle and sync into Xcode project
+        run: npm run build:ios
+
+      - name: Set version and build number
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          sed -i '' "s/MARKETING_VERSION = [^;]*;/MARKETING_VERSION = ${VERSION};/g" ios/App/App.xcodeproj/project.pbxproj
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [^;]*;/CURRENT_PROJECT_VERSION = ${GITHUB_RUN_NUMBER};/g" ios/App/App.xcodeproj/project.pbxproj
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+
+      - name: Build unsigned app
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -qry "Oramus-${VERSION}.ipa" Payload
+          ls -la *.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Oramus-${{ env.VERSION }}-ipa
+          path: oramus/Oramus-*.ipa
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios-v${{ env.VERSION }}-${{ github.run_number }}
+          name: Oramus ${{ env.VERSION }} (build ${{ github.run_number }})
+          body: |
+            Niepodpisany plik .ipa do instalacji przez Sideloadly lub AltStore.
+            Instalacja nowszej wersji na starszą zachowuje dane aplikacji (ten sam bundle id: app.oramus.mobile).
+          files: oramus/Oramus-*.ipa
