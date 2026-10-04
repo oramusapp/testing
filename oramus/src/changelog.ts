@@ -1,5 +1,13 @@
 export const CHANGELOG = [
   {
+    v: '1.2.0', date: '2026-10-04',
+    items: [
+      'Stały podział SDCA 60% / RSPS 40% (najwyższy Sharpe w backteście, lepszy Calmar przy remisie)',
+      'Dźwignia usunięta ze strategii: tylko propozycja w sygnale przy spełnieniu 10 warunków',
+      'Short altów jako propozycja zabezpieczenia przy pełnym trendzie spadkowym BTC'
+    ]
+  },
+  {
     v: '1.1.0', date: '2026-10-04',
     items: [
       'Piramida analizy: 7 filarów w kolejności ważności, wagi ROC (Barron i Barrett 1996)',

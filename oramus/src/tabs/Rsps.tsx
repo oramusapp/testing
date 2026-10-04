@@ -16,13 +16,13 @@ export const MEME = ['DOGE', 'SHIB', 'PEPE', 'WIF', 'BONK', 'FLOKI', 'TRUMP', 'M
 
 // Parameters chosen on 2020–2023 data and confirmed out of sample (research/run3.py, run4.py).
 export interface RspsSettings {
-  tokens: string[]; universeSize: number; lookback: number; topN: number; cap: number; breadthMin: number;
-  split: number; shorts: 'off' | '15' | '30'; capital: number; ltpiSource: 'auto' | 'sdca';
+  tokens: string[]; universeSize: number; lookback: number; topN: number; cap: number; breadthMin: number; capital: number;
 }
 export const RSPS_DEF: RspsSettings = {
-  tokens: DEFAULT_TOKENS, universeSize: 10, lookback: 90, topN: 3, cap: 50, breadthMin: 0.7,
-  split: 50, shorts: 'off', capital: 10000, ltpiSource: 'auto'
+  tokens: DEFAULT_TOKENS, universeSize: 10, lookback: 90, topN: 3, cap: 50, breadthMin: 0.7, capital: 10000
 };
+// Split with the highest Sharpe (1.52, tie 40/50%) and the better Calmar of the two (research/run8.py).
+export const SPLIT_SDCA = 60;
 interface ScanRow { sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; }
 interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; }
 interface LogEntry { time: number; regime: string; lev?: number; }
@@ -30,8 +30,7 @@ interface LogEntry { time: number; regime: string; lev?: number; }
 const REGIMES = {
   defense: { title: 'Ochrona kapitału', tone: 'red', icon: IcShield, desc: 'LTPI ujemne: sygnał wyjścia z SDCA. Bez RSPS, bez dźwigni.' },
   rsps: { title: 'RSPS aktywny', tone: 'accent', icon: IcLayers, desc: 'Szerokość rynku ≥ próg: część RSPS rotuje do najsilniejszych tokenów względem BTC.' },
-  btc: { title: 'BTC skalowany trendem', tone: 'dim', icon: IcShield, desc: 'RSPS nieaktywny: część RSPS trzyma BTC proporcjonalnie do siły trendu.' },
-  lev: { title: `BTC z dźwignią ${LEV_MAX}×`, tone: 'green', icon: IcBolt, desc: 'Spełnione są wszystkie ścisłe warunki dźwigni. Stan rzadki (ok. 1% dni w latach 2020–2026).' }
+  btc: { title: 'BTC skalowany trendem', tone: 'dim', icon: IcShield, desc: 'RSPS nieaktywny: część RSPS trzyma BTC proporcjonalnie do siły trendu.' }
 } as const;
 type RegimeId = keyof typeof REGIMES;
 
@@ -64,12 +63,12 @@ export default function Rsps() {
     trendEnsemble: a?.trendEnsemble ?? 0, adfTrending: !!a?.adfTrending, ltpi, sdcaRisk: a?.sdcaRisk ?? 100,
     volBelowMedian: !!a?.volBelowMedian, persistDays: a?.persistDays ?? 0, rspsActive, pyramid: pyr.comp, state: pyr.state
   });
-  const regime: RegimeId = ltpi < 0 ? 'defense' : rspsActive ? 'rsps' : gate.allowed ? 'lev' : 'btc';
+  const regime: RegimeId = ltpi < 0 ? 'defense' : rspsActive ? 'rsps' : 'btc';
   const R = REGIMES[regime];
 
   useEffect(() => {
     if (!a) return;
-    if (log[0]?.regime !== regime) setLog([{ time: Date.now(), regime, lev: gate.leverage }, ...log].slice(0, 200));
+    if (log[0]?.regime !== regime) setLog([{ time: Date.now(), regime }, ...log].slice(0, 200));
   }, [regime, a?.date]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // automatic scan after each daily close (when the app is open)
@@ -125,10 +124,9 @@ export default function Rsps() {
     const rest = 1 - picks.sel.reduce((x, p) => x + p.w, 0);
     if (rest > 0.001) sleeve.push({ sym: 'BTC', w: rest * btcTrend, note: 'reszta × trend BTC' });
   } else if (regime === 'btc') sleeve.push({ sym: 'BTC', w: btcTrend, note: `trend ${btcTrend.toFixed(2)}` });
-  else if (regime === 'lev') sleeve.push({ sym: 'BTC', w: 1, note: `ekspozycja ${LEV_MAX}×` });
-  const shortGross = s.shorts === 'off' ? 0 : +s.shorts / 100;
-  const shortOn = shortGross > 0 && btcTrend <= 0.25 && picks.shorts.length > 0;
-  const rspsCap = s.capital * (1 - s.split / 100), sdcaCap = s.capital * s.split / 100;
+  // short proposal: the backtested condition (BTC trend ensemble ≤ 0.25), weakest alts in their own downtrend
+  const shortProposal = btcTrend <= 0.25 && picks.shorts.length > 0 && scanFresh;
+  const rspsCap = s.capital * (1 - SPLIT_SDCA / 100), sdcaCap = s.capital * SPLIT_SDCA / 100;
 
   return (
     <Screen title="RSPS" subtitle="Inception SDCA ⊃ RSPS · piramida analizy · ścisła dźwignia"
@@ -151,18 +149,34 @@ export default function Rsps() {
         <div className="hr" />
         <div className="stat-grid">
           <div className="stat"><div className="k">Szerokość rynku</div><div className="v">{Number.isFinite(breadth) ? pct(breadth * 100, 0) : '—'}<span className="dim" style={{ fontSize: 13 }}> / {pct(s.breadthMin * 100, 0)}</span></div><div className="s">{scanFresh ? `skan ${scan?.closeDate}` : 'skan nieaktualny'}</div></div>
-          <div className="stat" onClick={() => setLevOpen(true)} style={{ cursor: 'pointer' }}><div className="k">Dźwignia</div><div className={'v ' + (gate.allowed ? 'green' : '')}>{gate.leverage.toFixed(1)}×</div><div className="s">{gate.checks.filter((c) => c.ok).length}/{gate.checks.length} warunków · szczegóły</div></div>
+          <div className="stat" onClick={() => setLevOpen(true)} style={{ cursor: 'pointer' }}><div className="k">Propozycje</div><div className="v">{(gate.allowed ? 1 : 0) + (shortProposal ? 1 : 0)}</div><div className="s">dźwignia {gate.checks.filter((c) => c.ok).length}/{gate.checks.length} · short {shortProposal ? 'tak' : 'nie'}</div></div>
         </div>
       </Card>
+
+      {(gate.allowed || shortProposal) && <div className="section-title">Propozycje w sygnale</div>}
+      {gate.allowed && (
+        <Card>
+          <div className="between"><b className="green">Dźwignia {LEV_MAX}× na BTC</b><span className="pill buy">propozycja</span></div>
+          <div className="note-text mt8">Spełnione wszystkie 10 ścisłych warunków. Dotyczy tylko części BTC; nie jest wliczona w alokację. W backteście 2020–2026 taki stan wystąpił w ok. 1% dni i nie zwiększył obsunięcia.</div>
+          <button className="btn small mt8" onClick={() => setLevOpen(true)}>Pokaż warunki</button>
+        </Card>
+      )}
+      {shortProposal && (
+        <Card>
+          <div className="between"><b className="red">Short altów jako zabezpieczenie</b><span className="pill sell">propozycja</span></div>
+          <div className="mt8"><b>{picks.shorts.map((r) => r.sym).join(', ')}</b> <span className="dim">· 15–30% części RSPS, kontrakty perpetual</span></div>
+          <div className="note-text mt8">Warunek: pełny trend spadkowy BTC (trend ≤ 0,25), tokeny najsłabsze względem BTC i we własnym trendzie spadkowym. W backteście zarabiał w latach bessy (+21,8 p.p. w 2022, +16,1 p.p. w 2025), tracił w odbiciach (−18,8 p.p. w 2020). Sam obniżał Sharpe; w portfelu z SDCA zmniejszał obsunięcie z −37% do −31%. Nie jest wliczony w alokację.</div>
+        </Card>
+      )}
 
       <PyramidCard p={pyr} />
 
       <div className="section-title">Alokacja</div>
       <Card>
         <div className="between mb12"><span className="dim">Kapitał całkowity</span><NumInput className="inline-input" value={s.capital} onChange={(v) => upd({ capital: v ?? 0 })} suffix="$" /></div>
-        <div className="mb12"><Seg value={String(s.split)} onChange={(v) => upd({ split: +v })} options={[{ v: '50', l: 'SDCA 50 / RSPS 50' }, { v: '70', l: 'SDCA 70 / RSPS 30' }]} /></div>
-        <Row className="compact" label={<b>SDCA ({s.split}%)</b>} value={<span>{usd(sdcaCap, 0)} <span className="dim">wg zakładki SDCA</span></span>} />
-        <Row className="compact" label={<b>RSPS ({100 - s.split}%)</b>} value={usd(rspsCap, 0)} />
+        <Row className="compact" label={<b>SDCA ({SPLIT_SDCA}%)</b>} value={<span>{usd(sdcaCap, 0)} <span className="dim">wg zakładki SDCA</span></span>} />
+        <Row className="compact" label={<b>RSPS ({100 - SPLIT_SDCA}%)</b>} value={usd(rspsCap, 0)} />
+        <div className="note-text mb12">Podział z najwyższym Sharpe w backteście 2020–2026 (1,52), rebalans raz w roku.</div>
         <div className="mt12" />
         {regime === 'defense' && <div className="note-text">LTPI ujemne: część RSPS w gotówce, bez nowych pozycji.</div>}
         {sleeve.map((x) => (
@@ -171,8 +185,7 @@ export default function Rsps() {
             <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 3, marginTop: 6 }}><div style={{ width: Math.min(100, x.w * 100) + '%', height: '100%', background: 'var(--accent)', borderRadius: 3 }} /></div>
           </div>
         ))}
-        {regime !== 'defense' && sleeve.reduce((p, x) => p + x.w, 0) < 0.999 && regime !== 'lev' && <div className="note-text">Reszta części RSPS w gotówce (stablecoin).</div>}
-        {shortOn && <div className="warn-box mt8" style={{ marginBottom: 0 }}>Short ({pct(shortGross * 100, 0)} części RSPS): {picks.shorts.map((r) => r.sym).join(', ')}. Wymaga kontraktów perpetual. Wyniki historyczne niespójne.</div>}
+        {regime !== 'defense' && sleeve.reduce((p, x) => p + x.w, 0) < 0.999 && <div className="note-text">Reszta części RSPS w gotówce (stablecoin).</div>}
       </Card>
 
       <div className="section-title">Skaner (top {s.universeSize} wg płynności, bez memów)</div>
@@ -207,8 +220,6 @@ export default function Rsps() {
 
       <div className="section-title">Parametry</div>
       <Card className="tight">
-        <div className="row"><div className="grow"><div>Shorty altów</div><div className="faint" style={{ fontSize: 12 }}>Tylko przy trendzie BTC ≤ 0,25. Domyślnie wyłączone (niespójne w testach).</div></div>
-          <Seg value={s.shorts} onChange={(v) => upd({ shorts: v })} options={[{ v: 'off', l: 'Wył.' }, { v: '15', l: '15%' }, { v: '30', l: '30%' }]} /></div>
         <div className="row"><span>Próg szerokości</span><Seg value={String(s.breadthMin)} onChange={(v) => upd({ breadthMin: +v })} options={[{ v: '0.6', l: '60%' }, { v: '0.7', l: '70% ★' }, { v: '0.8', l: '80%' }]} /></div>
         <div className="row"><span>Lookback siły</span><Seg value={String(s.lookback)} onChange={(v) => upd({ lookback: +v })} options={[{ v: '30', l: '30d' }, { v: '60', l: '60d' }, { v: '90', l: '90d ★' }]} /></div>
         <div className="note-text" style={{ padding: '4px 16px 14px' }}>★ = wartości wybrane w backteście 2020–2023 i potwierdzone w teście 2024–2026.</div>
@@ -220,8 +231,8 @@ export default function Rsps() {
         {log.slice(0, 20).map((l, i) => <Row key={i} label={REGIMES[l.regime as RegimeId]?.title ?? l.regime} value={<span className="dim">{new Date(l.time).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })}</span>} />)}
       </Card>
 
-      <Sheet open={levOpen} onClose={() => setLevOpen(false)} title="Ścisła bramka dźwigni">
-        <div className="note-text mb12">Dźwignia {LEV_MAX}× tylko na BTC i tylko gdy spełnione są wszystkie warunki naraz. W backteście 2020–2026 bramka była otwarta przez 24 dni (ok. 1%) i nie zwiększyła obsunięcia. W każdej innej sytuacji dźwignia jest wyłączona obowiązkowo.</div>
+      <Sheet open={levOpen} onClose={() => setLevOpen(false)} title="Propozycja dźwigni">
+        <div className="note-text mb12">Dźwignia nie jest częścią strategii. Propozycja {LEV_MAX}× na BTC pojawia się w sygnale tylko gdy spełnione są wszystkie warunki naraz (w backteście 2020–2026: 24 dni, ok. 1%). W każdej innej sytuacji brak propozycji.</div>
         <Card>
           <ol className="step-list">{gate.checks.map((c) => <li key={c.label} className={c.ok ? 'pass' : 'fail'}>{c.label}</li>)}</ol>
         </Card>
@@ -229,7 +240,7 @@ export default function Rsps() {
       <TokenSheet open={tokOpen} onClose={() => setTokOpen(false)} tokens={s.tokens} onChange={(t) => upd({ tokens: t })} />
       <Sheet open={info} onClose={() => setInfo(false)} title="Jak działa RSPS">
         <div className="note-text" style={{ fontSize: 14.5 }}>
-          <p><b className="accent">Podział kapitału.</b> SDCA {s.split}% (zakładka SDCA, krzywa bez zmian) + RSPS {100 - s.split}%. Rebalans między częściami raz w roku.</p>
+          <p><b className="accent">Podział kapitału.</b> SDCA {SPLIT_SDCA}% (zakładka SDCA, krzywa bez zmian) + RSPS {100 - SPLIT_SDCA}%. Rebalans raz w roku. Dźwignia i shorty nie są częścią alokacji, pojawiają się tylko jako propozycje w sygnale.</p>
           <p><b className="accent">RSPS.</b> Spośród {s.universeSize} najpłynniejszych dużych tokenów (bez memów) wybiera do {s.topN} najsilniejszych względem BTC (momentum ratio z {s.lookback} dni podzielone przez zmienność). Działa tylko gdy ≥ {Math.round(s.breadthMin * 100)}% tokenów ma ratio do BTC nad 50-dniową średnią, trend BTC ≥ 0,5 i LTPI ≥ 0. W przeciwnym razie część RSPS trzyma BTC proporcjonalnie do trendu.</p>
           <p><b className="accent">Piramida.</b> Siedem rodzajów analizy w kolejności ważności, wagi metodą ROC (Barron i Barrett 1996). Systematyzacja, on-chain, istotność statystyczna i sentyment aktualizują się automatycznie po zamknięciu świecy 00:00 UTC; ekonomia fundamentalna, makro i analiza techniczna są ręczne i ważne 7 dni.</p>
           <p><b className="accent">Aktualizacja.</b> iOS nie pozwala aplikacjom webowym działać w tle, więc przeliczenie następuje przy pierwszym otwarciu aplikacji po 00:00 UTC (albo automatycznie, jeśli jest wtedy otwarta).</p>
