@@ -1,0 +1,14 @@
+{
+  "appId": "app.oramus.mobile",
+  "appName": "Oramus",
+  "webDir": "dist",
+  "backgroundColor": "#000000",
+  "ios": {
+    "contentInset": "never",
+    "scheme": "Oramus",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}
