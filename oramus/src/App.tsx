@@ -1,17 +1,19 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
-import { IcSdca, IcRsps, IcNotes, IcGrid, IcGear } from './components/icons';
+import { IcSdca, IcRsps, IcNotes, IcGrid, IcGear, IcSignal } from './components/icons';
 import { ToastHost } from './components/ui';
 import { usePersisted } from './lib/db';
 import Settings from './Settings';
 import Sdca from './tabs/Sdca';
 import Rsps from './tabs/Rsps';
 import Notes from './tabs/Notes';
+import Signals from './tabs/Signals';
 const Excel = lazy(() => import('./tabs/Excel'));
 
-type Tab = 'sdca' | 'rsps' | 'notes' | 'excel';
+type Tab = 'sdca' | 'rsps' | 'signals' | 'notes' | 'excel';
 const TABS: { id: Tab; label: string; icon: typeof IcSdca }[] = [
   { id: 'sdca', label: 'SDCA', icon: IcSdca },
   { id: 'rsps', label: 'RSPS', icon: IcRsps },
+  { id: 'signals', label: 'Sygnały', icon: IcSignal },
   { id: 'notes', label: 'Notatnik', icon: IcNotes },
   { id: 'excel', label: 'Excel', icon: IcGrid }
 ];
@@ -41,6 +43,7 @@ export default function App({ updateReady, applyUpdate }: { updateReady: boolean
     <div className="app">
       {pane('sdca', <Sdca />)}
       {pane('rsps', <Rsps />)}
+      {pane('signals', <Signals />)}
       {pane('notes', <Notes />)}
       {pane('excel', <Suspense fallback={<div className="screen"><div className="empty">Ładowanie…</div></div>}><Excel /></Suspense>)}
       <button className="icon-btn" aria-label="Ustawienia" onClick={() => setSettings(true)}

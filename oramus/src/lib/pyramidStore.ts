@@ -8,7 +8,7 @@ import { fearGreed, lastClosedDay } from './market';
 import { composite, type PillarId, type PillarState, type PillarValue, type WeightMethod } from './pyramid';
 import { SDCA_DEFAULTS, type SdcaSettings } from '../tabs/Sdca';
 
-export type ManualMap = Partial<Record<PillarId, { score: number; updated: number; note?: string }>>;
+export type ManualMap = Partial<Record<PillarId, { score: number; updated: number; note?: string; answers?: number[] }>>;
 export interface Overrides { onchain?: boolean; sentiment?: boolean; stats?: boolean; system?: boolean; }
 interface FG { value: number; label: string; time: number; fetched: number; }
 
@@ -65,6 +65,6 @@ export function usePyramid() {
     void save('pyramid.history', [...hist, { date: auto.date, score: comp.score, coverage: comp.coverage }].slice(-730));
   }, [auto?.date]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const setPillar = (id: PillarId, score: number, note?: string) => setManual({ ...manual, [id]: { score, updated: Date.now(), note } });
+  const setPillar = (id: PillarId, score: number, note?: string, answers?: number[]) => setManual({ ...manual, [id]: { score, updated: Date.now(), note, answers } });
   return { auto, state, comp, method, setMethod, manual, setPillar, overrides, setOverrides, fg };
 }

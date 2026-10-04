@@ -1,5 +1,15 @@
 export const CHANGELOG = [
   {
+    v: '1.4.0', date: '2026-10-04',
+    items: [
+      'Nowy ekran Sygnały: rozpisanie kwoty na SDCA/RSPS i aktywa, codzienne zlecenia z przyciskiem „Wykonano”',
+      'Rotacja SDCA ↔ RSPS przy odchyleniu ±10 p.p., wpłaty i wypłaty, ręczna edycja stanów',
+      'Zamknięta bramka RSPS: decyzja użytkownika, domyślnie stablecoin; LTPI < 0 → 100% stablecoin',
+      'Propozycja zmniejszenia ekspozycji przy wysokiej zmienności portfela',
+      'Ręczne filary: standardowe pytania z linkami do źródeł (FRED, FedWatch, Farside, DefiLlama, TradingView…)'
+    ]
+  },
+  {
     v: '1.3.0', date: '2026-10-04',
     items: [
       'RSPS przeliczony na danych Binance (35 tokenów bez memów, w tym SOL, AVAX, NEAR, SUI)',

@@ -69,7 +69,17 @@ function PillarSheet({ p, id, onClose }: { p: P; id: PillarId | null; onClose: (
   const cur = id ? p.manual[id] : undefined;
   const [score, setScore] = useState<number>(cur?.score ?? 0);
   const [note, setNote] = useState(cur?.note ?? '');
-  useEffect(() => { setScore(cur?.score ?? 0); setNote(cur?.note ?? ''); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [answers, setAnswers] = useState<(number | null)[]>([]);
+  useEffect(() => {
+    setScore(cur?.score ?? 0); setNote(cur?.note ?? '');
+    const n = PILLARS.find((x) => x.id === id)?.rubric?.length ?? 0;
+    setAnswers(cur?.answers?.length === n ? cur.answers : new Array(n).fill(null));
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const answer = (i: number, v: number) => {
+    const next = [...answers]; next[i] = v; setAnswers(next);
+    const done = next.filter((x): x is number => x != null);
+    if (done.length) setScore(Math.round((done.reduce((a, b) => a + b, 0) / done.length) * 2) / 2);   // nearest 0.5
+  };
   if (!def || !id) return null;
   const v = p.state[id];
   const override = !!(p.overrides as Record<string, boolean>)[id];
@@ -80,11 +90,35 @@ function PillarSheet({ p, id, onClose }: { p: P; id: PillarId | null; onClose: (
       <Card className="tight">
         <div className="row"><span>Bieżąca wartość</span><span className="num" style={{ color: tone(v.score), fontWeight: 600 }}>{fmt(v.score)} · {v.score != null ? scoreLabel(v.score) : 'brak'}</span></div>
         <div className="row"><span>Aktualizacja</span><span className="dim">{ago(v.updated)}{v.detail ? ` · ${v.detail}` : ''}</span></div>
+        {def.verify?.map((v) => <div key={v.url} className="row"><span>Sprawdź źródło</span><a href={v.url} target="_blank" rel="noopener noreferrer" className="accent" style={{ textDecoration: 'none' }}>↗ {v.label}</a></div>)}
         {def.auto && <div className="row"><div className="grow"><div>Ręczna korekta</div><div className="faint" style={{ fontSize: 12 }}>Zastępuje wartość automatyczną</div></div><Switch checked={override} onChange={(on) => p.setOverrides({ ...p.overrides, [id]: on })} /></div>}
       </Card>
       {editable && (
         <>
-          {def.hints.length > 0 && <><div className="section-title">Na co patrzeć</div><ul className="note-text" style={{ margin: '0 0 8px', paddingLeft: 18 }}>{def.hints.map((h) => <li key={h}>{h}</li>)}</ul></>}
+          {def.rubric ? (
+            <>
+              <div className="section-title">Standardowa ocena · {def.rubric.length} pytania</div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {def.rubric.map((q, i) => (
+                  <Card key={q.q} className="tight">
+                    <div style={{ padding: '12px 14px 8px' }}>
+                      <div style={{ fontWeight: 600, fontSize: 14.5 }}>{q.q}</div>
+                      <a href={q.url} target="_blank" rel="noopener noreferrer" className="accent" style={{ fontSize: 13, textDecoration: 'none' }}>↗ {q.label}</a>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, padding: '0 10px 10px' }}>
+                      {[[-1, q.minus], [0, 'neutralnie'], [1, q.plus]].map(([v, l]) => (
+                        <button key={v as number} className="btn small" onClick={() => answer(i, v as number)}
+                          style={{ height: 'auto', minHeight: 40, padding: '6px 8px', fontSize: 12.5, lineHeight: 1.25, whiteSpace: 'normal', ...(answers[i] === v ? { background: (v as number) > 0 ? 'var(--green-soft)' : (v as number) < 0 ? 'var(--red-soft)' : 'var(--accent-soft)', color: (v as number) > 0 ? 'var(--green)' : (v as number) < 0 ? 'var(--red)' : 'var(--accent)', borderColor: 'currentColor' } : {}) }}>
+                          {(v as number) > 0 ? '+1 ' : (v as number) < 0 ? '−1 ' : '0 '}{l}
+                        </button>
+                      ))}
+                    </div>
+                  </Card>
+                ))}
+              </div>
+              <div className="note-text mt8">Ocena filaru = średnia odpowiedzi, zaokrąglona do 0,5. Możesz ją zmienić poniżej.</div>
+            </>
+          ) : def.hints.length > 0 && <><div className="section-title">Na co patrzeć</div><ul className="note-text" style={{ margin: '0 0 8px', paddingLeft: 18 }}>{def.hints.map((h) => <li key={h}>{h}</li>)}</ul></>}
           <div className="section-title">Twoja ocena</div>
           <div style={{ display: 'grid', gap: 6 }}>
             {STEPS.map((s, i) => (
@@ -95,7 +129,7 @@ function PillarSheet({ p, id, onClose }: { p: P; id: PillarId | null; onClose: (
             ))}
           </div>
           <div className="field mt12"><label>Notatka (opcjonalnie)</label><input className="input" value={note} placeholder="np. Fed obniża stopy, DXY słabnie" onChange={(e) => setNote(e.target.value)} /></div>
-          <button className="btn primary block" onClick={() => { p.setPillar(id, score, note || undefined); toast('Zapisano'); onClose(); }}>Zapisz ocenę</button>
+          <button className="btn primary block" onClick={() => { p.setPillar(id, score, note || undefined, answers.every((x) => x != null) && answers.length ? (answers as number[]) : undefined); toast('Zapisano'); onClose(); }}>Zapisz ocenę</button>
         </>
       )}
     </Sheet>
