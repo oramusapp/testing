@@ -8,6 +8,8 @@ on:
   workflow_dispatch:
   push:
     tags: ['v*']
+    branches: ['main', 'claude/serene-lovelace-p7xw3u']
+    paths: ['oramus/**', '.github/workflows/ios-build.yml']
 
 permissions:
   contents: write
