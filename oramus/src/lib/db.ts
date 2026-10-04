@@ -7,7 +7,7 @@ import { useEffect, useState, useCallback } from 'react';
 const kv = createStore('oramus', 'kv');
 const files = createStore('oramus-files', 'files');
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 const cache = new Map<string, unknown>();
 const listeners = new Map<string, Set<(v: unknown) => void>>();
 
@@ -41,6 +41,16 @@ const MIGRATIONS: Record<number, () => Promise<void>> = {
     const { lookback: _l, breadthMin: _b, split: _s, shorts: _sh, ...rest } = cur;
     if (Array.isArray(cur.tokens) && (cur.tokens as string[]).join(',') === v11) delete rest.tokens;
     await save('rsps.settings', rest);
+  },
+  // 1.5.0: pyramid moves to z-scores. Old −1…+1 manual scores map to −2…+2σ; history is reset.
+  4: async () => {
+    const man = cache.get('pyramid.manual') as Record<string, { score?: number; z?: number; updated: number; note?: string }> | undefined;
+    if (man) {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(man)) out[k] = { z: v.z ?? (v.score ?? 0) * 2, updated: v.updated, note: v.note };
+      await save('pyramid.manual', out);
+    }
+    await save('pyramid.history', []);
   }
 };
 

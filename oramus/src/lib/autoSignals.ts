@@ -7,10 +7,11 @@ export interface AutoSignals {
   adfStat: number; adfTrending: boolean; tStat90: number;
   vol30: number; volMedian365: number; volBelowMedian: boolean;
   persistDays: number;
+  zMom: number; zVal: number;
+  /** pillar z-scores (σ), positive = favourable */
   system: number; onchain: number; stats: number;
 }
 
-const clip = (x: number) => Math.max(-1, Math.min(1, x));
 
 function trendAt(p: number[], i: number) {
   const votes = [20, 50, 100, 200].map((L) => {
@@ -36,7 +37,16 @@ function gateAt(p: number[], risk: number[], i: number) {
   return trendAt(p, i) >= 1 && adfAt(p, i) > ADF_CRIT['5%'] && p[i] > s200 && risk[i] < 50 && volAt(p, i) < med;
 }
 
-export function computeAuto(dates: string[], prices: number[], compositeRisk: number[], mvrvSeries: number[]): AutoSignals {
+/** z-score of the latest 90-day log return against the distribution of 90-day returns over the last 8 years. */
+function momentumZ(p: number[], h = 90, years = 8) {
+  const n = p.length - 1;
+  const from = Math.max(h, n - years * 365);
+  const rs: number[] = [];
+  for (let k = from; k <= n; k += 1) rs.push(Math.log(p[k] / p[k - h]));
+  return (rs[rs.length - 1] - mean(rs)) / std(rs);
+}
+
+export function computeAuto(dates: string[], prices: number[], compositeRisk: number[], mvrvSeries: number[], compositeZ: number[], mvrvZ: number[]): AutoSignals {
   const i = prices.length - 1;
   const trendEnsemble = trendAt(prices, i);
   const s200 = sma(prices.slice(-200), 200).at(-1)!;
@@ -53,15 +63,17 @@ export function computeAuto(dates: string[], prices: number[], compositeRisk: nu
   const volMedian365 = [...vols].sort((a, b) => a - b)[Math.floor(vols.length / 2)];
   let persistDays = 0;
   for (let k = i; k > i - 40 && k > 600; k--) { if (gateAt(prices, compositeRisk, k)) persistDays++; else break; }
-  const valuation = Number.isFinite(sdcaRisk) ? clip((50 - sdcaRisk) / 50) : 0;
+  const zMom = momentumZ(prices);
+  const zVal = compositeZ[i];
   return {
     date: dates[i], trendEnsemble, ltpi, sdcaRisk, mvrvRisk, adfStat, adfTrending, tStat90, vol30, volMedian365,
     volBelowMedian: vol30 < volMedian365, persistDays,
-    system: mean([2 * trendEnsemble - 1, ltpi, valuation]),
-    onchain: Number.isFinite(mvrvRisk) ? clip((50 - mvrvRisk) / 50) : 0,
-    stats: clip(tStat90 / 2) * (adfTrending ? 1 : 0.5)
+    zMom, zVal,
+    system: Number.isFinite(zVal) ? mean([zMom, zVal]) : zMom,
+    onchain: Number.isFinite(mvrvZ[i]) ? mvrvZ[i] : NaN,
+    stats: tStat90 * (adfTrending ? 1 : 0.5)
   };
 }
 
-/** Contrarian reading of Fear & Greed: extreme fear → +1, extreme greed → −1. */
-export const sentimentScore = (fg: number) => clip((50 - fg) / 50);
+/** Contrarian z of Fear & Greed vs its own history: extreme fear → positive z. */
+export const sentimentZ = (fg: number, mu: number, sd: number) => (sd > 0 ? -(fg - mu) / sd : NaN);

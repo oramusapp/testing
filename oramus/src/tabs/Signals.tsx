@@ -100,7 +100,9 @@ export default function Signals() {
     }
   }
 
-  function execute(o: Order) {
+  function execute(order: Order) {
+    let o = order;
+    let short = false;
     if (!H) return;
     const h: Holdings = { sdca: { ...H.sdca }, rsps: { ...H.rsps } };
     if (o.sleeve === 'SDCA') {
@@ -111,13 +113,17 @@ export default function Signals() {
       h.rsps[STABLE] = (h.rsps[STABLE] ?? 0) - sign * o.usd;
       if (h.rsps[o.sym] < 1e-12) delete h.rsps[o.sym];
     } else {
-      // move value between sleeves through stablecoins (sell in the overweight sleeve first)
+      // move stablecoins from the overweight portfolio to the other one; never sell silently
       const fromSdca = sdcaShare > SPLIT_SDCA / 100;
-      if (fromSdca) { const fromStable = Math.min(h.sdca[STABLE], o.usd); h.sdca[STABLE] -= fromStable; const rest = o.usd - fromStable; if (rest > 0) h.sdca.BTC -= rest / px('BTC'); h.rsps[STABLE] = (h.rsps[STABLE] ?? 0) + o.usd; }
-      else { const fromStable = Math.min(h.rsps[STABLE] ?? 0, o.usd); h.rsps[STABLE] = (h.rsps[STABLE] ?? 0) - fromStable; h.sdca[STABLE] += o.usd; if (o.usd - fromStable > 0) toast('Brak stablecoinów w RSPS: sprzedaj część pozycji RSPS (zlecenia pojawią się po przeliczeniu)'); }
+      const avail = fromSdca ? h.sdca[STABLE] : (h.rsps[STABLE] ?? 0);
+      const moved = Math.min(avail, o.usd);
+      if (fromSdca) { h.sdca[STABLE] -= moved; h.rsps[STABLE] = (h.rsps[STABLE] ?? 0) + moved; }
+      else { h.rsps[STABLE] = (h.rsps[STABLE] ?? 0) - moved; h.sdca[STABLE] += moved; }
+      if (moved < o.usd - 1) short = true, toast(`Przeniesiono ${usd(moved, 0)}. Brakuje ${usd(o.usd - moved, 0)} stablecoinów w portfelu ${fromSdca ? 'SDCA' : 'RSPS'} — sprzedaj tam część pozycji i przenieś resztę.`);
+      o = { ...o, usd: moved };
     }
     setPf({ holdings: h, history: [{ time: Date.now(), text: `${o.sleeve}: ${o.side === 'buy' ? 'kupno' : o.side === 'sell' ? 'sprzedaż' : 'przeniesienie'} ${o.sym} ${usd(o.usd, 0)}` }, ...pf.history].slice(0, 200) });
-    toast('Zapisano wykonanie');
+    if (!short) toast('Zapisano wykonanie');
   }
 
   // conservative (fully correlated) portfolio volatility estimate for the exposure proposal
@@ -130,31 +136,61 @@ export default function Signals() {
         <Card className="hero">
           <div className="eyebrow">Kwota na kryptowaluty</div>
           <NumInput value={amount} onChange={setAmount} placeholder="np. 10000" suffix="USD" />
-          <div className="note-text mt8">System rozpisze kwotę na SDCA {SPLIT_SDCA}% i RSPS {100 - SPLIT_SDCA}% według dzisiejszego stanu modeli (zamknięcie {sdcaState?.date ?? '—'}).</div>
+          <div className="note-text mt8">System podzieli kwotę na dwa oddzielne portfele — SDCA {SPLIT_SDCA}% i RSPS {100 - SPLIT_SDCA}% — i rozpisze je według dzisiejszego stanu modeli (zamknięcie {sdcaState?.date ?? '—'}).</div>
         </Card>
         {p && <PlanTable h={p} px={px} />}
-        {p && <button className="btn primary block" onClick={() => { setPf({ holdings: p, history: [{ time: Date.now(), text: `Start: ${usd(amount!, 0)}` }] }); toast('Portfel zapisany'); }}>Kupiłem według planu — zapisz jako mój portfel</button>}
+        {p && <button className="btn primary block" onClick={() => { setPf({ holdings: p, history: [{ time: Date.now(), text: `Start: ${usd(amount!, 0)}` }] }); toast('Portfel zapisany'); }}>Kupiłem według planu — utwórz oba portfele</button>}
         {!R.scanFresh && <div className="warn-box mt12">Skan RSPS nieaktualny — otwórz zakładkę RSPS lub poczekaj na skan, aby plan RSPS był aktualny.</div>}
       </Screen>
     );
   }
 
+  const sdcaOrders = orders.filter((o) => o.sleeve === 'SDCA');
+  const rspsOrders = orders.filter((o) => o.sleeve === 'RSPS');
+  const transfer = orders.find((o) => o.sleeve === 'Rebalans');
+  const OrderList = ({ list, empty }: { list: Order[]; empty: string }) => (
+    <>
+      {list.length === 0 && <div className="note-text" style={{ padding: '10px 16px' }}>{empty}</div>}
+      {list.map((o) => (
+        <div key={o.id} className="row" style={{ alignItems: 'flex-start' }}>
+          <div className="grow">
+            <div><span className={o.side === 'buy' ? 'green' : 'red'}>{o.side === 'buy' ? 'KUP' : 'SPRZEDAJ'}</span> <b>{o.sym}</b> <span className="num">{usd(o.usd, 0)}</span> <span className="dim num">≈ {o.units.toPrecision(5)}</span></div>
+            <div className="faint" style={{ fontSize: 12 }}>{o.why}</div>
+          </div>
+          <button className="btn small" onClick={() => execute(o)}>Wykonano</button>
+        </div>
+      ))}
+    </>
+  );
+  const Holding = ({ sym, units }: { sym: string; units: number }) => (
+    <Row className="compact" label={<span style={{ paddingLeft: 16 }}>{sym}</span>} value={<span className="num" style={{ paddingRight: 16 }}>{sym === STABLE ? usd(units, 0) : `${units.toPrecision(6)} · ${usd(val(sym, units), 0)}`}</span>} />
+  );
+
   return (
     <Screen title="Sygnały" subtitle={`Codziennie po zamknięciu 00:00 UTC · dane ${sdcaState?.date ?? '—'}`}>
       <Card className="hero">
-        <div className="eyebrow">Mój portfel</div>
+        <div className="eyebrow">Kapitał na kryptowaluty</div>
         <div className="big-number">{usd(total, 0)}</div>
         <div className="stat-grid mt12">
-          <div className="stat"><div className="k">SDCA / RSPS</div><div className="v">{pct(sdcaShare * 100, 0)} / {pct((1 - sdcaShare) * 100, 0)}</div><div className="s">cel {SPLIT_SDCA}/{100 - SPLIT_SDCA}, pasmo ±10 p.p.</div></div>
+          <div className="stat"><div className="k">SDCA / RSPS</div><div className="v">{pct(sdcaShare * 100, 0)} / {pct((1 - sdcaShare) * 100, 0)}</div><div className="s">cel {SPLIT_SDCA}/{100 - SPLIT_SDCA} · pasmo 50–70%</div></div>
           <div className="stat"><div className="k">Ekspozycja na rynek</div><div className="v">{pct(exposure * 100, 0)}</div><div className="s">stablecoin {usd(stableVal, 0)}</div></div>
         </div>
         {missingPrice.length > 0 && <div className="warn-box mt12" style={{ marginBottom: 0 }}>Brak ceny dla: {missingPrice.join(', ')} (poza skanerem). Wartość pominięta.</div>}
+        <div className="flex mt12"><button className="btn small grow" onClick={() => setFlowOpen(true)}>Wpłata / wypłata</button><button className="btn small grow" onClick={() => setEditOpen(true)}>Edytuj stany</button></div>
       </Card>
+
+      {transfer ? (
+        <Card>
+          <div className="between"><b className="accent">Przeniesienie między portfelami</b><span className="pill trim">poza pasmem</span></div>
+          <div className="note-text mt8">{transfer.why}. Przenoszone są stablecoiny; jeśli w portfelu źródłowym ich brakuje, najpierw sprzedaj tam część pozycji.</div>
+          <button className="btn primary block mt12" onClick={() => execute(transfer)}>Przenieś {usd(transfer.usd, 0)} {sdcaShare > SPLIT_SDCA / 100 ? 'SDCA → RSPS' : 'RSPS → SDCA'}</button>
+        </Card>
+      ) : <div className="note-text center mb12">Portfele w paśmie 50–70% — brak przeniesienia między nimi.</div>}
 
       {R.parkingPending && (
         <Card>
           <div className="between"><b>Decyzja: bramka RSPS zamknięta</b><span className="pill trim">wymaga decyzji</span></div>
-          <div className="note-text mt8">Gdzie trzymać część RSPS? Domyślnie stablecoin. Backtest 2020–10.2026: stablecoin — CAGR 54%, obsunięcie −26%; BTC × trend — CAGR 73%, obsunięcie −32%.</div>
+          <div className="note-text mt8">Gdzie trzymać portfel RSPS? Domyślnie stablecoin. Backtest 2020–10.2026: stablecoin — CAGR 54%, obsunięcie −26%; BTC × trend — CAGR 73%, obsunięcie −32%.</div>
           <div className="flex mt12">
             <button className="btn small primary grow" onClick={() => R.confirmParking('stable')}>Stablecoin</button>
             <button className="btn small grow" onClick={() => R.confirmParking('btc')}>BTC × trend</button>
@@ -162,59 +198,48 @@ export default function Signals() {
         </Card>
       )}
 
-      <div className="section-title">Dzisiejsze zlecenia</div>
+      <div className="section-title">Portfel SDCA · {usd(sdcaVal, 0)} · {pct(sdcaShare * 100, 0)}</div>
       <Card className="tight">
-        {orders.length === 0 && <div className="empty">Brak zleceń — portfel zgodny z sygnałem</div>}
-        {orders.map((o) => (
-          <div key={o.id} className="row" style={{ alignItems: 'flex-start' }}>
-            <div className="grow">
-              <div><span className={o.side === 'buy' ? 'green' : o.side === 'sell' ? 'red' : 'accent'}>{o.side === 'buy' ? 'KUP' : o.side === 'sell' ? 'SPRZEDAJ' : 'PRZENIEŚ'}</span> <b>{o.sym}</b> <span className="dim">· {o.sleeve}</span></div>
-              <div className="num" style={{ fontSize: 14 }}>{usd(o.usd, 0)}{o.side !== 'move' && <span className="dim"> ≈ {o.units.toPrecision(5)} {o.sym}</span>}</div>
-              <div className="faint" style={{ fontSize: 12 }}>{o.why}</div>
-            </div>
-            <button className="btn small" onClick={() => execute(o)}>Wykonano</button>
-          </div>
-        ))}
+        <Holding sym="BTC" units={H.sdca.BTC} />
+        <Holding sym={STABLE} units={H.sdca[STABLE]} />
+        <div className="hr" style={{ margin: '4px 0' }} />
+        <div className="eyebrow" style={{ padding: '6px 16px 0', margin: 0 }}>Dzisiejsze wskazówki</div>
+        <OrderList list={sdcaOrders} empty={sdcaState ? `Krzywa ≈ 0% przy ryzyku ${sdcaState.risk.toFixed(1)}% — bez transakcji.` : 'Ładowanie modelu…'} />
       </Card>
 
-      {(R.gate.allowed || R.shortProposal || volEst > 0.6) && <div className="section-title">Propozycje (poza alokacją)</div>}
-      {R.gate.allowed && <Card><b className="green">Dźwignia {LEV_MAX}× na BTC</b><div className="note-text mt8">Spełnione wszystkie 10 warunków. Tylko propozycja; nie wliczona w zlecenia.</div></Card>}
-      {R.shortProposal && <Card><b className="red">Short altów: {R.picks.shorts.map((r) => r.sym).join(', ')}</b><div className="note-text mt8">Pełny trend spadkowy BTC. 15–30% części RSPS jako zabezpieczenie (kontrakty perpetual). Tylko propozycja.</div></Card>}
-      {volEst > 0.6 && <Card><b className="amber">Wysoka zmienność portfela ≈ {pct(volEst * 100, 0)}</b><div className="note-text mt8">Szacunek ostrożny (pełna korelacja aktywów). Propozycja: zmniejszyć ekspozycję do ok. {pct(Math.min(1, 0.6 / volEst) * exposure * 100, 0)} przenosząc resztę do stablecoinów. W backteście limit zmienności portfela nie poprawiał wyników istotnie — decyzja należy do Ciebie.</div></Card>}
-
-      <div className="section-title">Skład portfela</div>
+      <div className="section-title">Portfel RSPS · {usd(rspsVal, 0)} · {pct((1 - sdcaShare) * 100, 0)}</div>
       <Card className="tight">
-        <Row label={<b>SDCA</b>} value={usd(sdcaVal, 0)} />
-        <Row label="BTC" value={<span className="num">{H.sdca.BTC.toPrecision(6)} · {usd(val('BTC', H.sdca.BTC), 0)}</span>} />
-        <Row label={STABLE} value={usd(H.sdca[STABLE], 0)} />
-        <Row label={<b>RSPS</b>} value={usd(rspsVal, 0)} />
-        {Object.entries(H.rsps).map(([k, u]) => <Row key={k} label={k} value={<span className="num">{k === STABLE ? usd(u, 0) : `${u.toPrecision(6)} · ${usd(val(k, u), 0)}`}</span>} />)}
-        <div className="flex" style={{ padding: 12 }}>
-          <button className="btn small grow" onClick={() => setEditOpen(true)}>Edytuj stany</button>
-          <button className="btn small grow" onClick={() => setFlowOpen(true)}>Wpłata / wypłata</button>
-        </div>
+        {Object.entries(H.rsps).map(([k, u]) => <Holding key={k} sym={k} units={u} />)}
+        <div className="hr" style={{ margin: '4px 0' }} />
+        <div className="eyebrow" style={{ padding: '6px 16px 0', margin: 0 }}>Dzisiejsze wskazówki · {R.regime === 'rsps' ? 'RSPS aktywny' : R.regime === 'defense' ? 'LTPI < 0' : 'bramka zamknięta'}</div>
+        <OrderList list={rspsOrders} empty={R.scanFresh ? 'Portfel zgodny z sygnałem.' : 'Skan RSPS nieaktualny — wskazówki po skanie.'} />
       </Card>
 
-      <div className="section-title">Zasady rotacji</div>
+      {(R.gate.allowed || R.shortProposal || volEst > 0.6) && <div className="section-title">Propozycje (poza portfelami)</div>}
+      {R.gate.allowed && <Card><b className="green">Dźwignia {LEV_MAX}× na BTC</b><div className="note-text mt8">Spełnione wszystkie 10 warunków. Tylko propozycja.</div></Card>}
+      {R.shortProposal && <Card><b className="red">Short altów: {R.picks.shorts.map((r) => r.sym).join(', ')}</b><div className="note-text mt8">Pełny trend spadkowy BTC. 15–30% portfela RSPS jako zabezpieczenie (kontrakty perpetual). Tylko propozycja.</div></Card>}
+      {volEst > 0.6 && <Card><b className="amber">Zmienność portfela ≈ {pct(volEst * 100, 0)} rocznie</b><div className="note-text mt8">Szacunek ostrożny (pełna korelacja). Propozycja: ekspozycja ok. {pct(Math.min(1, 0.6 / volEst) * exposure * 100, 0)}, reszta w stablecoinach. W backteście limit zmienności nie poprawiał istotnie wyników.</div></Card>}
+
+      <div className="section-title">Zasady</div>
       <Card>
         <ol className="step-list">
-          <li><b>SDCA ↔ RSPS:</b> cel {SPLIT_SDCA}/{100 - SPLIT_SDCA}. Przeniesienie tylko gdy udział SDCA wyjdzie poza 50–70%, sprawdzane codziennie.</li>
-          <li><b>SDCA ↔ stablecoin:</b> krzywa akumulacji/dystrybucji — dzienne kupno z rezerwy lub sprzedaż BTC do rezerwy.</li>
-          <li><b>RSPS ↔ stablecoin:</b> bramka otwarta → wybrane tokeny + BTC × trend; bramka zamknięta → Twój wybór (domyślnie stablecoin); LTPI &lt; 0 → 100% stablecoin.</li>
-          <li><b>Zmiana stanu przez Ciebie</b> (wpłata, wypłata, ręczna korekta) → system przelicza i pokazuje potrzebne zlecenia.</li>
+          <li><b>Dwa oddzielne portfele.</b> SDCA i RSPS mają własne stablecoiny i kryptowaluty; wskazówki dotyczą tylko ich własnych środków.</li>
+          <li><b>Przeniesienie</b> między portfelami tylko gdy udział SDCA wyjdzie poza 50–70% (±10 p.p.) i po Twoim kliknięciu „Przenieś”.</li>
+          <li><b>SDCA ↔ stablecoin:</b> krzywa akumulacji/dystrybucji, codziennie.</li>
+          <li><b>RSPS ↔ stablecoin:</b> bramka otwarta → tokeny + BTC × trend; zamknięta → Twój wybór (domyślnie stablecoin); LTPI &lt; 0 → 100% stablecoin.</li>
         </ol>
-        <div className="note-text mt8">Backtest 2020–10.2026 (research/run14–15): pasmo ±10 p.p. poprawiło Sharpe i obsunięcie względem rebalansu rocznego; średnia ekspozycja portfela ok. 62–66%, w 2022 ok. 41%.</div>
       </Card>
 
       {pf.history.length > 0 && <><div className="section-title">Historia</div><Card className="tight">{pf.history.slice(0, 15).map((h, i) => <Row key={i} label={h.text} value={<span className="dim">{new Date(h.time).toLocaleDateString('pl-PL')}</span>} />)}</Card></>}
-      <button className="btn danger block mt12" onClick={() => { if (confirm('Usunąć zapisany portfel i zacząć od nowa?')) setPf({ holdings: null, history: [] }); }}>Zacznij od nowa</button>
+      <button className="btn danger block mt12" onClick={() => { if (confirm('Usunąć zapisane portfele i zacząć od nowa?')) setPf({ holdings: null, history: [] }); }}>Zacznij od nowa</button>
 
       <EditSheet open={editOpen} onClose={() => setEditOpen(false)} h={H} onSave={(h) => { setPf({ holdings: h, history: [{ time: Date.now(), text: 'Ręczna korekta stanów' }, ...pf.history] }); }} />
-      <FlowSheet open={flowOpen} onClose={() => setFlowOpen(false)} onSave={(amt) => {
+      <FlowSheet open={flowOpen} onClose={() => setFlowOpen(false)} onSave={(amt, target) => {
         const h: Holdings = { sdca: { ...H.sdca }, rsps: { ...H.rsps } };
-        h.sdca[STABLE] += amt * SPLIT_SDCA / 100; h.rsps[STABLE] = (h.rsps[STABLE] ?? 0) + amt * (1 - SPLIT_SDCA / 100);
-        if (h.sdca[STABLE] < 0 || (h.rsps[STABLE] ?? 0) < 0) { toast('Za mało stablecoinów — najpierw sprzedaj część pozycji'); return; }
-        setPf({ holdings: h, history: [{ time: Date.now(), text: `${amt >= 0 ? 'Wpłata' : 'Wypłata'} ${usd(Math.abs(amt), 0)}` }, ...pf.history] });
+        const toS = target === 'split' ? amt * SPLIT_SDCA / 100 : target === 'sdca' ? amt : 0;
+        h.sdca[STABLE] += toS; h.rsps[STABLE] = (h.rsps[STABLE] ?? 0) + (amt - toS);
+        if (h.sdca[STABLE] < -1e-9 || (h.rsps[STABLE] ?? 0) < -1e-9) { toast('Za mało stablecoinów w portfelu — najpierw sprzedaj część pozycji'); return; }
+        setPf({ holdings: h, history: [{ time: Date.now(), text: `${amt >= 0 ? 'Wpłata' : 'Wypłata'} ${usd(Math.abs(amt), 0)} (${target === 'split' ? `${SPLIT_SDCA}/${100 - SPLIT_SDCA}` : target.toUpperCase()})` }, ...pf.history] });
       }} />
     </Screen>
   );
@@ -262,9 +287,10 @@ function EditSheet({ open, onClose, h, onSave }: { open: boolean; onClose: () =>
   );
 }
 
-function FlowSheet({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: (amt: number) => void }) {
+function FlowSheet({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: (amt: number, target: 'split' | 'sdca' | 'rsps') => void }) {
   const [amt, setAmt] = useState<number | null>(null);
   const [side, setSide] = useState<'in' | 'out'>('in');
+  const [target, setTarget] = useState<'split' | 'sdca' | 'rsps'>('split');
   return (
     <Sheet open={open} onClose={onClose} title="Wpłata / wypłata">
       <div className="flex mb12">
@@ -272,8 +298,13 @@ function FlowSheet({ open, onClose, onSave }: { open: boolean; onClose: () => vo
         <button className="btn small grow" style={side === 'out' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => setSide('out')}>Wypłata</button>
       </div>
       <div className="field"><label>Kwota (USD)</label><NumInput value={amt} onChange={setAmt} /></div>
-      <div className="note-text mb12">Kwota trafia do stablecoinów w proporcji {SPLIT_SDCA}/{100 - SPLIT_SDCA}. Zlecenia kupna pojawią się według sygnałów.</div>
-      <button className="btn primary block" onClick={() => { if (amt && amt > 0) { onSave(side === 'in' ? amt : -amt); setAmt(null); onClose(); } }}>Zapisz</button>
+      <div className="flex mb12">
+        {([['split', `Oba (${SPLIT_SDCA}/${100 - SPLIT_SDCA})`], ['sdca', 'SDCA'], ['rsps', 'RSPS']] as const).map(([k, l]) => (
+          <button key={k} className="btn small grow" style={target === k ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => setTarget(k)}>{l}</button>
+        ))}
+      </div>
+      <div className="note-text mb12">Kwota trafia do stablecoinów wybranego portfela (wypłata z nich znika). Wskazówki kupna pojawią się według sygnałów.</div>
+      <button className="btn primary block" onClick={() => { if (amt && amt > 0) { onSave(side === 'in' ? amt : -amt, target); setAmt(null); onClose(); } }}>Zapisz</button>
     </Sheet>
   );
 }

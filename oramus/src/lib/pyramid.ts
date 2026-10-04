@@ -1,46 +1,52 @@
 // Analysis pyramid: seven pillars in order of importance (1 = most important).
 // Weights come from the rank order alone via Rank Order Centroid (Barron & Barrett 1996,
 // Management Science 42(11)): w_i = (1/n) * Σ_{k=i..n} 1/k. Linear (rank-sum) and equal
-// weights are offered as alternatives. Each pillar is scored on −1 (bearish) … +1 (bullish).
+// weights are offered as alternatives.
+//
+// Normal-distribution model: every pillar is a z-score (σ units, positive = favourable).
+// Probability of a favourable reading = Φ(z). Pillars are combined with a weighted mean of z
+// (not Stouffer's Σwz/√Σw²): pillars are correlated and the mean avoids overstating confidence.
+import { normCdf } from './quant';
 
 export type PillarId = 'system' | 'fundamental' | 'macro' | 'onchain' | 'stats' | 'sentiment' | 'ta';
 export type WeightMethod = 'roc' | 'linear' | 'equal';
 
-export interface RubricItem { q: string; label: string; url: string; plus: string; minus: string; }
-export interface PillarDef { id: PillarId; rank: number; name: string; short: string; auto: boolean; source: string; hints: string[]; rubric?: RubricItem[]; verify?: { label: string; url: string }[]; }
+/** One standardised question: the user reads the measure in σ (e.g. Bollinger Bands) and picks −2…+2. */
+export interface RubricItem { q: string; measure: string; label: string; url: string; invert?: boolean; qualitative?: boolean; }
+export interface PillarDef { id: PillarId; rank: number; name: string; short: string; auto: boolean; source: string; rubric?: RubricItem[]; verify?: { label: string; url: string }[]; }
+
+const TV = (sym: string) => `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(sym)}`;
 
 export const PILLARS: PillarDef[] = [
-  { id: 'system', rank: 1, name: 'Systematyzacja', short: 'Systematyzacja', auto: true, source: 'Auto: trend BTC (4 średnie), LTPI (SMA200), wycena SDCA', hints: [], verify: [{ label: 'Strona sygnałów SDCA', url: 'https://sdca-signals-automation-production-bdd2.up.railway.app/' }] },
-  { id: 'fundamental', rank: 2, name: 'Ekonomia fundamentalna', short: 'Fundamenty', auto: false, source: 'Ręcznie',
-    hints: ['Podaż i emisja (halving, odblokowania tokenów)', 'Adopcja i popyt (ETF, napływy instytucjonalne)', 'Regulacje i ryzyka strukturalne'],
+  { id: 'system', rank: 1, name: 'Systematyzacja', short: 'Systematyzacja', auto: true,
+    source: 'Auto: średnia z-score momentum BTC 90 dni (vs 8 lat historii) i z-score wyceny SDCA',
+    verify: [{ label: 'Strona sygnałów SDCA', url: 'https://sdca-signals-automation-production-bdd2.up.railway.app/' }] },
+  { id: 'fundamental', rank: 2, name: 'Ekonomia fundamentalna', short: 'Fundamenty', auto: false, source: 'Ręcznie · skala σ',
     rubric: [
-      { q: 'Napływy do spot ETF na BTC (ostatnie 10 sesji)', label: 'Farside Investors', url: 'https://farside.co.uk/btc/', plus: 'przewaga napływów', minus: 'przewaga odpływów' },
-      { q: 'Odblokowania tokenów w portfelu RSPS (najbliższe 30 dni)', label: 'Tokenomist', url: 'https://tokenomist.ai/', plus: 'brak dużych odblokowań', minus: 'odblokowania > 2% podaży' },
-      { q: 'Aktywność sieci: opłaty i TVL (trend 30 dni)', label: 'DefiLlama', url: 'https://defillama.com/', plus: 'rosną', minus: 'spadają' },
-      { q: 'Regulacje i zdarzenia strukturalne', label: 'CoinDesk Policy', url: 'https://www.coindesk.com/policy', plus: 'korzystne', minus: 'niekorzystne / ryzyko systemowe' }
-    ],
-  },
-  { id: 'macro', rank: 3, name: 'Makroekonomia', short: 'Makro', auto: false, source: 'Ręcznie',
-    hints: ['Globalna płynność (M2, bilanse banków centralnych)', 'Kierunek stóp procentowych', 'Dolar (DXY) i apetyt na ryzyko (akcje)'],
+      { q: 'Napływy netto do spot ETF na BTC', measure: 'Suma z 10 sesji względem średniej i odchylenia z ostatniego roku', label: 'Farside Investors', url: 'https://farside.co.uk/btc/' },
+      { q: 'Odblokowania tokenów (portfel RSPS, 30 dni)', measure: '% podaży względem typowego miesiąca; więcej = gorzej', label: 'Tokenomist', url: 'https://tokenomist.ai/', invert: true },
+      { q: 'Opłaty i TVL sieci', measure: 'Zmiana 30-dniowa względem rozkładu zmian z ostatniego roku', label: 'DefiLlama', url: 'https://defillama.com/' },
+      { q: 'Regulacje i zdarzenia strukturalne', measure: 'Ocena jakościowa: siła wpływu w skali σ', label: 'CoinDesk Policy', url: 'https://www.coindesk.com/policy', qualitative: true }
+    ] },
+  { id: 'macro', rank: 3, name: 'Makroekonomia', short: 'Makro', auto: false, source: 'Ręcznie · skala σ',
     rubric: [
-      { q: 'Płynność: bilans Fed (WALCL), trend 3 mies.', label: 'FRED · WALCL', url: 'https://fred.stlouisfed.org/series/WALCL', plus: 'rośnie', minus: 'spada' },
-      { q: 'Stopy: oczekiwania na najbliższe posiedzenia Fed', label: 'CME FedWatch', url: 'https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html', plus: 'obniżki', minus: 'podwyżki' },
-      { q: 'Dolar (DXY) względem 50-dniowej średniej', label: 'TradingView · DXY', url: 'https://www.tradingview.com/symbols/TVC-DXY/', plus: 'poniżej i spada', minus: 'powyżej i rośnie' },
-      { q: 'Akcje (S&P 500) względem 200-dniowej średniej', label: 'TradingView · SPX', url: 'https://www.tradingview.com/symbols/SPX/', plus: 'powyżej', minus: 'poniżej' }
-    ],
-  },
-  { id: 'onchain', rank: 4, name: 'Dane on-chain', short: 'On-chain', auto: true, source: 'Auto: MVRV (Coin Metrics), percentyl po odtrendowaniu', hints: [], verify: [{ label: 'Coin Metrics · MVRV', url: 'https://charts.coinmetrics.io/crypto-data/' }] },
-  { id: 'stats', rank: 5, name: 'Istotność statystyczna', short: 'Statystyka', auto: true, source: 'Auto: statystyka t momentum 90 dni + test ADF', hints: [] },
-  { id: 'sentiment', rank: 6, name: 'Sentyment', short: 'Sentyment', auto: true, source: 'Auto: Crypto Fear & Greed (alternative.me), odczyt kontrariański', hints: [], verify: [{ label: 'Crypto Fear & Greed', url: 'https://alternative.me/crypto/fear-and-greed-index/' }] },
-  { id: 'ta', rank: 7, name: 'Uznaniowa analiza techniczna', short: 'Analiza techniczna', auto: false, source: 'Ręcznie',
-    hints: ['Struktura rynku (wyższe szczyty/dołki)', 'Kluczowe wsparcia i opory', 'Formacje i wolumen'],
+      { q: 'Płynność: bilans Fed (WALCL)', measure: 'Zmiana 13-tygodniowa względem rozkładu z 5 lat (FRED: Edit graph → Units: % change)', label: 'FRED · WALCL', url: 'https://fred.stlouisfed.org/series/WALCL' },
+      { q: 'Stopy procentowe: oczekiwania rynku', measure: 'Oczekiwana zmiana stóp na 3 posiedzenia względem zmian z 5 lat; obniżki = plus', label: 'CME FedWatch', url: 'https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html' },
+      { q: 'Dolar (DXY)', measure: 'Pozycja w Bollinger Bands (50, 2σ); górna wstęga ≈ +2σ = negatywne dla krypto', label: 'TradingView · DXY', url: TV('TVC:DXY'), invert: true },
+      { q: 'Akcje (S&P 500)', measure: 'Pozycja w Bollinger Bands (50, 2σ)', label: 'TradingView · SPX', url: TV('SP:SPX') }
+    ] },
+  { id: 'onchain', rank: 4, name: 'Dane on-chain', short: 'On-chain', auto: true, source: 'Auto: z-score MVRV (Coin Metrics) po odtrendowaniu; tanio = plus',
+    verify: [{ label: 'Coin Metrics · MVRV', url: 'https://charts.coinmetrics.io/crypto-data/' }] },
+  { id: 'stats', rank: 5, name: 'Istotność statystyczna', short: 'Statystyka', auto: true, source: 'Auto: statystyka t średniego zwrotu z 90 dni (≈ z przy H0); ×0,5 gdy ADF wskazuje konsolidację' },
+  { id: 'sentiment', rank: 6, name: 'Sentyment', short: 'Sentyment', auto: true, source: 'Auto: z-score Fear & Greed względem całej historii, odczyt kontrariański',
+    verify: [{ label: 'Crypto Fear & Greed', url: 'https://alternative.me/crypto/fear-and-greed-index/' }] },
+  { id: 'ta', rank: 7, name: 'Uznaniowa analiza techniczna', short: 'Analiza techniczna', auto: false, source: 'Ręcznie · skala σ',
     rubric: [
-      { q: 'Struktura BTC na interwale tygodniowym', label: 'TradingView · BTCUSDT', url: 'https://www.tradingview.com/chart/?symbol=BINANCE:BTCUSDT', plus: 'wyższe szczyty i dołki', minus: 'niższe szczyty i dołki' },
-      { q: 'Cena względem kluczowego wsparcia/oporu', label: 'TradingView · BTCUSDT', url: 'https://www.tradingview.com/chart/?symbol=BINANCE:BTCUSDT', plus: 'wybicie oporu', minus: 'przebicie wsparcia' },
-      { q: 'Kapitalizacja całego rynku (TOTAL) względem 200-dniowej średniej', label: 'TradingView · TOTAL', url: 'https://www.tradingview.com/symbols/CRYPTOCAP-TOTAL/', plus: 'powyżej', minus: 'poniżej' },
-      { q: 'Wolumen potwierdza ruch', label: 'TradingView · BTCUSDT', url: 'https://www.tradingview.com/chart/?symbol=BINANCE:BTCUSDT', plus: 'rośnie z trendem', minus: 'rośnie przeciw trendowi' }
-    ],
-  }
+      { q: 'BTC na interwale tygodniowym', measure: 'Pozycja w Bollinger Bands (20, 2σ) na świecach 1W', label: 'TradingView · BTCUSDT 1W', url: TV('BINANCE:BTCUSDT') },
+      { q: 'Kapitalizacja całego rynku (TOTAL)', measure: 'Pozycja w Bollinger Bands (50, 2σ) na świecach 1D', label: 'TradingView · TOTAL', url: TV('CRYPTOCAP:TOTAL') },
+      { q: 'Wolumen BTC', measure: 'Wolumen względem średniej 20 dni w σ, ze znakiem kierunku ceny', label: 'TradingView · BTCUSDT', url: TV('BINANCE:BTCUSDT') },
+      { q: 'Struktura rynku (szczyty i dołki)', measure: 'Ocena jakościowa: siła struktury w skali σ', label: 'TradingView · BTCUSDT', url: TV('BINANCE:BTCUSDT'), qualitative: true }
+    ] }
 ];
 
 export function weights(method: WeightMethod): Record<PillarId, number> {
@@ -54,18 +60,20 @@ export function weights(method: WeightMethod): Record<PillarId, number> {
   return Object.fromEntries(PILLARS.map((p, i) => [p.id, raw[i] / tot])) as Record<PillarId, number>;
 }
 
-export interface PillarValue { score: number | null; updated: number | null; detail?: string; manual?: boolean; }
+/** z: pillar z-score (σ), positive = favourable. */
+export interface PillarValue { z: number | null; updated: number | null; detail?: string; manual?: boolean; }
 export type PillarState = Record<PillarId, PillarValue>;
 
-/** Manual inputs older than this are treated as missing (and block leverage). */
 export const MANUAL_MAX_AGE_DAYS = 7;
+export const Z_CLIP = 3;
+export const clipZ = (z: number) => Math.max(-Z_CLIP, Math.min(Z_CLIP, z));
 
 export const isFresh = (v: PillarValue | undefined, now = Date.now()) =>
-  !!v && v.score != null && v.updated != null && now - v.updated <= MANUAL_MAX_AGE_DAYS * 86400000;
+  !!v && v.z != null && Number.isFinite(v.z) && v.updated != null && now - v.updated <= MANUAL_MAX_AGE_DAYS * 86400000;
 
-export interface Composite { score: number; coverage: number; agreement: number; missing: PillarId[]; contributions: Record<string, number>; }
+export interface Composite { z: number; p: number; coverage: number; dispersion: number; missing: PillarId[]; contributions: Record<string, number>; }
 
-/** Weighted average over pillars that have a fresh value; coverage = weight share available. */
+/** Weighted mean of fresh pillar z-scores; p = Φ(Z); dispersion = weighted std of pillar z (σ). */
 export function composite(state: PillarState, method: WeightMethod, now = Date.now()): Composite {
   const w = weights(method);
   let sw = 0, s = 0;
@@ -75,35 +83,28 @@ export function composite(state: PillarState, method: WeightMethod, now = Date.n
   for (const p of PILLARS) {
     const v = state[p.id];
     if (!isFresh(v, now)) { missing.push(p.id); continue; }
-    sw += w[p.id]; s += w[p.id] * (v.score as number);
-    contributions[p.id] = w[p.id] * (v.score as number);
-    vals.push(v.score as number); ws.push(w[p.id]);
+    const z = clipZ(v.z as number);
+    sw += w[p.id]; s += w[p.id] * z; contributions[p.id] = w[p.id] * z;
+    vals.push(z); ws.push(w[p.id]);
   }
-  const score = sw ? s / sw : 0;
-  // agreement: 1 − weighted std of pillar scores around the composite (scores live in [−1, 1])
-  const varw = sw ? ws.reduce((a, wi, i) => a + wi * (vals[i] - score) ** 2, 0) / sw : 1;
-  return { score, coverage: sw, agreement: Math.max(0, 1 - Math.sqrt(varw)), missing, contributions };
+  const z = sw ? s / sw : 0;
+  const dispersion = sw ? Math.sqrt(ws.reduce((a, wi, i) => a + wi * (vals[i] - z) ** 2, 0) / sw) : 0;
+  return { z, p: normCdf(z), coverage: sw, dispersion, missing, contributions };
 }
 
-export const scoreLabel = (s: number) =>
-  s >= 0.5 ? 'Silnie pozytywny' : s >= 0.15 ? 'Pozytywny' : s > -0.15 ? 'Neutralny' : s > -0.5 ? 'Negatywny' : 'Silnie negatywny';
+export const zLabel = (z: number) =>
+  z >= 1 ? 'Silnie pozytywny' : z >= 0.25 ? 'Pozytywny' : z > -0.25 ? 'Neutralny' : z > -1 ? 'Negatywny' : 'Silnie negatywny';
 
-// ---------- strict leverage gate ----------
+// ---------- strict leverage gate (proposal only) ----------
 export interface LeverageInputs {
-  trendEnsemble: number;      // 0..1, BTC price above SMA20/50/100/200
-  adfTrending: boolean;       // ADF fails to reject unit root (5%) on 90d log price
-  ltpi: number;               // −1..1
-  sdcaRisk: number;           // 0..100
-  volBelowMedian: boolean;    // 30d realised vol < 365d median
-  persistDays: number;        // consecutive days all automatic conditions held
-  rspsActive: boolean;        // leverage only applies to the BTC fallback, never to RSPS picks
-  pyramid: Composite;
-  state: PillarState;
+  trendEnsemble: number; adfTrending: boolean; ltpi: number; sdcaRisk: number; volBelowMedian: boolean;
+  persistDays: number; rspsActive: boolean; pyramid: Composite; state: PillarState;
 }
 export const LEV_MAX = 1.5;
 export const LEV_PERSIST = 10;
-export const LEV_PYRAMID_MIN = 0.5;
-export const LEV_PILLAR_FLOOR = -0.25;
+/** Z ≥ +0.674 ⇔ Φ(Z) ≥ 75%; pillar floor z > −0.319 ⇔ Φ(z) > 37.5% (same as the former −1…+1 thresholds 0.5 / −0.25). */
+export const LEV_Z_MIN = 0.674;
+export const LEV_PILLAR_Z_FLOOR = -0.319;
 
 export function leverageGate(x: LeverageInputs) {
   const checks = [
@@ -114,8 +115,8 @@ export function leverageGate(x: LeverageInputs) {
     { ok: x.volBelowMedian, label: 'Zmienność BTC 30d poniżej mediany z roku' },
     { ok: x.persistDays >= LEV_PERSIST, label: `Wszystkie warunki automatyczne spełnione ≥ ${LEV_PERSIST} dni z rzędu (teraz ${x.persistDays})` },
     { ok: x.pyramid.missing.length === 0, label: `Wszystkie filary piramidy aktualne (ręczne ≤ ${MANUAL_MAX_AGE_DAYS} dni)` },
-    { ok: x.pyramid.score >= LEV_PYRAMID_MIN, label: `Wynik piramidy ≥ +${LEV_PYRAMID_MIN} (teraz ${x.pyramid.score >= 0 ? '+' : ''}${x.pyramid.score.toFixed(2)})` },
-    { ok: PILLARS.every((p) => (x.state[p.id]?.score ?? -1) > LEV_PILLAR_FLOOR), label: `Żaden filar poniżej ${LEV_PILLAR_FLOOR}` },
+    { ok: x.pyramid.z >= LEV_Z_MIN, label: `Piramida Z ≥ +0,67σ, P ≥ 75% (teraz ${x.pyramid.z >= 0 ? '+' : ''}${x.pyramid.z.toFixed(2)}σ, P ${Math.round(x.pyramid.p * 100)}%)` },
+    { ok: PILLARS.every((p) => (x.state[p.id]?.z ?? -9) > LEV_PILLAR_Z_FLOOR), label: 'Żaden filar poniżej −0,32σ (P > 37,5%)' },
     { ok: !x.rspsActive, label: 'RSPS nieaktywny (dźwignia tylko na BTC, nigdy na alty)' }
   ];
   const allowed = checks.every((c) => c.ok);

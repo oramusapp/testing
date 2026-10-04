@@ -1,5 +1,14 @@
 export const CHANGELOG = [
   {
+    v: '1.5.0', date: '2026-10-04',
+    items: [
+      'Model rozkładu normalnego: każdy filar piramidy jako z-score (σ), P = Φ(z); średnia ważona z',
+      'Auto: z momentum BTC 90 dni, z wyceny SDCA, z MVRV, statystyka t, z Fear & Greed względem całej historii',
+      'Ręczne filary: odczyt w σ (−2σ…+2σ), np. pozycja w Bollinger Bands',
+      'Sygnały: dwa oddzielne portfele SDCA i RSPS z własnymi stablecoinami i wskazówkami; przeniesienie tylko po przekroczeniu ±10 p.p. i kliknięciu'
+    ]
+  },
+  {
     v: '1.4.0', date: '2026-10-04',
     items: [
       'Nowy ekran Sygnały: rozpisanie kwoty na SDCA/RSPS i aktywa, codzienne zlecenia z przyciskiem „Wykonano”',
