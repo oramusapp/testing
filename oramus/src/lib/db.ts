@@ -7,7 +7,7 @@ import { useEffect, useState, useCallback } from 'react';
 const kv = createStore('oramus', 'kv');
 const files = createStore('oramus-files', 'files');
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 3;
 const cache = new Map<string, unknown>();
 const listeners = new Map<string, Set<(v: unknown) => void>>();
 
@@ -22,7 +22,26 @@ export async function hydrate() {
 
 // Add an entry here for every schema change, never edit an old one.
 const MIGRATIONS: Record<number, () => Promise<void>> = {
-  1: async () => { /* initial schema */ }
+  1: async () => { /* initial schema */ },
+  // 1.1.0: RSPS parameters from the 2020–2026 backtest, non-meme universe. User capital is kept.
+  2: async () => {
+    const old = cache.get('rsps.settings') as Record<string, unknown> | undefined;
+    if (!old) return;
+    const meme = ['DOGE', 'SHIB', 'PEPE', 'WIF', 'BONK', 'FLOKI', 'TRUMP'];
+    const oldDefault = 'ETH,SOL,SUI,BNB,XRP,DOGE,AVAX,LINK,TON,NEAR,APT,INJ,RENDER,FET,PEPE,WIF,TAO';
+    const tokens = Array.isArray(old.tokens) && (old.tokens as string[]).join(',') !== oldDefault
+      ? (old.tokens as string[]).filter((t) => !meme.includes(t)) : undefined;
+    await save('rsps.settings', { capital: old.capital ?? 10000, ...(tokens ? { tokens } : {}) });
+  },
+  // 1.3.0: wider non-meme universe; a list equal to the 1.1 default is replaced, a custom one is kept
+  3: async () => {
+    const cur = cache.get('rsps.settings') as Record<string, unknown> | undefined;
+    if (!cur) return;
+    const v11 = 'ETH,BNB,XRP,SOL,ADA,TRX,LINK,AVAX,DOT,LTC,BCH,XLM,ATOM,NEAR,UNI,AAVE,ETC,ICP';
+    const { lookback: _l, breadthMin: _b, split: _s, shorts: _sh, ...rest } = cur;
+    if (Array.isArray(cur.tokens) && (cur.tokens as string[]).join(',') === v11) delete rest.tokens;
+    await save('rsps.settings', rest);
+  }
 };
 
 export function load<T>(key: string, fallback: T): T {

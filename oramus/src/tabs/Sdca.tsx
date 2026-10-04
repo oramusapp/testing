@@ -5,7 +5,7 @@ import { IcRefresh, IcInfo, IcPlus, IcTrash } from '../components/icons';
 import { useBtc, refresh } from '../lib/btcStore';
 import { usePersisted } from '../lib/db';
 import { INDICATORS, composite, RAIL_TAUS } from '../lib/sdcaModel';
-import { BANDS, DEFAULT_CURVE, backtest, curveRate, riskZone, tpiProxy } from '../lib/quant';
+import { BANDS, DEFAULT_CURVE, backtest, curveRate, riskZone } from '../lib/quant';
 import { usd as usdFull, usdShort, pct, signed, fmtDate, uid } from '../lib/format';
 
 // whole dollars once amounts get large so stat tiles stay readable
@@ -37,6 +37,7 @@ export default function Sdca() {
   const [s, setS] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
   const [ltpi, setLtpi] = usePersisted<LtpiState>('signals.ltpi', { mode: 'proxy', manual: 0 });
   const [trades, setTrades] = usePersisted<Trade[]>('sdca.journal', []);
+  const [pyrHist] = usePersisted<{ date: string; score: number; coverage: number }[]>('pyramid.history', []);
   const [view, setView] = useState<'rainbow' | 'risk' | 'curve'>('rainbow');
   const [info, setInfo] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
@@ -65,7 +66,7 @@ export default function Sdca() {
   const zone = riskZone(riskToday);
   const priceRisk = model.risk.price[last];
   const band = BANDS.find((b) => priceRisk / 100 >= b.from && priceRisk / 100 < b.to) ?? (priceRisk < 1 ? BANDS[0] : BANDS[BANDS.length - 1]);
-  const ltpiProxy = tpiProxy(model.prices, 'long');
+  const ltpiProxy = price > model.prices.slice(-200).reduce((a, b) => a + b, 0) / 200 ? 1 : -1;
   const ltpiValue = ltpi.mode === 'manual' ? ltpi.manual : ltpiProxy;
 
   let actionTitle = 'HOLD — brak transakcji', actionSub = `Krzywa ≈ 0% przy dzisiejszym ryzyku`, actionTone = 'dim';
@@ -107,6 +108,7 @@ export default function Sdca() {
         <Row className="compact" label="Composite Risk dziś" value={pct(riskToday)} />
         <Row className="compact" label="Krzywa dziś" value={signed(rate) + '%/dzień'} />
         <Row className="compact" label="Cena BTC" value={usd(price)} />
+        {pyrHist.length > 0 && <Row className="compact" label="Piramida analizy" value={<span style={{ color: pyrHist.at(-1)!.score >= 0.15 ? 'var(--green)' : pyrHist.at(-1)!.score <= -0.15 ? 'var(--red)' : 'var(--amber)' }}>{signed(pyrHist.at(-1)!.score)} <span className="dim">· pokrycie {Math.round(pyrHist.at(-1)!.coverage * 100)}%</span></span>} />}
         <Row className="compact" label="Rezerwa gotówki" value={<NumInput className="inline-input" value={cfg.cash} onChange={(v) => upd({ cash: v ?? 0 })} suffix="$" />} />
         <Row className="compact" label="Posiadane BTC" value={<NumInput className="inline-input" value={cfg.btcHeld} onChange={(v) => upd({ btcHeld: v ?? 0 })} />} />
       </Card>
@@ -240,7 +242,7 @@ export default function Sdca() {
         {ltpi.mode === 'manual' ? (
           <div className="mt12"><input type="range" min={-1} max={1} step={0.05} value={ltpi.manual} onChange={(e) => setLtpi({ ...ltpi, manual: +e.target.value })} />
             <div className="note-text">Wpisz wartość LTPI z własnego systemu (−1 … +1). Wartość jest używana przez silnik reżimów w zakładce RSPS.</div></div>
-        ) : <div className="note-text mt12">Proxy: średnia 4 głosów trendu (cena &gt; EMA200, EMA50 &gt; EMA200, ROC 180d &gt; 0, cena &gt; SMA400). To przybliżenie, nie oryginalny LTPI — przełącz na „Ręcznie”, aby użyć własnego.</div>}
+        ) : <div className="note-text mt12">Proxy: cena powyżej 200-dniowej średniej = +1, poniżej = −1 (ta sama reguła co w backteście 2020–2026). To przybliżenie, nie oryginalny LTPI — przełącz na „Ręcznie”, aby użyć własnego.</div>}
       </Card>
 
       <div className="section-title">Dziennik transakcji</div>

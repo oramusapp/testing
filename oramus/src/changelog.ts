@@ -1,5 +1,34 @@
 export const CHANGELOG = [
   {
+    v: '1.3.0', date: '2026-10-04',
+    items: [
+      'RSPS przeliczony na danych Binance (35 tokenów bez memów, w tym SOL, AVAX, NEAR, SUI)',
+      'Codzienny przegląd po zamknięciu 00:00 UTC, siła względem BTC jako średnia z 30/60/90 dni',
+      'Bramka szerokości z histerezą: wejście ≥ 70%, wyjście < 60%',
+      'Logo i nazwa w nagłówku, stopka © @thenotoriousg'
+    ]
+  },
+  {
+    v: '1.2.0', date: '2026-10-04',
+    items: [
+      'Stały podział SDCA 60% / RSPS 40% (najwyższy Sharpe w backteście, lepszy Calmar przy remisie)',
+      'Dźwignia usunięta ze strategii: tylko propozycja w sygnale przy spełnieniu 10 warunków',
+      'Short altów jako propozycja zabezpieczenia przy pełnym trendzie spadkowym BTC'
+    ]
+  },
+  {
+    v: '1.1.0', date: '2026-10-04',
+    items: [
+      'Piramida analizy: 7 filarów w kolejności ważności, wagi ROC (Barron i Barrett 1996)',
+      'Automatyczne przeliczenie po zamknięciu świecy 00:00 UTC (systematyzacja, on-chain, statystyka, Fear & Greed)',
+      'Ręczne filary (fundamenty, makro, analiza techniczna) z szybką edycją i ważnością 7 dni',
+      'RSPS według backtestu 2020–2026: uniwersum bez memów, bramka szerokości 70%, lookback 90 dni',
+      'Podział SDCA/RSPS 50/50 lub 70/30, shorty opcjonalne (domyślnie wyłączone)',
+      'Dźwignia maks. 1,5× tylko przy spełnieniu 10 ścisłych warunków naraz; w pozostałych przypadkach obowiązkowo wyłączona',
+      'Dane tylko z zamkniętych świec dziennych'
+    ]
+  },
+  {
     v: '1.0.0', date: '2026-10-04',
     items: [
       'Ekran główny z 4 zakładkami: SDCA, RSPS, Notatnik, Excel',

@@ -1,7 +1,7 @@
 // Shared BTC history + SDCA model, loaded once and used by both SDCA and RSPS tabs.
 import { useEffect, useState } from 'react';
 import { get, set, createStore } from 'idb-keyval';
-import { loadBtcHistory, refreshBtcHistory, type BtcHistory } from './market';
+import { loadBtcHistory, refreshBtcHistory, lastClosedDay, msToNextUtcClose, type BtcHistory } from './market';
 import type { SdcaModel } from './sdcaModel';
 
 const cacheStore = createStore('oramus-model', 'model');
@@ -30,6 +30,7 @@ async function compute(h: BtcHistory) {
 }
 
 let started = false;
+let lastRefresh = 0;
 export async function startBtc() {
   if (started) return; started = true;
   try {
@@ -38,10 +39,26 @@ export async function startBtc() {
     await compute(h);
     await refresh();
   } catch (e) { emit({ status: 'Błąd: ' + (e as Error).message, busy: false }); }
+  scheduleDailyClose();
+  // iOS suspends web apps in the background, so also catch up whenever the app returns to the foreground
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void catchUp(); });
+}
+
+/** Refreshes when a newer daily candle has closed than the one the model was built on. */
+async function catchUp() {
+  const last = state.history?.rows.at(-1)?.[0];
+  if (!last || state.busy) return;
+  if (last < lastClosedDay() && Date.now() - lastRefresh > 10 * 60 * 1000) await refresh();
+}
+
+function scheduleDailyClose() {
+  // 2 minutes after 00:00 UTC so exchanges have published the closed candle
+  setTimeout(() => { void refresh().finally(scheduleDailyClose); }, msToNextUtcClose() + 2 * 60 * 1000);
 }
 
 export async function refresh() {
   if (!state.history) return;
+  lastRefresh = Date.now();
   emit({ busy: true, status: 'Aktualizacja danych…' });
   const h = await refreshBtcHistory(state.history, (m) => emit({ status: 'Aktualizacja: ' + m }));
   emit({ history: h });
