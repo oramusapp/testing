@@ -1,5 +1,13 @@
 export const CHANGELOG = [
   {
+    v: '1.6.0', date: '2026-10-04',
+    items: [
+      'Sygnały: wyniki portfela od startu (TWR całości, SDCA i RSPS, porównanie z BTC, obsunięcie, zmienność, Sharpe)',
+      'Codzienny zapis stanu po zamknięciu 00:00 UTC i wykres wyniku',
+      'Automatyczne raporty miesięczne zapisywane w historii, z możliwością udostępnienia'
+    ]
+  },
+  {
     v: '1.5.0', date: '2026-10-04',
     items: [
       'Model rozkładu normalnego: każdy filar piramidy jako z-score (σ), P = Φ(z); średnia ważona z',
