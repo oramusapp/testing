@@ -11,7 +11,7 @@ import { athSellSeries, backtest, curveRate, minBuyRate, safetyStep, slowBuyRate
 import { ltpiStateSeries } from '../lib/tpi';
 import { PaperCard } from '../components/Paper';
 import type { PaperInputs } from '../lib/paper';
-import { useRsps, splitTarget, SPLIT_SDCA, SPLIT_TILT } from '../lib/useRsps';
+import { useRsps, SPLIT_SDCA, SPLIT_TILT } from '../lib/useRsps';
 import { LEV_MAX } from '../lib/pyramid';
 import { SDCA_DEFAULTS, type SdcaSettings, manualLtpiActive, type LtpiState } from './Sdca';
 import { usd, pct } from '../lib/format';
@@ -31,8 +31,8 @@ interface Order { id: string; sleeve: 'SDCA' | 'RSPS' | 'Rebalans'; side: 'buy' 
 export default function Signals() {
   const { model } = useBtc();
   const R = useRsps();
-  const [tilt, setTilt] = usePersisted<boolean>('portfolio.tilt', true);
-  const splitSdca = splitTarget(tilt, R.pyr.auto?.ltpi);
+  const { tilt, setTilt } = R;
+  const splitSdca = R.split;   // shared with the RSPS tab
   const [sd] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
   const [pf, setPf] = usePersisted<Portfolio>('portfolio', { holdings: null, history: [] });
   const [snaps, setSnaps] = usePersisted<Snapshot[]>('portfolio.snapshots', []);

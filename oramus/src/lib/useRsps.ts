@@ -60,6 +60,9 @@ export function useRsps() {
     const c = { ...SDCA_DEFAULTS, ...sdcaCfg };
     return composite(btcModel, c.enabled, freshManual(c)).risk.at(-1) ?? NaN;
   }, [btcModel, sdcaCfg]);
+  // one SDCA/RSPS split for the whole app: 60/40, or 40/60 while LTPI on $TOTAL is positive and the tilt is on
+  const [tilt, setTilt] = usePersisted<boolean>('portfolio.tilt', true);
+  const split = splitTarget(tilt, pyr.auto?.ltpi);
   const [parking, setParking] = usePersisted<{ choice: Parking; ack?: string }>('rsps.parking', { choice: 'btc' });
   const [s0, setS] = usePersisted<RspsSettings>('rsps.settings', RSPS_DEF);
   const s = { ...RSPS_DEF, ...s0 };
@@ -199,7 +202,7 @@ export function useRsps() {
   (scan?.rows ?? []).forEach((r) => { if (Number.isFinite(r.vol)) vols[r.sym] = r.vol / 100; });
   if (a) vols.BTC = a.vol30;
 
-  return { pyr, s, upd, scan, scanFresh, busy, runScan, breadth, btcTrend, ltpi, regime, gate, picks, sleeve, shortProposal, signalReady, manualMissing,
+  return { pyr, s, upd, scan, scanFresh, busy, runScan, breadth, btcTrend, ltpi, regime, gate, picks, sleeve, shortProposal, signalReady, manualMissing, split, tilt, setTilt,
     parking, parkingPending, confirmParking, log, prices, vols, sdcaRisk };
 }
 
