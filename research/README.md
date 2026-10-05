@@ -200,3 +200,9 @@ wagi równe/wg siły, trend tokena ≥ 0,75/1,0, bramka MTPI($TOTAL) (OOS 0,48),
 Ekspozycja × szerokość: OOS 0,72 przy tym samym IS, ale CAGR 46,1% — nie podnosi zwrotu. Obecne parametry zostają.
 Największe dźwignie zwrotu (kosztem ryzyka): parking BTC×trend (portfel CAGR ok. 73% vs 67%, DD −27% vs −24%, run39)
 i weto RSPS z LTPI na BTC (portfel CAGR 53,9% vs 51,6%, run45) — do decyzji użytkownika.
+
+## RSPS na LTPI z BTC i przechylenie podziału wg $TOTAL (run47.py)
+RSPS z wetem LTPI na BTC (wdrożone 2.15.0): IS 1,36, OOS 0,91, CAGR 53,3%. Portfel (SDCA LTPI BTC, parking hybrydowy), 2020→:
+stały 70/30 — CAGR 49,9%, DD −28,7%, OOS 1,05; 60/40 — 51,0%, −25,0%, 1,10; 50/50 — 51,9%, −25,1%, 1,09; 40/60 — 53,2%, −27,7%, 1,08.
+Przechył wg $TOTAL (LTPI+ → 40/60): 54,2%, −29,7%, 1,05; LTPI+ → 30/70: 55,7%, −31,5%, 1,04; LTPI+ i MTPI+ → 40/60: 54,1%, −29,6%, 1,00.
+W aplikacji: przełącznik w Portfelu (domyślnie wyłączony, 40/60). $TOTAL zostaje wskaźnikiem kierunku rynku w zakładce LTPI·MTPI.

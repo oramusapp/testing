@@ -135,15 +135,15 @@ export function rspsRun(dates: string[], btc: number[], coins: CoinSeries[], ltp
 }
 
 /** Two sub-accounts (SDCA / RSPS) rebalanced back to the split when SDCA's share leaves ±band. */
-export function combine(a: Run, b: Run, wA = 0.6, band = 0.1): Run {
+export function combine(a: Run, b: Run, wA = 0.6, band = 0.1, target?: (date: string) => number): Run {
   const mb = new Map(b.dates.map((d, i) => [d, i]));
   const dates: string[] = [], ret: number[] = [], expo: number[] = [];
   let va = wA, vb = 1 - wA;
   a.dates.forEach((d, i) => {
     const j = mb.get(d); if (j == null) return;
-    const tot = va + vb;
+    const tot = va + vb, tg = target ? target(d) : wA;
     let cost = 0;
-    if (Math.abs(va / tot - wA) > band) { cost = Math.abs(va / tot - wA) * ((a.expo[i] + b.expo[j]) / 2) * COST * 2; va = tot * wA; vb = tot * (1 - wA); }
+    if (Math.abs(va / tot - tg) > band) { cost = Math.abs(va / tot - tg) * ((a.expo[i] + b.expo[j]) / 2) * COST * 2; va = tot * tg; vb = tot * (1 - tg); }
     const t0 = va + vb;
     expo.push((va * a.expo[i] + vb * b.expo[j]) / t0);
     va *= 1 + a.ret[i]; vb *= 1 + b.ret[j];

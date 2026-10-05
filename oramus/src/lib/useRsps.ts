@@ -23,6 +23,10 @@ export const LOOKBACKS = [30, 60, 90];          // relative-strength ensemble
 export const BREADTH_ENTER = 0.7, BREADTH_EXIT = 0.6;   // gate hysteresis
 // Split with the highest Sharpe (1.52, tie 40/50%) and the better Calmar of the two (research/run8.py).
 export const SPLIT_SDCA = 60;
+// Optional tilt (research/run47.py): while LTPI on $TOTAL is positive the target moves to SDCA 40 / RSPS 60.
+// 2020→: CAGR 51.0% → 54.2%, max drawdown −25.0% → −29.7%, Sharpe 2024→ 1.10 → 1.05.
+export const SPLIT_TILT = 40;
+export const splitTarget = (tilt: boolean, totalLtpi: number | undefined) => (tilt && (totalLtpi ?? 0) > 0 ? SPLIT_TILT : SPLIT_SDCA);
 export interface ScanRow { sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; sharpe?: number; sortino?: number; omega?: number; corrBtc?: number; }
 export interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; gateOpen: boolean; gateSince?: string; }
 interface LogEntry { time: number; regime: string; lev?: number; }
@@ -59,7 +63,8 @@ export function useRsps() {
   const [busy, setBusy] = useState(false);
   const a = pyr.auto;
 
-  const ltpi = manualLtpiActive(ltpiManual) ? ltpiManual.manual : a?.ltpi ?? 0;
+  // RSPS veto uses LTPI on BTC (research/run45: RSPS OOS Sharpe 0.88 vs 0.61–0.69 with $TOTAL); the LTPI · MTPI tab shows $TOTAL
+  const ltpi = manualLtpiActive(ltpiManual) ? ltpiManual.manual : a?.ltpiBtc ?? 0;
   const scanFresh = !!scan && scan.closeDate >= lastClosedDay();
   const breadth = scan?.breadth ?? NaN;
   // BTC sizing: 4-average trend (backtested default) or, if chosen, the 10-signal MTPI mapped to 0…1

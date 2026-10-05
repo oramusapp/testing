@@ -7,7 +7,7 @@ import { composite, freshManual } from '../lib/sdcaModel';
 import { athSellSeries, backtest } from '../lib/quant';
 import { computeTpi, ltpiStateSeries, MTPI_SPEC } from '../lib/tpi';
 import { PERIODS, buyHold, combine, equity, loadCoins, perf, rspsRun, sdcaRun, tpiRun, type Run } from '../lib/backtestAll';
-import { HYBRID_RISK_MAX, MEME, RSPS_DEF, SPLIT_SDCA, type Parking, type RspsSettings } from '../lib/useRsps';
+import { HYBRID_RISK_MAX, MEME, RSPS_DEF, SPLIT_SDCA, SPLIT_TILT, type Parking, type RspsSettings } from '../lib/useRsps';
 import { SDCA_DEFAULTS, type SdcaSettings } from './Sdca';
 import { TPI_DEFAULTS, type TpiSettings } from '../lib/pyramidStore';
 import { fmtDate } from '../lib/format';
@@ -29,6 +29,7 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
   const [parking] = usePersisted<{ choice: Parking }>('rsps.parking', { choice: 'hybrid' });
   const [saved, setSaved] = usePersisted<{ key: string; run: Run } | null>('backtest.rsps', null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [tilt] = usePersisted<boolean>('portfolio.tilt', false);
   const cfg = { ...SDCA_DEFAULTS, ...sd }, tpiCfg = { ...TPI_DEFAULTS, ...tpi0 }, rs = { ...RSPS_DEF, ...rs0 };
   const effStart = mode === 'all' || mode === 'rsps' ? (start < '2020-01-01' ? '2020-01-01' : start) : start;
 
@@ -69,7 +70,7 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
       const coins = await loadCoins(dates, rs.tokens.filter((t) => !MEME.includes(t)), (m) => setBusy(m));
       setBusy('Liczenie…');
       const st = Math.max(0, dates.findIndex((d) => d >= effStart));
-      const run = rspsRun(dates, btc, coins, base.ltpi.slice(i0), base.comp.risk.slice(i0), st,
+      const run = rspsRun(dates, btc, coins, base.ltpiBtc.slice(i0), base.comp.risk.slice(i0), st,
         { universe: rs.universeSize, topN: rs.topN, cap: rs.cap / 100, parking: parking.choice, hybridMax: HYBRID_RISK_MAX, every: 1 });
       const lite = { dates: run.dates, ret: run.ret, expo: run.expo };
       rspsCache = { key: rspsKey, run: lite }; setSaved({ key: rspsKey, run: lite });
@@ -84,8 +85,11 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
     if (mode === 'tpi') return { main: [{ name: 'LTPI (long/stable)', run: runs.ltpi, color: '#5aa9e6' }, { name: 'MTPI (long/stable)', run: runs.mtpi, color: '#d4b483' }] };
     if (!rspsRunRes) return null;
     if (mode === 'rsps') return { main: [{ name: 'RSPS', run: rspsRunRes, color: '#d4b483' }] };
-    return { main: [{ name: `Strategia ${SPLIT_SDCA}/${100 - SPLIT_SDCA}`, run: combine(runs.sdca, rspsRunRes, SPLIT_SDCA / 100, 0.1), color: '#d4b483' }, { name: 'SDCA', run: runs.sdca, color: '#9ccc5a' }, { name: 'RSPS', run: rspsRunRes, color: '#5aa9e6' }] };
-  }, [runs, rspsRunRes, mode]);
+    // tilt: target decided on the previous close from LTPI on $TOTAL
+    const prevLt = new Map(model!.dates.map((d, i) => [d, i > 0 ? base!.ltpi[i - 1] : 0]));
+    const target = tilt ? (d: string) => ((prevLt.get(d) ?? 0) > 0 ? SPLIT_TILT : SPLIT_SDCA) / 100 : undefined;
+    return { main: [{ name: tilt ? `Strategia (przechył ${SPLIT_TILT}/${100 - SPLIT_TILT})` : `Strategia ${SPLIT_SDCA}/${100 - SPLIT_SDCA}`, run: combine(runs.sdca, rspsRunRes, SPLIT_SDCA / 100, 0.1, target), color: '#d4b483' }, { name: 'SDCA', run: runs.sdca, color: '#9ccc5a' }, { name: 'RSPS', run: rspsRunRes, color: '#5aa9e6' }] };
+  }, [runs, rspsRunRes, mode, tilt, model, base]);
 
   const needRsps = (mode === 'all' || mode === 'rsps') && !rspsRunRes;
   // recompute automatically after every daily close (new candle → new key) or settings change
@@ -130,9 +134,9 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
       <div className="note-text mt12">
         Bez patrzenia w przyszłość: każdy dzień używa tylko danych do zamknięcia swojej świecy (00:00 UTC) — model wyceny przeliczany co rok na danych sprzed 1 stycznia, percentyle tylko z przeszłości, TPI z wcześniejszych zamknięć; decyzja na zamknięciu, transakcja następnego dnia. Zasady jak w sygnałach: decyzja na zamknięciu dnia, transakcja następnego dnia, koszt 0,15% za stronę. SDCA: krzywa, bezpiecznik LTPI (liczone z BTC), tempo zakupów przy LTPI− i (jeśli włączona) sprzedaż przy ATH — od 100% stablecoinów w dniu startu.
         LTPI · MTPI: BTC, gdy stan TPI jest dodatni, w przeciwnym razie stablecoin. Kupowany jest BTC; $TOTAL (cały rynek) służy wyłącznie do odczytu kierunku i trendu (TPI), jak w notatkach — nie jest aktywem do kupienia. Próg stanu wg ustawień (domyślnie 0).
-        RSPS: codzienna rotacja siły względnej wśród {rs.universeSize - 1} najpłynniejszych altów (plus BTC), bramka szerokości 70%/60%, LTPI− → stablecoin, parking: {parking.choice === 'stable' ? 'stablecoin' : parking.choice === 'btc' ? 'BTC × trend' : `hybryda (ryzyko < ${HYBRID_RISK_MAX}%)`}.
+        RSPS: weto LTPI liczone z BTC; codzienna rotacja siły względnej wśród {rs.universeSize - 1} najpłynniejszych altów (plus BTC), bramka szerokości 70%/60%, LTPI− → stablecoin, parking: {parking.choice === 'stable' ? 'stablecoin' : parking.choice === 'btc' ? 'BTC × trend' : `hybryda (ryzyko < ${HYBRID_RISK_MAX}%)`}.
         Używa dzisiejszej listy kandydatów, więc tokeny, które zniknęły z rynku, są pominięte — wynik RSPS jest optymistyczny (błąd przeżywalności).
-        Całość: {SPLIT_SDCA}% SDCA / {100 - SPLIT_SDCA}% RSPS z rebalansem przy odchyleniu ±10 p.p. Wyniki historyczne nie gwarantują przyszłych.
+        Całość: {SPLIT_SDCA}% SDCA / {100 - SPLIT_SDCA}% RSPS{tilt ? ` (przechył: ${SPLIT_TILT}/${100 - SPLIT_TILT}, gdy LTPI z $TOTAL dodatnie)` : ''} z rebalansem przy odchyleniu ±10 p.p. Wyniki historyczne nie gwarantują przyszłych.
       </div>
     </Screen>
   );

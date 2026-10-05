@@ -5,7 +5,7 @@ import { computeTpi, MTPI_SPEC, LTPI_SPEC, type TpiResult } from './tpi';
 export interface AutoSignals {
   date: string;
   mtpi: TpiResult; ltpiTpi: TpiResult; ltpiSma: number;
-  trendEnsemble: number; ltpi: number; sdcaRisk: number; mvrvRisk: number;
+  trendEnsemble: number; ltpi: number; /** LTPI on BTC — used by SDCA and RSPS */ ltpiBtc: number; sdcaRisk: number; mvrvRisk: number;
   adfStat: number; adfTrending: boolean; tStat90: number;
   vol30: number; volMedian365: number; volBelowMedian: boolean;
   persistDays: number;
@@ -95,6 +95,9 @@ export function computeAuto(dates: string[], prices: number[], compositeRisk: nu
     ? (ltpiTpi.stateSeries[k - off] ?? 0)
     : (tp[k] > sma(tp.slice(k - 199, k + 1), 200).at(-1)! ? 1 : -1);
   const ltpi = ltpiAt(i);
+  const btcTpi = computeTpi(prices, LTPI_SPEC, W, hyst);
+  const ltpiBtcAt = (k: number) => ltpiSource === 'ensemble' ? (btcTpi.stateSeries[k - off] ?? 0) : (prices[k] > sma(prices.slice(k - 199, k + 1), 200).at(-1)! ? 1 : -1);
+  const ltpiBtc = ltpiBtcAt(i);
   const sdcaRisk = compositeRisk[i];
   const mvrvRisk = mvrvSeries[i];
   const adfStat = adfAt(prices, i);
@@ -106,12 +109,12 @@ export function computeAuto(dates: string[], prices: number[], compositeRisk: nu
   for (let k = i - 364; k <= i; k++) vols.push(volAt(prices, k));
   const volMedian365 = [...vols].sort((a, b) => a - b)[Math.floor(vols.length / 2)];
   let persistDays = 0;
-  for (let k = i; k > i - 40 && k > 600; k--) { if (gateAt(prices, compositeRisk, k, ltpiAt)) persistDays++; else break; }
+  for (let k = i; k > i - 40 && k > 600; k--) { if (gateAt(prices, compositeRisk, k, ltpiBtcAt)) persistDays++; else break; }
   const zMom = momentumZ(prices);
   const ta = taAuto(prices.slice(0, i + 1));
   const zVal = compositeZ[i];
   return {
-    date: dates[i], mtpi, ltpiTpi, ltpiSma, trendEnsemble, ltpi, sdcaRisk, mvrvRisk, adfStat, adfTrending, tStat90, vol30, volMedian365,
+    date: dates[i], mtpi, ltpiTpi, ltpiSma, trendEnsemble, ltpi, ltpiBtc, sdcaRisk, mvrvRisk, adfStat, adfTrending, tStat90, vol30, volMedian365,
     volBelowMedian: vol30 < volMedian365, persistDays,
     zMom, zVal,
     system: Number.isFinite(zVal) ? mean([zMom, zVal]) : zMom,
