@@ -1,4 +1,12 @@
 export const CHANGELOG = [
+  {
+    v: '2.2.0', date: '2026-10-05',
+    items: [
+      'RSPS: Sentyment — zwrot BTC po 20 dniach według przedziałów Fear & Greed, liczony na pełnej historii F&G',
+      'RSPS: korelacja tokenów z BTC (90 dni) w tabeli jakości aktywów',
+      'Statystyka: tryb Korelacja — wykres punktowy, r, R² i prosta regresji'
+    ]
+  },
   { v: '2.1.1', date: '2026-10-05', items: ['Statystyka: tryb „znane μ i σ”, wykres rozkładu z pasmami 68–95–99,7 i zacieniowanym polem, prawdopodobieństwo przedziału'] },
   {
     v: '2.1.0', date: '2026-10-05',

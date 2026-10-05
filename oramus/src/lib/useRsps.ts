@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from '../components/ui';
 import { usePersisted } from './db';
 import { klines, lastClosedDay } from './market';
-import { vams, annVol, capWeights, ratios } from './quant';
+import { vams, annVol, capWeights, ratios, linfit } from './quant';
 import { leverageGate } from './pyramid';
 import { usePyramid } from './pyramidStore';
 import type { LtpiState } from '../tabs/Sdca';
@@ -20,7 +20,7 @@ export const LOOKBACKS = [30, 60, 90];          // relative-strength ensemble
 export const BREADTH_ENTER = 0.7, BREADTH_EXIT = 0.6;   // gate hysteresis
 // Split with the highest Sharpe (1.52, tie 40/50%) and the better Calmar of the two (research/run8.py).
 export const SPLIT_SDCA = 60;
-export interface ScanRow { sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; sharpe?: number; sortino?: number; omega?: number; }
+export interface ScanRow { sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; sharpe?: number; sortino?: number; omega?: number; corrBtc?: number; }
 export interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; gateOpen: boolean; gateSince?: string; }
 interface LogEntry { time: number; regime: string; lev?: number; }
 
@@ -89,7 +89,12 @@ export function useRsps() {
             sym, price: c.at(-1)!, ret: (c.at(-1)! / c[c.length - 31] - 1) * 100, vol: vol * 100,
             liq: k.slice(-30).reduce((p, x) => p + (x.q ?? 0), 0) / 30, ratioUp: ratio.at(-1)! > r50, trend: trendOf(c),
             score: LOOKBACKS.map((L) => vams(ratio, L, 30)).reduce((p, v) => p + v, 0) / LOOKBACKS.length,
-            ...ratios(c, 365)
+            ...ratios(c, 365),
+            corrBtc: (() => {
+              const kk = k.filter((x) => btcMap.has(x.t)).slice(-91);
+              const ra = kk.slice(1).map((x, i) => x.c / kk[i].c - 1), rb = kk.slice(1).map((x, i) => btcMap.get(x.t)! / btcMap.get(kk[i].t)! - 1);
+              return linfit(ra, rb).r;
+            })()
           });
         } catch (e) { rows.push({ sym, price: NaN, ret: NaN, vol: NaN, liq: 0, ratioUp: false, trend: 0, score: NaN, error: (e as Error).message }); }
       }));

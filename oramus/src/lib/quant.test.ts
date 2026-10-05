@@ -88,3 +88,11 @@ describe('normal table (lesson values)', () => {
     expect(Phi(1) - Phi(-1)).toBeCloseTo(0.6827, 3); expect(Phi(2) - Phi(-2)).toBeCloseTo(0.9545, 3);
   });
 });
+
+import { linfit } from './quant';
+describe('linear fit', () => {
+  it('recovers a perfect line and r = ±1', () => {
+    const f = linfit([1, 2, 3, 4], [3, 5, 7, 9]); expect(f.r).toBeCloseTo(1); expect(f.a).toBeCloseTo(1); expect(f.b).toBeCloseTo(2);
+    expect(linfit([1, 2, 3], [3, 2, 1]).r).toBeCloseTo(-1);
+  });
+});

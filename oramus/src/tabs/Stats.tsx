@@ -1,15 +1,15 @@
 import { useMemo } from 'react';
 import { Screen, Card, Seg } from '../components/ui';
 import { usePersisted } from '../lib/db';
-import { normCdf } from '../lib/quant';
+import { normCdf, linfit } from '../lib/quant';
 
 const num = (v: number, d = 2) => (Number.isFinite(v) ? v.toLocaleString('pl-PL', { maximumFractionDigits: d, minimumFractionDigits: 0 }) : '—');
 const parse = (t: string) => t.replace(/;/g, ' ').split(/[\s\n]+/).map((x) => parseFloat(x.replace(',', '.').replace('−', '-'))).filter(Number.isFinite);
 
 /** Standard deviation, z-score and normal-table probability, step by step as in the statistics lessons. */
 export default function Stats({ nav }: { nav?: React.ReactNode }) {
-  const [st0, setSt] = usePersisted<{ data: string; x: string; mode?: 'data' | 'params'; mu?: string; sd?: string; a?: string; b?: string }>('tools.stats', { data: '56 65 74 75 76 77 77 87 88', x: '80' });
-  const st = { mode: 'data' as const, mu: '30', sd: '5', a: '25', b: '35', ...st0 };
+  const [st0, setSt] = usePersisted<{ data: string; x: string; mode?: 'data' | 'params' | 'corr'; cx?: string; cy?: string; mu?: string; sd?: string; a?: string; b?: string }>('tools.stats', { data: '56 65 74 75 76 77 77 87 88', x: '80' });
+  const st = { mode: 'data' as 'data' | 'params' | 'corr', mu: '30', sd: '5', a: '25', b: '35', cx: '540 600 700 760 820 860 900 950 1000 1060 1120 1300', cy: '8500 7800 9100 8200 9900 9800 10300 11100 11300 10700 8900 11300', ...st0 };
   const pf = (t: string) => parseFloat(t.replace(',', '.').replace('−', '-'));
   const xs = useMemo(() => parse(st.data), [st.data]);
   const byData = st.mode === 'data';
@@ -25,8 +25,10 @@ export default function Stats({ nav }: { nav?: React.ReactNode }) {
   const below = normCdf(z);
   return (
     <Screen nav={nav} title="Statystyka" subtitle="Odchylenie standardowe · z-score · tablica rozkładu normalnego">
-      <Seg value={st.mode} onChange={(m) => setSt({ ...st, mode: m })} options={[{ v: 'data', l: 'Z listy danych' }, { v: 'params', l: 'Znane μ i σ' }]} />
+      <Seg value={st.mode} onChange={(m) => setSt({ ...st, mode: m })} options={[{ v: 'data', l: 'Lista danych' }, { v: 'params', l: 'Znane μ i σ' }, { v: 'corr', l: 'Korelacja' }]} />
       <div className="mt12" />
+      {st.mode === 'corr' && <Corr x={st.cx} y={st.cy} set={(cx, cy) => setSt({ ...st, cx, cy })} />}
+      {st.mode !== 'corr' && <>
       {!byData && (
         <Card>
           <div className="flex" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -80,7 +82,45 @@ export default function Stats({ nav }: { nav?: React.ReactNode }) {
           </div>
         </Card>
       )}
+      </>}
     </Screen>
+  );
+}
+
+const strength = (r: number) => { const a = Math.abs(r); const w = a >= 0.99 ? 'idealna' : a >= 0.7 ? 'wysoka' : a >= 0.3 ? 'niska' : 'brak'; return w === 'brak' ? 'brak korelacji' : `${w} ${r > 0 ? 'dodatnia' : 'ujemna'}`; };
+
+/** Scatter plot with Pearson r, R² and the least-squares line (lesson: scatterplots, correlation, regression). */
+function Corr({ x, y, set }: { x: string; y: string; set: (x: string, y: string) => void }) {
+  const xs = parse(x), ys = parse(y), n = Math.min(xs.length, ys.length);
+  const f = linfit(xs.slice(0, n), ys.slice(0, n));
+  const W = 320, H = 200, L = 40, R = 10, T = 10, B = 24;
+  const [x0, x1] = [Math.min(...xs.slice(0, n)), Math.max(...xs.slice(0, n))], [y0, y1] = [Math.min(...ys.slice(0, n)), Math.max(...ys.slice(0, n))];
+  const sx = (v: number) => L + ((v - x0) / (x1 - x0 || 1)) * (W - L - R), sy = (v: number) => H - B - ((v - y0) / (y1 - y0 || 1)) * (H - T - B);
+  return (
+    <>
+      <Card>
+        <div className="eyebrow" style={{ margin: 0 }}>Zmienna x</div>
+        <textarea className="input mt8" style={{ width: '100%', minHeight: 60, fontFamily: 'inherit' }} value={x} onChange={(e) => set(e.target.value, y)} />
+        <div className="eyebrow mt12" style={{ margin: 0 }}>Zmienna y</div>
+        <textarea className="input mt8" style={{ width: '100%', minHeight: 60, fontFamily: 'inherit' }} value={y} onChange={(e) => set(x, e.target.value)} />
+        {xs.length !== ys.length && <div className="warn-box mt8">Listy mają różną długość ({xs.length} i {ys.length}); liczę pierwsze {n} par.</div>}
+      </Card>
+      {n >= 3 && (
+        <Card>
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label="Wykres punktowy">
+            <line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="var(--faint)" /><line x1={L} x2={L} y1={T} y2={H - B} stroke="var(--faint)" />
+            {xs.slice(0, n).map((v, i) => <circle key={i} cx={sx(v)} cy={sy(ys[i])} r={3.5} fill="var(--text)" opacity={0.75} />)}
+            {Number.isFinite(f.b) && <line x1={sx(x0)} y1={sy(f.a + f.b * x0)} x2={sx(x1)} y2={sy(f.a + f.b * x1)} stroke="var(--accent)" strokeWidth={2} />}
+            <text x={L} y={H - 6} fontSize={9} fill="var(--faint)">{num(x0)}</text><text x={W - R} y={H - 6} fontSize={9} fill="var(--faint)" textAnchor="end">{num(x1)}</text>
+            <text x={L - 4} y={H - B} fontSize={9} fill="var(--faint)" textAnchor="end">{num(y0)}</text><text x={L - 4} y={T + 8} fontSize={9} fill="var(--faint)" textAnchor="end">{num(y1)}</text>
+          </svg>
+          <div className="row compact"><span>Korelacja r</span><span className="num" style={{ fontWeight: 600 }}>{num(f.r, 3)} · {strength(f.r)}</span></div>
+          <div className="row compact"><span>R² (siła wyjaśniania, 0–1)</span><span className="num">{num(f.r2, 3)}</span></div>
+          <div className="row compact"><span>Prosta regresji</span><span className="num">y = {num(f.a)} {f.b >= 0 ? '+' : '−'} {num(Math.abs(f.b), 4)}·x</span></div>
+          <div className="note-text mt8">Regresja wybiera prostą o najmniejszej sumie kwadratów odległości punktów od niej. r mierzy siłę i kierunek zależności liniowej (od −1 do +1), R² = r² mówi, jaką część zmienności y wyjaśnia x. Pojedyncze punkty odstające mocno zmieniają r. Krzywe zależności wymagają przekształcenia danych, a korelacja nie oznacza przyczynowości.</div>
+        </Card>
+      )}
+    </>
   );
 }
 

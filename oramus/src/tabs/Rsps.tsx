@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Screen, Card, Row, NumInput, Sheet, toast } from '../components/ui';
 import { IcInfo, IcRefresh, IcShield, IcLayers, IcX, IcPlus } from '../components/icons';
 import { PyramidCard } from '../components/Pyramid';
+import { SentimentCard } from '../components/Sentiment';
 import { usePersisted } from '../lib/db';
 import { LEV_MAX } from '../lib/pyramid';
 import { useRsps, DEFAULT_TOKENS, MEME, RSPS_DEF, SPLIT_SDCA } from '../lib/useRsps';
@@ -77,6 +78,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       )}
 
       <PyramidCard p={pyr} />
+      <SentimentCard fg={pyr.fg} />
 
       <div className="section-title">Trend</div>
       <Card className="tight">
@@ -131,16 +133,16 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
             <div className="section-title" style={{ padding: '0 16px' }}>Jakość aktywów (MPT, 365 dni)</div>
             <div className="scroll-x">
               <table className="data">
-                <thead><tr><th style={{ paddingLeft: 16 }}>Token</th><th>Omega</th><th>Sortino</th><th style={{ paddingRight: 16 }}>Sharpe</th></tr></thead>
+                <thead><tr><th style={{ paddingLeft: 16 }}>Token</th><th>Omega</th><th>Sortino</th><th>Sharpe</th><th style={{ paddingRight: 16 }}>Korel. BTC</th></tr></thead>
                 <tbody>
                   {scan.rows.filter((r) => r.inUniverse && Number.isFinite(r.omega)).sort((a, b) => (b.omega ?? 0) - (a.omega ?? 0)).map((r) => (
                     <tr key={r.sym}><td style={{ paddingLeft: 16 }}><b>{r.sym}</b></td>
-                      <td className={(r.omega ?? 0) >= 1 ? 'green' : 'red'}>{r.omega!.toFixed(2)}</td><td>{r.sortino!.toFixed(2)}</td><td style={{ paddingRight: 16 }}>{r.sharpe!.toFixed(2)}</td></tr>
+                      <td className={(r.omega ?? 0) >= 1 ? 'green' : 'red'}>{r.omega!.toFixed(2)}</td><td>{r.sortino!.toFixed(2)}</td><td>{r.sharpe!.toFixed(2)}</td><td style={{ paddingRight: 16 }}>{r.corrBtc == null || !Number.isFinite(r.corrBtc) ? '—' : r.corrBtc.toFixed(2)}</td></tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div className="note-text" style={{ padding: '6px 16px 0' }}>Informacyjnie, jak w lekcji o wyborze aktywów: Omega = suma zysków / suma strat (&gt; 1 = więcej zysków), Sortino karze tylko spadki, Sharpe całą zmienność. Ranking według Omega zamiast siły ratio dał w backteście gorszy wynik poza próbą (Sharpe 0,74 vs 0,88), więc nie steruje wyborem.</div>
+            <div className="note-text" style={{ padding: '6px 16px 0' }}>Informacyjnie, jak w lekcji o wyborze aktywów: Omega = suma zysków / suma strat (&gt; 1 = więcej zysków), Sortino karze tylko spadki, Sharpe całą zmienność. Korelacja dziennych zwrotów z BTC (90 dni): blisko 1 oznacza, że token porusza się prawie jak BTC, więc dywersyfikacja niewiele daje. Ranking według Omega zamiast siły ratio dał w backteście gorszy wynik poza próbą (Sharpe 0,74 vs 0,88), więc nie steruje wyborem.</div>
             <div className="note-text" style={{ padding: '10px 16px 14px' }}>Zamknięcie {scan.closeDate} UTC. Siła = średnia z momentum ratio do BTC z 30/60/90 dni podzielonego przez zmienność. Przegląd codziennie po zamknięciu 00:00 UTC. Wybór: siła &gt; 0 i trend tokena ≥ 0,5; maks. {s.topN} pozycje, limit {s.cap}% na token. Wyszarzone = poza top {s.universeSize}.</div>
           </>
         )}

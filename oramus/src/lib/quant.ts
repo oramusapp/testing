@@ -450,3 +450,29 @@ export function varianceRatio(prices: number[], q = 10, n = 90): number {
   const v = (a: number[]) => { const m = a.reduce((x, y) => x + y, 0) / a.length; return a.reduce((x, y) => x + (y - m) ** 2, 0) / (a.length - 1); };
   return v(sums) / (q * v(d));
 }
+
+/** Pearson correlation, R² and least-squares line y = a + b·x. */
+export function linfit(x: number[], y: number[]): { n: number; r: number; r2: number; a: number; b: number } {
+  const n = Math.min(x.length, y.length);
+  if (n < 3) return { n, r: NaN, r2: NaN, a: NaN, b: NaN };
+  const mx = x.slice(0, n).reduce((s, v) => s + v, 0) / n, my = y.slice(0, n).reduce((s, v) => s + v, 0) / n;
+  let sxy = 0, sxx = 0, syy = 0;
+  for (let i = 0; i < n; i++) { sxy += (x[i] - mx) * (y[i] - my); sxx += (x[i] - mx) ** 2; syy += (y[i] - my) ** 2; }
+  const b = sxy / sxx, r = sxy / Math.sqrt(sxx * syy);
+  return { n, r, r2: r * r, a: my - b * mx, b };
+}
+
+/** BTC forward return over h days grouped by the Fear & Greed reading on the start day. */
+export function fgForward(hist: [string, number][], dates: string[], prices: number[], h = 20) {
+  const idx = new Map(dates.map((d, i) => [d, i]));
+  const pts: { fg: number; r: number }[] = [];
+  for (const [d, v] of hist) { const i = idx.get(d); if (i == null || i + h >= prices.length) continue; pts.push({ fg: v, r: prices[i + h] / prices[i] - 1 }); }
+  const edges: [number, number, string][] = [[0, 25, 'Skrajny strach 0–24'], [25, 45, 'Strach 25–44'], [45, 56, 'Neutralnie 45–55'], [56, 76, 'Chciwość 56–75'], [76, 90, 'Skrajna chciwość 76–89'], [90, 101, 'Powyżej 90']];
+  const all = pts.map((p) => p.r), mAll = all.reduce((s, v) => s + v, 0) / Math.max(all.length, 1);
+  const buckets = edges.map(([lo, hi, label]) => {
+    const r = pts.filter((p) => p.fg >= lo && p.fg < hi).map((p) => p.r).sort((a, b) => a - b);
+    const m = r.length ? r.reduce((s, v) => s + v, 0) / r.length : NaN;
+    return { label, lo, hi, n: r.length, mean: m, median: r.length ? r[Math.floor(r.length / 2)] : NaN, pos: r.length ? r.filter((v) => v > 0).length / r.length : NaN };
+  });
+  return { n: pts.length, mean: mAll, buckets, fit: linfit(pts.map((p) => p.fg), pts.map((p) => p.r)) };
+}
