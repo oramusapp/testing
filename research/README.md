@@ -191,3 +191,12 @@ $TOTAL nie jest aktywem w backteście — służy tylko jako wejście TPI (kieru
 Portfel 60/40, 2020→, próg 0 / ±0,2: oba z BTC — OOS 1,06 / 1,09, CAGR 51,1 / 53,9%; oba z $TOTAL — 0,88 / 0,92, 48,8 / 49,7%;
 SDCA z BTC + RSPS z $TOTAL (wdrożone w 2.14.0) — 0,94 / 1,01, CAGR 50,4 / 51,6%, DD −26,1 / −23,9%. Sam SDCA: LTPI z BTC OOS 0,98–1,00 vs 0,87–0,89.
 Weto RSPS z LTPI na BTC dawało RSPS OOS 0,88–0,89 vs 0,61–0,69 z $TOTAL — zakładka LTPI·MTPI i RSPS zostają na $TOTAL zgodnie z notatkami.
+
+## Szukanie alfy w RSPS — siatka parametrów (run46.py)
+Konfiguracja jak w aplikacji (weto LTPI $TOTAL, parking hybrydowy, SDCA z LTPI BTC), 2020→. Baza top 3 / cap 50% / uniwersum 10 /
+waga = siła/zmienność: RSPS IS 1,39, OOS 0,63, CAGR 47,5%; portfel IS 1,76, OOS 0,95, CAGR 49,3%, DD −26,6%.
+Żaden wariant nie poprawił jednocześnie IS i CAGR: top 1/2/4/5 (CAGR 36–49%), cap 0,34/0,7/1,0, uniwersum 15/20 (gorzej: 38/32%),
+wagi równe/wg siły, trend tokena ≥ 0,75/1,0, bramka MTPI($TOTAL) (OOS 0,48), bramka 0,6/0,5 i 0,8/0,7 (IS 0,92/1,08).
+Ekspozycja × szerokość: OOS 0,72 przy tym samym IS, ale CAGR 46,1% — nie podnosi zwrotu. Obecne parametry zostają.
+Największe dźwignie zwrotu (kosztem ryzyka): parking BTC×trend (portfel CAGR ok. 73% vs 67%, DD −27% vs −24%, run39)
+i weto RSPS z LTPI na BTC (portfel CAGR 53,9% vs 51,6%, run45) — do decyzji użytkownika.
