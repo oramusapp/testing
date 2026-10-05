@@ -27,7 +27,7 @@ export const SPLIT_SDCA = 60;
 // 2020→: CAGR 51.0% → 54.2%, max drawdown −25.0% → −29.7%, Sharpe 2024→ 1.10 → 1.05.
 export const SPLIT_TILT = 40;
 export const splitTarget = (tilt: boolean, totalLtpi: number | undefined) => (tilt && (totalLtpi ?? 0) > 0 ? SPLIT_TILT : SPLIT_SDCA);
-export interface ScanRow { sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; sharpe?: number; sortino?: number; omega?: number; corrBtc?: number; }
+export interface ScanRow { sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; bench?: boolean; sharpe?: number; sortino?: number; omega?: number; corrBtc?: number; }
 export interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; gateOpen: boolean; gateSince?: string; }
 interface LogEntry { time: number; regime: string; lev?: number; }
 
@@ -126,7 +126,11 @@ export function useRsps() {
       const wasOpen = !!scan?.gateOpen;
       const gateOpen = Number.isFinite(br) && (wasOpen ? br >= BREADTH_EXIT : br >= BREADTH_ENTER);
       const gateSince = scan && scan.gateOpen === gateOpen && scan.gateSince ? scan.gateSince : lastClosedDay();
-      setScan({ time: Date.now(), closeDate: lastClosedDay(), rows, breadth: br, btcTrend: trendOf(btc.map((x) => x.c)), gateOpen, gateSince });
+      // BTC as the reference row: RSPS ranks alts by strength against BTC (BTC = 0); BTC itself is held via the
+      // unpicked part and the BTC × trend parking, so it is part of the RSPS allocation even though it is not a candidate
+      const bc = btc.map((x) => x.c);
+      if (bc.length > 150) rows.unshift({ sym: 'BTC', price: bc.at(-1)!, ret: (bc.at(-1)! / bc[bc.length - 31] - 1) * 100, vol: annVol(bc, 30) * 100, liq: 0, ratioUp: false, trend: trendOf(bc), score: 0, inUniverse: true, bench: true, ...ratios(bc, 365), corrBtc: 1 });
+      setScan({ time: Date.now(), closeDate: lastClosedDay(), rows, breadth: br, btcTrend: trendOf(bc), gateOpen, gateSince });
       if (!silent) toast('Skan zakończony');
     } catch (e) {
       if (!silent) toast('Brak połączenia z Binance: ' + (e as Error).message);
@@ -134,7 +138,7 @@ export function useRsps() {
   }
 
   const picks = useMemo(() => {
-    const uni = (scan?.rows ?? []).filter((r) => r.inUniverse && Number.isFinite(r.score));
+    const uni = (scan?.rows ?? []).filter((r) => r.inUniverse && !r.bench && Number.isFinite(r.score));
     const sel = uni.filter((r) => r.score > 0 && r.trend >= 0.5).sort((x, y) => y.score - x.score).slice(0, s.topN);
     const w = capWeights(sel.map((r) => r.score / (r.vol / 100)), s.cap / 100).map((x) => Math.min(x, s.cap / 100));
     const shorts = uni.filter((r) => r.score < 0 && r.trend <= 0.25).sort((x, y) => x.score - y.score).slice(0, 3);

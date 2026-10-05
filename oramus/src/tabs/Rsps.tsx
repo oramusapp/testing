@@ -117,12 +117,12 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
                 <thead><tr><th style={{ paddingLeft: 16 }}>Token</th><th>Ratio</th><th>Siła</th><th>Trend</th><th>30d</th><th>Vol</th><th style={{ paddingRight: 16 }}>Waga</th></tr></thead>
                 <tbody>
                   {scan.rows.map((r) => {
-                    const w = regime === 'rsps' ? picks.sel.find((x) => x.sym === r.sym)?.w : undefined;
+                    const w = r.bench ? sleeve.find((x) => x.sym === 'BTC')?.w : regime === 'rsps' ? picks.sel.find((x) => x.sym === r.sym)?.w : undefined;
                     return (
                       <tr key={r.sym} style={{ opacity: r.inUniverse ? 1 : 0.45, background: w ? 'var(--accent-soft)' : undefined }}>
                         <td style={{ paddingLeft: 16 }}><b>{r.sym}</b>{r.error && <div className="red" style={{ fontSize: 11 }}>{r.error}</div>}</td>
-                        <td className={r.ratioUp ? 'green' : 'red'}>{r.error ? '' : r.ratioUp ? '▲' : '▼'}</td>
-                        <td>{signed(r.score)}</td><td>{r.error ? '' : r.trend.toFixed(2)}</td>
+                        <td className={r.bench ? 'dim' : r.ratioUp ? 'green' : 'red'}>{r.error || r.bench ? (r.bench ? '—' : '') : r.ratioUp ? '▲' : '▼'}</td>
+                        <td>{r.bench ? <span className="dim">wzorzec</span> : signed(r.score)}</td><td>{r.error ? '' : r.trend.toFixed(2)}</td>
                         <td className={r.ret >= 0 ? 'green' : 'red'}>{pct(r.ret, 0, true)}</td><td className="dim">{pct(r.vol, 0)}</td>
                         <td style={{ paddingRight: 16 }} className="accent">{w ? pct(w * 100, 0) : ''}</td>
                       </tr>
