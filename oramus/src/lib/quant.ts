@@ -496,3 +496,23 @@ export function probit(p: number): number {
   const t = q - 0.5, r = t * t;
   return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * t / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
 }
+
+/** Least-squares polynomial fit of degree d; returns coefficients (c0 + c1·x + …), R² and adjusted R². */
+export function polyfit(x: number[], y: number[], d: number): { c: number[]; r2: number; adjR2: number; sd: number } {
+  const n = Math.min(x.length, y.length), k = d + 1;
+  const m = x.slice(0, n).reduce((a, v) => a + v, 0) / n, sc = Math.max(...x.slice(0, n).map((v) => Math.abs(v - m))) || 1;
+  const u = x.slice(0, n).map((v) => (v - m) / sc);                       // centred and scaled for numerical stability
+  const A = Array.from({ length: k }, (_, i) => Array.from({ length: k }, (_, j) => u.reduce((a, v) => a + v ** (i + j), 0)));
+  const b = Array.from({ length: k }, (_, i) => u.reduce((a, v, t) => a + y[t] * v ** i, 0));
+  for (let i = 0; i < k; i++) {                                            // Gauss-Jordan
+    let p = i; for (let r = i + 1; r < k; r++) if (Math.abs(A[r][i]) > Math.abs(A[p][i])) p = r;
+    [A[i], A[p]] = [A[p], A[i]]; [b[i], b[p]] = [b[p], b[i]];
+    for (let r = 0; r < k; r++) if (r !== i) { const f = A[r][i] / A[i][i]; for (let c = i; c < k; c++) A[r][c] -= f * A[i][c]; b[r] -= f * b[i]; }
+  }
+  const cu = b.map((v, i) => v / A[i][i]);
+  const f = (v: number) => cu.reduce((a, c, i) => a + c * ((v - m) / sc) ** i, 0);
+  const my = y.slice(0, n).reduce((a, v) => a + v, 0) / n;
+  const ssr = y.slice(0, n).reduce((a, v, t) => a + (v - f(x[t])) ** 2, 0), sst = y.slice(0, n).reduce((a, v) => a + (v - my) ** 2, 0);
+  const r2 = 1 - ssr / sst;
+  return { c: cu, r2, adjR2: 1 - (1 - r2) * (n - 1) / Math.max(n - k, 1), sd: Math.sqrt(ssr / Math.max(n - k, 1)), ...{ f } } as { c: number[]; r2: number; adjR2: number; sd: number; f: (v: number) => number };
+}

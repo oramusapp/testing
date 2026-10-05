@@ -1,4 +1,5 @@
 export const CHANGELOG = [
+  { v: '2.5.0', date: '2026-10-05', items: ['Statystyka: regresja wielomianowa 2. i 3. stopnia ze skorygowanym R², skala log₁₀ dla y', 'Badanie: stopień modelu wyceny SDCA (1 / 2 / 3) — zostaje 2., stopień 3 przeuczony'] },
   {
     v: '2.4.0', date: '2026-10-05',
     items: [

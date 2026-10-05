@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Screen, Card, Seg } from '../components/ui';
 import { usePersisted } from '../lib/db';
-import { normCdf, linfit, spearman, probit } from '../lib/quant';
+import { normCdf, linfit, spearman, probit, polyfit } from '../lib/quant';
 
 const num = (v: number, d = 2) => (Number.isFinite(v) ? v.toLocaleString('pl-PL', { maximumFractionDigits: d, minimumFractionDigits: 0 }) : '—');
 const parse = (t: string) => t.replace(/;/g, ' ').split(/[\s\n]+/).map((x) => parseFloat(x.replace(',', '.').replace('−', '-'))).filter(Number.isFinite);
@@ -93,7 +93,12 @@ const strength = (r: number) => { const a = Math.abs(r); const w = a >= 0.99 ? '
 
 /** Scatter plot with Pearson r, R² and the least-squares line (lesson: scatterplots, correlation, regression). */
 function Corr({ x, y, set }: { x: string; y: string; set: (x: string, y: string) => void }) {
-  const xs = parse(x), ys = parse(y), n = Math.min(xs.length, ys.length);
+  const [deg, setDeg] = useState<'1' | '2' | '3'>('1');
+  const [logY, setLogY] = useState(false);
+  const xs = parse(x), ysRaw = parse(y), n = Math.min(xs.length, ysRaw.length);
+  const canLog = ysRaw.slice(0, n).every((v) => v > 0);
+  const ys = logY && canLog ? ysRaw.map((v) => Math.log10(v)) : ysRaw;
+  const pf = n > +deg + 1 ? (polyfit(xs, ys, +deg) as ReturnType<typeof polyfit> & { f: (v: number) => number }) : null;
   const f = linfit(xs.slice(0, n), ys.slice(0, n));
   const rho = spearman(xs, ys);
   // outliers: residual from the fit beyond 2.5 standard deviations of the residuals
@@ -114,15 +119,21 @@ function Corr({ x, y, set }: { x: string; y: string; set: (x: string, y: string)
         <textarea className="input mt8" style={{ width: '100%', minHeight: 60, fontFamily: 'inherit' }} value={x} onChange={(e) => set(e.target.value, y)} />
         <div className="eyebrow mt12" style={{ margin: 0 }}>Zmienna y</div>
         <textarea className="input mt8" style={{ width: '100%', minHeight: 60, fontFamily: 'inherit' }} value={y} onChange={(e) => set(x, e.target.value)} />
-        {xs.length !== ys.length && <div className="warn-box mt8">Listy mają różną długość ({xs.length} i {ys.length}); liczę pierwsze {n} par.</div>}
+        <div className="flex mt12" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span className="dim" style={{ fontSize: 13 }}>Stopień regresji</span>
+          <Seg value={deg} onChange={setDeg} options={[{ v: '1', l: 'liniowa' }, { v: '2', l: '2.' }, { v: '3', l: '3.' }]} />
+          <label className="dim" style={{ fontSize: 13 }}><input type="checkbox" checked={logY && canLog} disabled={!canLog} onChange={(e) => setLogY(e.target.checked)} /> log₁₀ y</label>
+        </div>
+        {xs.length !== ysRaw.length && <div className="warn-box mt8">Listy mają różną długość ({xs.length} i {ysRaw.length}); liczę pierwsze {n} par.</div>}
       </Card>
       {n >= 3 && (
         <Card>
           <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label="Wykres punktowy">
             <line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="var(--faint)" /><line x1={L} x2={L} y1={T} y2={H - B} stroke="var(--faint)" />
             {xs.slice(0, n).map((v, i) => <circle key={i} cx={sx(v)} cy={sy(ys[i])} r={out[i] ? 5 : 3.5} fill={out[i] ? 'none' : 'var(--text)'} stroke={out[i] ? 'var(--red)' : 'none'} strokeWidth={2} opacity={0.85} />)}
-            {Number.isFinite(f.b) && [-2, -1, 1, 2].map((k) => <line key={k} x1={sx(x0)} y1={sy(f.a + f.b * x0 + k * rsd)} x2={sx(x1)} y2={sy(f.a + f.b * x1 + k * rsd)} stroke="var(--accent)" strokeWidth={1} strokeDasharray={Math.abs(k) === 2 ? '2 3' : '5 3'} opacity={0.7} />)}
-            {Number.isFinite(f.b) && <line x1={sx(x0)} y1={sy(f.a + f.b * x0)} x2={sx(x1)} y2={sy(f.a + f.b * x1)} stroke="var(--accent)" strokeWidth={2} />}
+            {deg === '1' && Number.isFinite(f.b) && [-2, -1, 1, 2].map((k) => <line key={k} x1={sx(x0)} y1={sy(f.a + f.b * x0 + k * rsd)} x2={sx(x1)} y2={sy(f.a + f.b * x1 + k * rsd)} stroke="var(--accent)" strokeWidth={1} strokeDasharray={Math.abs(k) === 2 ? '2 3' : '5 3'} opacity={0.7} />)}
+            {deg === '1' && Number.isFinite(f.b) && <line x1={sx(x0)} y1={sy(f.a + f.b * x0)} x2={sx(x1)} y2={sy(f.a + f.b * x1)} stroke="var(--accent)" strokeWidth={2} />}
+            {deg !== '1' && pf && <path d={Array.from({ length: 41 }, (_, i) => x0 + (i / 40) * (x1 - x0)).map((v, i) => `${i ? 'L' : 'M'}${sx(v).toFixed(1)} ${sy(pf.f(v)).toFixed(1)}`).join('')} fill="none" stroke="var(--accent)" strokeWidth={2} />}
             <text x={L} y={H - 6} fontSize={9} fill="var(--faint)">{num(x0)}</text><text x={W - R} y={H - 6} fontSize={9} fill="var(--faint)" textAnchor="end">{num(x1)}</text>
             <text x={L - 4} y={H - B} fontSize={8.5} fill="var(--faint)" textAnchor="end">{num(y0)}</text><text x={L - 4} y={T + 8} fontSize={8.5} fill="var(--faint)" textAnchor="end">{num(y1)}</text>
           </svg>
@@ -130,9 +141,10 @@ function Corr({ x, y, set }: { x: string; y: string; set: (x: string, y: string)
           <div className="row compact"><span>Korelacja rangowa Spearmana ρ</span><span className="num">{num(rho, 3)}</span></div>
           {f2 && <div className="row compact"><span>r bez odstających ({out.filter(Boolean).length})</span><span className="num">{num(f2.r, 3)}</span></div>}
           <div className="row compact"><span>R² (siła wyjaśniania, 0–1)</span><span className="num">{num(f.r2, 3)}</span></div>
+          {pf && <div className="row compact"><span>R² / skorygowane R² ({deg === '1' ? 'liniowa' : `stopień ${deg}`})</span><span className="num">{num(pf.r2, 3)} / {num(pf.adjR2, 3)}</span></div>}
           <div className="row compact"><span>Odchylenie reszt σ (szerokość pasm)</span><span className="num">{num(rsd)}</span></div>
           <div className="row compact"><span>Prosta regresji</span><span className="num">y = {num(f.a)} {f.b >= 0 ? '+' : '−'} {num(Math.abs(f.b), 4)}·x</span></div>
-          <div className="note-text mt8">Regresja wybiera prostą o najmniejszej sumie kwadratów odległości punktów od niej. Przerywane linie to ±1σ i ±2σ reszt: przy normalnych resztach ok. 68% i 95% punktów leży w tych pasmach (warunkowy rozkład y przy danym x), co daje probabilistyczne strefy wykupienia i wyprzedania. Lepiej używać tego do oceny bieżącej (koincydentnej) niż do prognozy poza zakresem danych. r mierzy siłę i kierunek zależności liniowej (od −1 do +1), R² = r² mówi, jaką część zmienności y wyjaśnia x. Punkty odstające (czerwone kółka, reszta &gt; 2,5σ) mocno zmieniają r; sprawdź, czy to błąd danych, czy szczególna sytuacja, zanim je pominiesz. r mierzy tylko zależność liniową: krzywa lub fala może mieć r = 0 mimo silnego związku, a duże r nie gwarantuje, że prosta pasuje. Spearman ρ porównuje rangi, więc wychwytuje zależności rosnące lub malejące także nieliniowe i jest mniej czuły na odstające. Korelacja nie oznacza przyczynowości.</div>
+          <div className="note-text mt8">Regresja wybiera prostą o najmniejszej sumie kwadratów odległości punktów od niej. Przerywane linie to ±1σ i ±2σ reszt: przy normalnych resztach ok. 68% i 95% punktów leży w tych pasmach (warunkowy rozkład y przy danym x), co daje probabilistyczne strefy wykupienia i wyprzedania. Lepiej używać tego do oceny bieżącej (koincydentnej) niż do prognozy poza zakresem danych. r mierzy siłę i kierunek zależności liniowej (od −1 do +1), R² = r² mówi, jaką część zmienności y wyjaśnia x. Punkty odstające (czerwone kółka, reszta &gt; 2,5σ) mocno zmieniają r; sprawdź, czy to błąd danych, czy szczególna sytuacja, zanim je pominiesz. r mierzy tylko zależność liniową: krzywa lub fala może mieć r = 0 mimo silnego związku, a duże r nie gwarantuje, że prosta pasuje. Spearman ρ porównuje rangi, więc wychwytuje zależności rosnące lub malejące także nieliniowe i jest mniej czuły na odstające. Korelacja nie oznacza przyczynowości. Wyższy stopień zawsze podnosi R², ale może przeuczyć model (dopasowanie do szumu, które psuje się poza próbą); skorygowane R² karze za dodatkowe parametry, więc wybieraj model, przy którym ono rośnie. Skala log₁₀ zamienia wzrost wykładniczy w prostą (np. cena BTC w czasie). W backteście modelu wyceny SDCA stopień 3 był przeuczony, a 2 dał najlepszy wynik.</div>
         </Card>
       )}
     </>

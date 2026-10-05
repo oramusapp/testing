@@ -84,3 +84,9 @@ S1 = OLS ln(cena) ~ podaż, S2 = dopasowanie do miesięcznych dołków (jak na s
 Jako 3. składnik wyceny SDCA: portfel 60/40 obsunięcie −27,3% → −25,2%, ale CAGR 72,8% → 68,8%, Sharpe OOS 1,04 → 1,00.
 Zamiast modelu ceny: wyraźnie gorzej. Prosta w podaży zakłada wykładniczy wzrost przy podaży zbliżającej się do 21 mln
 (model w 10.2026 nadal „średnio drogo” 66% vs 8% w modelu ceny) → nie wdrożone.
+
+## Dopasowanie modelu wyceny SDCA: stopień wielomianu (run28.py, slajdy o przeuczeniu)
+Regresja kwantylowa log ceny na wielomianie w log czasu, refit co rok tylko na przeszłości:
+stopień 1 (prawo potęgowe): najmniejszy błąd mediany w kolejnym roku (0,247), ale portfel OOS DD −39,7% (nie uznał 2024–25 za drogie);
+stopień 2 (obecny): błąd 0,259, portfel OOS Sharpe 1,04, DD −27,3% — najlepszy; stopień 3: błąd 0,324, gorzej wszędzie (przeuczony);
+średnia stopni 1 i 2: OOS DD −37,8%. Zostaje stopień 2.

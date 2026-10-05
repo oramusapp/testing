@@ -104,3 +104,12 @@ describe('spearman and probit', () => {
     expect(probit(0.975)).toBeCloseTo(1.96, 2); expect(probit(0.5)).toBeCloseTo(0, 6);
   });
 });
+
+import { polyfit } from './quant';
+describe('polyfit', () => {
+  it('fits a parabola exactly with degree 2', () => {
+    const x = [-2, -1, 0, 1, 2, 3], y = x.map((v) => 1 + 2 * v + 0.5 * v * v);
+    const f = polyfit(x, y, 2) as ReturnType<typeof polyfit> & { f: (v: number) => number };
+    expect(f.r2).toBeCloseTo(1, 6); expect(f.f(4)).toBeCloseTo(1 + 8 + 8, 6);
+  });
+});
