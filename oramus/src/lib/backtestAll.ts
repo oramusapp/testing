@@ -75,12 +75,15 @@ const trend4 = (c: number[], i: number) => {
 };
 const finiteFrom = (a: number[], i: number, n: number) => { for (let k = i - n + 1; k <= i; k++) if (!(a[k] > 0)) return false; return true; };
 
-/** Relative strength as in the research (strategies.rs_scores): log change of the coin/BTC ratio over 30/60/90 days
- *  divided by the coin's own 30-day annualised volatility, averaged over the three lookbacks. */
-export function rsScore(ratio: number[], coinVol: number): number {
+/** Relative-strength lookbacks (days). 7/21/42 since 2.23.0 (research/run52–53.py: better than 30/60/90 in-sample,
+ *  out-of-sample, without 2021 and at double cost). */
+export const RS_LOOKBACKS = [7, 21, 42];
+/** Relative strength as in the research (strategies.rs_scores): log change of the coin/BTC ratio over each lookback
+ *  divided by the coin's own 30-day annualised volatility, averaged over the lookbacks. */
+export function rsScore(ratio: number[], coinVol: number, lbs: number[] = RS_LOOKBACKS): number {
   const n = ratio.length - 1;
-  if (!(coinVol > 0)) return NaN;
-  return mean([30, 60, 90].map((L) => Math.log(ratio[n] / ratio[n - L]) / coinVol));
+  if (!(coinVol > 0) || n < Math.max(...lbs)) return NaN;
+  return mean(lbs.map((L) => Math.log(ratio[n] / ratio[n - L]) / coinVol));
 }
 
 export interface RspsOpts { universe: number; topN: number; cap: number; parking: 'stable' | 'btc' | 'hybrid'; hybridMax: number; every?: number; reserve?: 'stable' | 'gold' | 'goldTrend' | 'hierarchy' }

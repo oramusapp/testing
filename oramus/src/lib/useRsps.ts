@@ -6,7 +6,7 @@ import { klines, klinesAny, lastClosedDay } from './market';
 import { annVol, capWeights, ratios, linfit, vams3 } from './quant';
 import { leverageGate, PILLARS, isFresh } from './pyramid';
 import { usePyramid } from './pyramidStore';
-import { rsScore } from './backtestAll';
+import { rsScore, RS_LOOKBACKS } from './backtestAll';
 import { SDCA_DEFAULTS, manualLtpiActive, type LtpiState, type SdcaSettings } from '../tabs/Sdca';
 import { useBtc } from './btcStore';
 import { composite, freshManual } from './sdcaModel';
@@ -26,7 +26,7 @@ export const GOLD = 'PAXG';
 export const GOLD_VS_BTC = 'mom' as 'none' | 'ratio' | 'mom';   // research/run50.py: trend alone pushed BTC out and lowered returns
 export const goldIsStrong = (g: { trend: number; ratioUp?: boolean; ratioMom?: boolean }) =>
   g.trend >= 0.5 && (GOLD_VS_BTC === 'none' || (GOLD_VS_BTC === 'ratio' ? !!g.ratioUp : !!g.ratioMom));
-export const LOOKBACKS = [30, 60, 90];          // relative-strength ensemble
+export const LOOKBACKS = RS_LOOKBACKS;          // relative-strength ensemble
 export const BREADTH_ENTER = 0.7, BREADTH_EXIT = 0.6;   // gate hysteresis
 // Split with the highest Sharpe (1.52, tie 40/50%) and the better Calmar of the two (research/run8.py).
 export const SPLIT_SDCA = 60;
@@ -116,7 +116,7 @@ export function useRsps() {
           rows.push({
             sym, price: c.at(-1)!, ret: (c.at(-1)! / c[c.length - 31] - 1) * 100, vol: vol * 100,
             liq: k.slice(-30).reduce((p, x) => p + (x.q ?? 0), 0) / 30, ratioUp: ratio.at(-1)! > r50, trend: trendOf(c),
-            score: rsScore(ratio, vol),   // research definition: ratio log change / coin volatility, 30/60/90
+            score: rsScore(ratio, vol),   // research definition: ratio log change / coin volatility, 7/21/42
             ...ratios(c, 365),
             corrBtc: (() => {
               const kk = k.filter((x) => btcMap.has(x.t)).slice(-91);

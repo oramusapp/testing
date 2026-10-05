@@ -247,3 +247,14 @@ B: BTC w rezerwie RSPS 0/50/100% wg trendu (VAMS 3-stanowy) — 72,8%, −26,1%,
 B + C razem — CAGR 74,2%, DD −26,1%, IS 1,80, OOS 1,28, Dale 0,54. Odrzucone: D przechył wg ETH/BTC (65,9%), E cel zmienności
 RSPS 60/80/100% (63,0–69,7%). Statystyka zdarzeń: 5 dni po zamknięciu pod dolną granicą średnio −0,37% (z −1,98), nad górną +1,46% (z 3,34)
 — dlatego ×0,5 nad zakresem nie zostało wybrane.
+
+## Dalsze szukanie zwrotu (run52.py, run53.py) — wdrożone okna 7/21/42 w 2.23.0
+Baza = 2.22.0 (VAMS BTC, SDCA ×2 pod zakresem, przechył 40/60), portfel 2020→: CAGR 74,2%, DD −26,1%, IS 1,80, OOS 1,28.
+Okna siły względnej RSPS (portfel CAGR / IS / OOS): 30/60/90 — 74,2 / 1,80 / 1,28; 7/21/42 — 81,7 / 1,87 / 1,32 (wybrane);
+10/20/40 — 80,0 / 1,83 / 1,32; 14/30/60 — 80,9 / 1,89 / 1,25; 7/14/30 — 78,0 / 1,78 / 1,34; 21/42/63 — 79,8 / 1,88 / 1,22;
+60/90/120 — 68,9 / 1,71 / 1,24. Krótsze okna poprawiają wynik w całym sąsiedztwie. Sprawdzenia 7/21/42: portfel bez roku 2021 —
+57,8% vs 55,0%; koszt 0,3% za stronę — 73,6% vs 67,6% (OOS 1,21 vs 1,17); obrót podobny (ok. 50× rocznie). Silnik aplikacji
+(fixture, bez PAXG): RSPS CAGR 91,9 → 101,7%, DD −33,4 → −31,3%, IS 1,89 → 1,92, OOS 0,96 → 1,07.
+Odrzucone: bufor rankingu (trzymaj, dopóki w top 5/6) — 67,6/62,9%; ETH jako druga ławka — 67,8%, DD −35%; top 2/4 z buforem — 66,8/70,1%;
+pasmo rebalansu 5% — bez zmian, 20% — gorzej; przechył 30/70 — 77,5% ale DD −29,3%; SDCA bez sprzedaży z krzywej — DD −51,9%;
+SDCA ×1,5 przy LTPI+ — bez zmian. Informacyjnie (założenie, nie reguła): oprocentowanie stablecoinów 4%/rok — portfel 76,3% zamiast 74,2%.

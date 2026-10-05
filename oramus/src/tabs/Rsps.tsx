@@ -152,7 +152,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
               </table>
             </div>
             <div className="note-text" style={{ padding: '6px 16px 0' }}>Informacyjnie, jak w lekcji o wyborze aktywów: Omega = suma zysków / suma strat (&gt; 1 = więcej zysków), Sortino karze tylko spadki, Sharpe całą zmienność. Korelacja dziennych zwrotów z BTC (90 dni): blisko 1 oznacza, że token porusza się prawie jak BTC, więc dywersyfikacja niewiele daje. Ranking według Omega zamiast siły ratio dał w backteście gorszy wynik poza próbą (Sharpe 0,74 vs 0,88), więc nie steruje wyborem.</div>
-            <div className="note-text" style={{ padding: '10px 16px 14px' }}>Zamknięcie {scan.closeDate} UTC. Siła = średnia z momentum ratio do BTC z 30/60/90 dni podzielonego przez zmienność. Przegląd codziennie po zamknięciu 00:00 UTC. Wybór: siła &gt; 0 i trend tokena ≥ 0,5; maks. {s.topN} pozycje, limit {s.cap}% na token. Wyszarzone = poza top {s.universeSize}.</div>
+            <div className="note-text" style={{ padding: '10px 16px 14px' }}>Zamknięcie {scan.closeDate} UTC. Siła = średnia z momentum ratio do BTC z 7/21/42 dni podzielonego przez zmienność. Przegląd codziennie po zamknięciu 00:00 UTC. Wybór: siła &gt; 0 i trend tokena ≥ 0,5; maks. {s.topN} pozycje, limit {s.cap}% na token. Wyszarzone = poza top {s.universeSize}.</div>
           </>
         )}
       </Card>
@@ -161,7 +161,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       <div className="section-title">Parametry</div>
       <Card className="tight">
         <Row label="Przegląd" value="codziennie, 00:00 UTC" />
-        <Row label="Siła względem BTC" value="średnia 30/60/90 dni" />
+        <Row label="Siła względem BTC" value="średnia 7/21/42 dni" />
         <Row label="Bramka szerokości" value="wejście ≥ 70%, wyjście < 60%" />
         <Row label="Pozycje / limit" value={`maks. ${s.topN} · ${s.cap}% na token`} />
         <div className="note-text" style={{ padding: '4px 16px 14px' }}>Wybrane na danych 2020–2023, sprawdzone poza próbą 01.2024–10.2026 (Binance, 35 tokenów bez memów). Strategia jest wrażliwa na koszty: przy dziennym przeglądzie używaj zleceń z niską prowizją (≤ 0,1%).</div>
@@ -185,7 +185,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       <Sheet open={info} onClose={() => setInfo(false)} title="Jak działa RSPS">
         <div className="note-text" style={{ fontSize: 14.5 }}>
           <p><b className="accent">Podział kapitału.</b> SDCA {split}% (zakładka SDCA) + RSPS {100 - split}% — ten sam cel co w Portfelu ({SPLIT_SDCA}/{100 - SPLIT_SDCA}, przy przechyle {SPLIT_TILT}/{100 - SPLIT_TILT}, gdy LTPI z $TOTAL dodatnie). Rebalans przy odchyleniu ±10 p.p. Dźwignia i shorty nie są częścią alokacji, pojawiają się tylko jako propozycje w sygnale.</p>
-          <p><b className="accent">RSPS.</b> Codziennie, spośród {s.universeSize} najpłynniejszych dużych tokenów (bez memów), wybiera do {s.topN} najsilniejszych względem BTC (średnia momentum ratio z 30/60/90 dni podzielona przez zmienność). Włącza się, gdy ≥ 70% tokenów ma ratio do BTC nad 50-dniową średnią, i wyłącza dopiero poniżej 60%; trend BTC ≥ 0,5 i LTPI ≥ 0. W przeciwnym razie część RSPS trzyma BTC proporcjonalnie do trendu.</p>
+          <p><b className="accent">RSPS.</b> Codziennie, spośród {s.universeSize} najpłynniejszych dużych tokenów (bez memów), wybiera do {s.topN} najsilniejszych względem BTC (średnia momentum ratio z 7/21/42 dni podzielona przez zmienność). Włącza się, gdy ≥ 70% tokenów ma ratio do BTC nad 50-dniową średnią, i wyłącza dopiero poniżej 60%; trend BTC ≥ 0,5 i LTPI ≥ 0. W przeciwnym razie część RSPS trzyma BTC proporcjonalnie do trendu.</p>
           <p><b className="accent">Piramida.</b> Siedem rodzajów analizy w kolejności ważności, wagi metodą ROC (Barron i Barrett 1996). Systematyzacja, on-chain, istotność statystyczna i sentyment aktualizują się automatycznie po zamknięciu świecy 00:00 UTC; ekonomia fundamentalna, makro i analiza techniczna są ręczne i ważne 7 dni.</p>
           <p><b className="accent">Aktualizacja.</b> iOS nie pozwala aplikacjom webowym działać w tle, więc przeliczenie następuje przy pierwszym otwarciu aplikacji po 00:00 UTC (albo automatycznie, jeśli jest wtedy otwarta).</p>
           <p className="faint">Wyniki z backtestu: research/ w repozytorium. Narzędzie analityczne, nie porada inwestycyjna.</p>
