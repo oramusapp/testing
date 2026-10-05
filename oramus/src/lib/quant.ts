@@ -349,6 +349,9 @@ export function athSellSeries(prices: Series, riskPct: Series): { frac: number[]
 // Sharpe better in about half, median CAGR 43.7% → 40.1%.
 export const SLOW_BUY_OPTIONS = [1, 0.5, 0.25, 0.1];
 export const slowBuyRate = (ratePct: number, ltpi: number, mult: number) => (ratePct > 0 && ltpi < 0 ? ratePct * mult : ratePct);
+/** Buys of 1% of the remaining stablecoin per day or less are shown as HOLD and not executed (sells unaffected). */
+export const MIN_BUY_PCT = 1;
+export const minBuyRate = (ratePct: number) => (ratePct > 0 && ratePct <= MIN_BUY_PCT ? 0 : ratePct);
 
 /** ltpiState: optional LTPI state per day (aligned with prices) — enables the SDCA safety.
  *  athSell: optional per-day fraction of BTC to sell (athSellSeries().frac).
@@ -363,7 +366,7 @@ export function backtest(prices: Series, riskPct: Series, curve: number[], start
     // no look-ahead: signals from the previous close (i − 1), executed at today's close (as research/sdca.py)
     const r = i > 0 ? riskPct[i - 1] : NaN;
     const rate0 = Number.isFinite(r) ? curveRate(curve, r) / 100 : 0;
-    const rate = slow ? slowBuyRate(rate0, slow.ltpi[i - 1] ?? 0, slow.mult) : rate0;
+    const rate = minBuyRate((slow ? slowBuyRate(rate0, slow.ltpi[i - 1] ?? 0, slow.mult) : rate0) * 100) / 100;   // rate is a fraction here
     let act = rate;
     if (rate > 1e-6 && cash > 0) {
       const amt = cash * rate;

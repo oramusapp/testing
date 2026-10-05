@@ -174,3 +174,13 @@ describe('live testing (paper portfolio)', () => {
     expect(paperSummary(s, 'month')[0].period).toBe('2026-01');
   });
 });
+
+import { minBuyRate } from './quant';
+describe('minimum SDCA buy', () => {
+  it('holds at 1%/day or less, buys above, leaves sells alone', () => {
+    expect(minBuyRate(0.96)).toBe(0);
+    expect(minBuyRate(1)).toBe(0);
+    expect(minBuyRate(1.25)).toBe(1.25);
+    expect(minBuyRate(-2)).toBe(-2);
+  });
+});
