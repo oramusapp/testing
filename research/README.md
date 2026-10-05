@@ -101,3 +101,8 @@ Zwrot BTC po 90 dniach (2014→, wycena bez look-ahead × LTPI z histerezą): ta
 środek + LTPI+: mediana +25%, 78%; środek + LTPI−: mediana −14%, 31% (najgorzej); wszystkie dni: mediana +7%, 57%.
 Próg bezpiecznika SDCA (LTPI < 0 i ryzyko ≥ R, z odkupem): R = 30…60 obniżają DD, ale też CAGR i Sharpe; R = 70 najlepszy → bez zmian.
 W aplikacji: stożek prawdopodobieństwa w SDCA.
+
+## Uznaniowa analiza techniczna (run32.py, slajdy: formacje, świece, struktura, linie trendu)
+BTCUSDT 1D OHLC 2018→: żadna formacja świecowa (objęcie hossy/bessy, młot, spadająca gwiazda, doji, trzech żołnierzy,
+trzy wrony) nie daje istotnie innego zwrotu 5/20-dniowego niż wszystkie dni (|t| < 1,4; formacje „niedźwiedzie” 50–57% dni na plusie).
+Struktura HH/HL (pivot ±3/5/10/20) jako filtr long: Sharpe OOS 0,09–0,62 vs 0,89 (4 średnie) i 0,78 (B&H). Zgodne z lekcją: nie wdrażamy.
