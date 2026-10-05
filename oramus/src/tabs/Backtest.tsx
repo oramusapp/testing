@@ -58,7 +58,7 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
     };
   }, [model, base, s0, cfg.curve, cfg.safety, cfg.athSell, cfg.slowBuy]);
 
-  const rspsKey = model ? ['r2.25', model.dates.at(-1), effStart, rs.tokens.join(','), rs.universeSize, rs.topN, rs.cap, rs.reserve, parking.choice, cfg.enabled.mvrv, tpiCfg.ltpiSource, tpiCfg.hyst].join('|') : '';
+  const rspsKey = model ? ['r2.26', model.dates.at(-1), effStart, rs.tokens.join(','), rs.universeSize, rs.topN, rs.cap, rs.reserve, parking.choice, cfg.enabled.mvrv, tpiCfg.ltpiSource, tpiCfg.hyst].join('|') : '';
   const rspsRunRes = rspsCache?.key === rspsKey ? rspsCache.run : saved?.key === rspsKey ? saved.run : null;
 
   async function runRsps() {
@@ -71,7 +71,7 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
       setBusy('Liczenie…');
       const st = Math.max(0, dates.findIndex((d) => d >= effStart));
       const run = rspsRun(dates, btc, coins, base.ltpiBtc.slice(i0), base.comp.risk.slice(i0), st,
-        { core: CORE, universe: rs.universeSize, topN: rs.topN, cap: rs.cap / 100, parking: parking.choice, hybridMax: HYBRID_RISK_MAX, every: 1, reserve: rs.reserve ?? 'hierarchy' });
+        { universe: rs.universeSize, topN: rs.topN, cap: rs.cap / 100, parking: parking.choice, hybridMax: HYBRID_RISK_MAX, every: 1, reserve: rs.reserve ?? 'hierarchy' });
       const lite = { dates: run.dates, ret: run.ret, expo: run.expo };
       rspsCache = { key: rspsKey, run: lite }; setSaved({ key: rspsKey, run: lite });
       toast(`RSPS: ${coins.length} tokenów z Binance`);
@@ -137,7 +137,7 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
       <div className="note-text mt12">
         Bez patrzenia w przyszłość: każdy dzień używa tylko danych do zamknięcia swojej świecy (00:00 UTC) — model wyceny przeliczany co rok na danych sprzed 1 stycznia, percentyle tylko z przeszłości, TPI z wcześniejszych zamknięć; decyzja na zamknięciu, transakcja następnego dnia. Zasady jak w sygnałach: decyzja na zamknięciu dnia, transakcja następnego dnia, koszt 0,15% za stronę. SDCA: krzywa, bezpiecznik LTPI (liczone z BTC), tempo zakupów przy LTPI− i (jeśli włączona) sprzedaż przy ATH — od 100% stablecoinów w dniu startu.
         LTPI · MTPI: BTC, gdy stan TPI jest dodatni, w przeciwnym razie stablecoin. Kupowany jest BTC; $TOTAL (cały rynek) służy wyłącznie do odczytu kierunku i trendu (TPI), jak w notatkach — nie jest aktywem do kupienia. Próg stanu wg ustawień (domyślnie 0).
-        RSPS: weto LTPI liczone z BTC; codzienna rotacja siły względnej: duże coiny (ETH, SOL, XRP, SUI, HYPE) zawsze, małe spośród {rs.universeSize - 1} najpłynniejszych tylko, gdy ich grupa jest silniejsza od dużych (plus BTC), bramka szerokości 70%/60%, LTPI− → stablecoin, parking: {parking.choice === 'stable' ? 'stablecoin' : parking.choice === 'btc' ? 'BTC × trend' : `hybryda (ryzyko < ${HYBRID_RISK_MAX}%)`}.
+        RSPS: weto LTPI liczone z BTC; codzienna rotacja siły względnej wśród {rs.universeSize - 1} najpłynniejszych altów (plus BTC), wybieranych w każdym dniu bez wiedzy z przyszłości — Twoje stałe coiny (ETH, SOL, XRP, SUI, HYPE) nie mają w backteście specjalnego statusu, bo ich wybór opiera się na dzisiejszej wiedzy (dodanie ich do puli w teście informacyjnym nie zmieniało wyniku: 85,2% vs 87,0%), bramka szerokości 70%/60%, LTPI− → stablecoin, parking: {parking.choice === 'stable' ? 'stablecoin' : parking.choice === 'btc' ? 'BTC × trend' : `hybryda (ryzyko < ${HYBRID_RISK_MAX}%)`}.
         Używa dzisiejszej listy kandydatów, więc tokeny, które zniknęły z rynku, są pominięte — wynik RSPS jest optymistyczny (błąd przeżywalności).
         Całość: {SPLIT_SDCA}% SDCA / {100 - SPLIT_SDCA}% RSPS{tilt ? ` (przechył: ${SPLIT_TILT}/${100 - SPLIT_TILT}, gdy LTPI z $TOTAL dodatnie)` : ''} z rebalansem przy odchyleniu ±10 p.p. Dale = liczba lat potrzebna do odrobienia maks. obsunięcia przy danym CAGR (miara z raportów 42 Macro; mniej = lepiej). Wyniki historyczne nie gwarantują przyszłych.
       </div>

@@ -288,3 +288,14 @@ backtestem — wynik 2.24 jest zawyżony. Lista dużych zostaje tylko jako wybó
 Inne źródła optymizmu: okna 7/21/42 wybrano częściowo patrząc na 2024→ (gdyby wybierać tylko po 2020–23, wygrałoby 14/28/56 z OOS
 1,22 < 1,28 bazy), więc 2024→ nie jest już czystym testem poza próbą; RSPS pomija coiny, które upadły; $TOTAL to własny indeks
 z 45 aktywów Coin Metrics, nie oficjalny TOTAL z TradingView. Zmiana LTPI (2.25) poprawiła też okres 2020–23, więc jest wiarygodniejsza.
+
+## Uczciwy protokół (run58.py, run59.py) — 2.26.0
+Na prośbę użytkownika: każdy wariant point-in-time, wybór tylko na 2020–23, 2024→ raportowane, nie używane do wyboru.
+Warstwy z notatek point-in-time (duże = top 3/4/5 płynności, z priorytetem lub bez): IS 1,57–1,85 — wszystkie gorsze od jednej puli
+top 10 (IS 1,93) → wycofane. Stała lista użytkownika dodana do puli bez priorytetu (informacyjnie, wiedza z przyszłości): CAGR 85,2%
+vs 87,0%, ta sama DD — neutralna, więc w aplikacji zostaje jako wybór użytkownika (zawsze kandydaci), a backtest jej nie uwzględnia.
+Okna siły, wybór po IS (portfel IS / OOS / CAGR / DD): 30/60/90 — 1,86 / 1,35 / 78,4 / −26,1; 21/42/63 — 1,97 / 1,32 / 85,4;
+14/28/56 — 1,97 / 1,32 / 85,7 / −25,6 (wybrane: najwyższe IS, środek płaskiego obszaru 14–21); 14/30/60 — 1,96 / 1,34; 7/21/42 — 1,93 /
+1,42 / 87,0 (lepsze w 2024→, ale tego nie można było wiedzieć). Silnik aplikacji (fixture, stare LTPI, bez PAXG): IS 1,91 vs 1,92 dla
+7/21/42 — różnica w granicach szumu. Wynik uczciwy 2.26 (portfel 2020→): CAGR 85,7%, DD −25,6%, IS 1,97, 2024→ Sharpe 1,32, CAGR 55,0%.
+Wyniki 2.23–2.25 w tym README są zawyżone (wybory z wglądem w 2024→ lub z wiedzą z przyszłości o liście coinów).

@@ -75,9 +75,9 @@ const trend4 = (c: number[], i: number) => {
 };
 const finiteFrom = (a: number[], i: number, n: number) => { for (let k = i - n + 1; k <= i; k++) if (!(a[k] > 0)) return false; return true; };
 
-/** Relative-strength lookbacks (days). 7/21/42 since 2.23.0 (research/run52–53.py: better than 30/60/90 in-sample,
- *  out-of-sample, without 2021 and at double cost). */
-export const RS_LOOKBACKS = [7, 21, 42];
+/** Relative-strength lookbacks (days): 14/28/56, chosen on 2020–23 only (research/run59.py; 2024→ not used for the
+ *  choice). 7/21/42 (2.23) had been picked partly on 2024→ data, which overstated its out-of-sample result. */
+export const RS_LOOKBACKS = [14, 28, 56];
 /** Relative strength as in the research (strategies.rs_scores): log change of the coin/BTC ratio over each lookback
  *  divided by the coin's own 30-day annualised volatility, averaged over the lookbacks. */
 export function rsScore(ratio: number[], coinVol: number, lbs: number[] = RS_LOOKBACKS): number {
@@ -86,7 +86,7 @@ export function rsScore(ratio: number[], coinVol: number, lbs: number[] = RS_LOO
   return mean(lbs.map((L) => Math.log(ratio[n] / ratio[n - L]) / coinVol));
 }
 
-export interface RspsOpts { core?: string[]; universe: number; topN: number; cap: number; parking: 'stable' | 'btc' | 'hybrid'; hybridMax: number; every?: number; reserve?: 'stable' | 'gold' | 'goldTrend' | 'hierarchy' }
+export interface RspsOpts { universe: number; topN: number; cap: number; parking: 'stable' | 'btc' | 'hybrid'; hybridMax: number; every?: number; reserve?: 'stable' | 'gold' | 'goldTrend' | 'hierarchy' }
 
 /** Weekly relative-strength rotation with the live rules: point-in-time liquidity universe, VAMS of the coin/BTC ratio
  *  (30/60/90), breadth gate 70%/60%, own trend ≥ 0.5, LTPI < 0 → all stablecoin, parking per choice when the gate is closed. */
@@ -95,25 +95,6 @@ export function rspsRun(dates: string[], btc: number[], coins: CoinSeries[], ltp
   const n = dates.length;
   const W: number[][] = []; let cur: Record<string, number> = {}; let gate = false;
   const syms = ['BTC', ...coins.map((c) => c.sym)], col = new Map(syms.map((s, i) => [s, i]));
-  // tiers (notes, research/run54.py V5): fixed large caps always candidates and ranked first; the other liquid tokens
-  // form the small-cap group, allowed only while its equal-weight index beats the large caps (point-in-time members)
-  const core = new Set(o.core ?? []);
-  const alts = coins.filter((c) => c.sym !== 'PAXG');
-  const q30 = alts.map((c) => { const out = new Array(n).fill(NaN); let acc = 0; for (let k = 0; k < n; k++) { acc += c.quote[k] || 0; if (k >= 30) acc -= c.quote[k - 30] || 0; if (k >= 29) out[k] = acc; } return out; });
-  const members = (i: number) => alts.map((c, j) => ({ c, j })).filter(({ c }) => finiteFrom(c.close, i, 91)).sort((a, b) => q30[b.j][i] - q30[a.j][i]).slice(0, o.universe - 1).map(({ c }) => c);
-  const grp: number[] = new Array(n).fill(0);
-  if (core.size) for (let i = 1; i < n; i++) {
-    const lr = (x: number[]) => (x[i] > 0 && x[i - 1] > 0 ? Math.log(x[i] / x[i - 1]) : NaN);
-    const prev = i >= 92 ? members(i - 1) : [];
-    const bigs = [lr(btc), ...alts.filter((c) => core.has(c.sym) && finiteFrom(c.close, i - 1, 91)).map((c) => lr(c.close))].filter(Number.isFinite);
-    const sm = prev.filter((c) => !core.has(c.sym)).map((c) => lr(c.close)).filter(Number.isFinite);
-    grp[i] = grp[i - 1] + (bigs.length && sm.length ? mean(sm) - mean(bigs) : 0);
-  }
-  const smallOn = (i: number) => {
-    if (i < 50 + 42) return false;
-    let m = 0; for (let k = i - 49; k <= i; k++) m += grp[k];
-    return grp[i] > m / 50 && RS_LOOKBACKS.reduce((a, L) => a + grp[i] - grp[i - L], 0) / RS_LOOKBACKS.length > 0;
-  };
   for (let i = 0; i < n; i++) {
     if (i >= start && (i - start) % every === 0) {
       const bt = trend4(btc, i);
@@ -126,16 +107,13 @@ export function rspsRun(dates: string[], btc: number[], coins: CoinSeries[], ltp
         return { sym: c.sym, liq: q, up: ratio[ratio.length - 1] > r50, score: rsScore(ratio, vol), trend: trend4(c.close, i), vol };
       };
       const rows = coins.filter((c) => c.sym !== 'PAXG' && finiteFrom(c.close, i, 91)).map(rowOf).sort((a, b) => b.liq - a.liq).slice(0, o.universe - 1);   // BTC itself is one of the top-N by liquidity (as in the research)
-      const coreRows = coins.filter((c) => core.has(c.sym) && finiteFrom(c.close, i, 91)).map(rowOf);
       const breadth = rows.length ? rows.filter((r) => r.up).length / rows.length : 0;
       gate = gate ? breadth >= 0.6 : breadth >= 0.7;
       const w: Record<string, number> = {};
       const parkBtc = o.parking === 'btc' || (o.parking === 'hybrid' && risk[i] < o.hybridMax);   // unpicked capital follows the parking rule
       if (ltpi[i] < 0) { /* defence: all stablecoin */ }
       else if (gate && bt >= 0.5) {
-        const pool = core.size ? [...rows.filter((r) => !core.has(r.sym) && smallOn(i)), ...coreRows] : rows;
-        const ok = pool.filter((r) => r.score > 0 && r.trend >= 0.5).sort((a, b) => b.score - a.score);
-        const picks = (core.size ? [...ok.filter((r) => core.has(r.sym)), ...ok.filter((r) => !core.has(r.sym))] : ok).slice(0, o.topN);
+        const picks = rows.filter((r) => r.score > 0 && r.trend >= 0.5).sort((a, b) => b.score - a.score).slice(0, o.topN);
         const cw = capWeights(picks.map((r) => r.score / (r.vol || 1)), o.cap).map((x) => Math.min(x, o.cap));
         picks.forEach((r, k) => (w[r.sym] = cw[k]));
         const rest = 1 - cw.reduce((a, b) => a + b, 0);

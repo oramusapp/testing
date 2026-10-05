@@ -53,7 +53,6 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
           <div className="stat" onClick={() => setLevOpen(true)} style={{ cursor: 'pointer' }}><div className="k">Propozycje</div><div className="v">{(gate.allowed ? 1 : 0) + (shortProposal ? 1 : 0)}</div><div className="s">dźwignia {gate.checks.filter((c) => c.ok).length}/{gate.checks.length} · short {shortProposal ? 'tak' : 'nie'}</div></div>
         </div>
         <div className="row compact" style={{ padding: '10px 0 0' }}><span className="dim">LTPI (BTC) · weto RSPS</span><span className={R0.ltpi > 0 ? 'green' : 'red'} style={{ fontWeight: 600 }}>{R0.ltpi > 0 ? 'pozytywne' : 'negatywne → stablecoin'}</span></div>
-        <div className="row compact" style={{ padding: '6px 0 0' }}><span className="dim">Małe coiny vs duże (grupy)</span><span className={scan?.smallOn ? 'green' : 'dim'} style={{ fontWeight: 600 }}>{scan?.smallOn == null ? '—' : scan.smallOn ? 'małe silniejsze → dopuszczone' : 'duże silniejsze → tylko duże'}</span></div>
       </Card>
 
       {(gate.allowed || shortProposal) && <div className="section-title">Propozycje w sygnale</div>}
@@ -129,7 +128,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
                     const w = r.bench ? sleeve.find((x) => x.sym === 'BTC')?.w : regime === 'rsps' ? picks.sel.find((x) => x.sym === r.sym)?.w : undefined;
                     return (
                       <tr key={r.sym} style={{ opacity: r.inUniverse ? 1 : 0.45, background: w ? 'var(--accent-soft)' : undefined }}>
-                        <td style={{ paddingLeft: 16 }}><b>{r.sym}</b>{r.core && <span className="faint" style={{ fontSize: 11 }}> duży</span>}{r.error && <div className="red" style={{ fontSize: 11 }}>{r.error}</div>}</td>
+                        <td style={{ paddingLeft: 16 }}><b>{r.sym}</b>{r.core && <span className="faint" style={{ fontSize: 11 }}> stały</span>}{r.error && <div className="red" style={{ fontSize: 11 }}>{r.error}</div>}</td>
                         <td className={r.bench ? 'dim' : r.ratioUp ? 'green' : 'red'}>{r.error || r.bench ? (r.bench ? '—' : '') : r.ratioUp ? '▲' : '▼'}</td>
                         <td>{r.bench ? <span className="dim">wzorzec</span> : signed(r.score)}</td><td>{r.error ? '' : r.trend.toFixed(2)}</td>
                         <td className={r.ret >= 0 ? 'green' : 'red'}>{pct(r.ret, 0, true)}</td><td className="dim">{pct(r.vol, 0)}</td>
@@ -153,7 +152,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
               </table>
             </div>
             <div className="note-text" style={{ padding: '6px 16px 0' }}>Informacyjnie, jak w lekcji o wyborze aktywów: Omega = suma zysków / suma strat (&gt; 1 = więcej zysków), Sortino karze tylko spadki, Sharpe całą zmienność. Korelacja dziennych zwrotów z BTC (90 dni): blisko 1 oznacza, że token porusza się prawie jak BTC, więc dywersyfikacja niewiele daje. Ranking według Omega zamiast siły ratio dał w backteście gorszy wynik poza próbą (Sharpe 0,74 vs 0,88), więc nie steruje wyborem.</div>
-            <div className="note-text" style={{ padding: '10px 16px 14px' }}>Zamknięcie {scan.closeDate} UTC. Siła = średnia z momentum ratio do BTC z 7/21/42 dni podzielonego przez zmienność. Przegląd codziennie po zamknięciu 00:00 UTC. Wybór: siła &gt; 0 i trend tokena ≥ 0,5; maks. {s.topN} pozycje, limit {s.cap}% na token. Wyszarzone = poza top {s.universeSize}. Warstwy wg notatek: duże coiny (ETH, SOL, XRP, SUI, HYPE) są zawsze kandydatami i mają pierwszeństwo; małe (pozostałe płynne) wchodzą tylko, gdy ich grupa jest silniejsza od dużych (indeks równowagowy nad średnią 50 d i momentum 7/21/42 d &gt; 0). Backtest od 2020 (research/run54.py): portfel 2024→ CAGR 54,8 → 65,4%, bez roku 2021 57,8 → 63,1%, obsunięcie −26,6 → −27,1%; w samym 2021 (mania małych coinów) mniej. Uwaga: lista dużych jest wybrana dziś, gdy wiadomo, że SOL i SUI urosły — gdy „duże” to 4 najpłynniejsze coiny znane w danym dniu, wynik jest gorszy (CAGR 64% zamiast 84%, research/run57.py). Ten backtest jest więc zawyżony; lista dużych to Twój wybór, nie ulepszenie potwierdzone danymi.</div>
+            <div className="note-text" style={{ padding: '10px 16px 14px' }}>Zamknięcie {scan.closeDate} UTC. Siła = średnia z momentum ratio do BTC z 14/28/56 dni podzielonego przez zmienność. Przegląd codziennie po zamknięciu 00:00 UTC. Wybór: siła &gt; 0 i trend tokena ≥ 0,5; maks. {s.topN} pozycje, limit {s.cap}% na token. Wyszarzone = poza top {s.universeSize}. Stałe coiny (Twój wybór): ETH, SOL, XRP, SUI, HYPE są zawsze kandydatami, bez pierwszeństwa — o wyborze decyduje siła, jak dla reszty. Warstwy z notatek (duże vs małe jako grupy) liczone bez wiedzy z przyszłości obniżały wynik w latach 2020–23, więc nie są używane (research/run57–58.py). Okna siły 14/28/56 wybrane tylko na latach 2020–23.</div>
           </>
         )}
       </Card>
@@ -162,7 +161,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       <div className="section-title">Parametry</div>
       <Card className="tight">
         <Row label="Przegląd" value="codziennie, 00:00 UTC" />
-        <Row label="Siła względem BTC" value="średnia 7/21/42 dni" />
+        <Row label="Siła względem BTC" value="średnia 14/28/56 dni" />
         <Row label="Bramka szerokości" value="wejście ≥ 70%, wyjście < 60%" />
         <Row label="Pozycje / limit" value={`maks. ${s.topN} · ${s.cap}% na token`} />
         <div className="note-text" style={{ padding: '4px 16px 14px' }}>Wybrane na danych 2020–2023, sprawdzone poza próbą 01.2024–10.2026 (Binance, 35 tokenów bez memów). Strategia jest wrażliwa na koszty: przy dziennym przeglądzie używaj zleceń z niską prowizją (≤ 0,1%).</div>
@@ -186,7 +185,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       <Sheet open={info} onClose={() => setInfo(false)} title="Jak działa RSPS">
         <div className="note-text" style={{ fontSize: 14.5 }}>
           <p><b className="accent">Podział kapitału.</b> SDCA {split}% (zakładka SDCA) + RSPS {100 - split}% — ten sam cel co w Portfelu ({SPLIT_SDCA}/{100 - SPLIT_SDCA}, przy przechyle {SPLIT_TILT}/{100 - SPLIT_TILT}, gdy LTPI z $TOTAL dodatnie). Rebalans przy odchyleniu ±10 p.p. Dźwignia i shorty nie są częścią alokacji, pojawiają się tylko jako propozycje w sygnale.</p>
-          <p><b className="accent">RSPS.</b> Codziennie, spośród {s.universeSize} najpłynniejszych dużych tokenów (bez memów), wybiera do {s.topN} najsilniejszych względem BTC (średnia momentum ratio z 7/21/42 dni podzielona przez zmienność). Włącza się, gdy ≥ 70% tokenów ma ratio do BTC nad 50-dniową średnią, i wyłącza dopiero poniżej 60%; trend BTC ≥ 0,5 i LTPI ≥ 0. W przeciwnym razie część RSPS trzyma BTC proporcjonalnie do trendu.</p>
+          <p><b className="accent">RSPS.</b> Codziennie, spośród {s.universeSize} najpłynniejszych dużych tokenów (bez memów), wybiera do {s.topN} najsilniejszych względem BTC (średnia momentum ratio z 14/28/56 dni podzielona przez zmienność). Włącza się, gdy ≥ 70% tokenów ma ratio do BTC nad 50-dniową średnią, i wyłącza dopiero poniżej 60%; trend BTC ≥ 0,5 i LTPI ≥ 0. W przeciwnym razie część RSPS trzyma BTC proporcjonalnie do trendu.</p>
           <p><b className="accent">Piramida.</b> Siedem rodzajów analizy w kolejności ważności, wagi metodą ROC (Barron i Barrett 1996). Systematyzacja, on-chain, istotność statystyczna i sentyment aktualizują się automatycznie po zamknięciu świecy 00:00 UTC; ekonomia fundamentalna, makro i analiza techniczna są ręczne i ważne 7 dni.</p>
           <p><b className="accent">Aktualizacja.</b> iOS nie pozwala aplikacjom webowym działać w tle, więc przeliczenie następuje przy pierwszym otwarciu aplikacji po 00:00 UTC (albo automatycznie, jeśli jest wtedy otwarta).</p>
           <p className="faint">Wyniki z backtestu: research/ w repozytorium. Narzędzie analityczne, nie porada inwestycyjna.</p>
