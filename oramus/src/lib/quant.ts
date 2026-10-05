@@ -360,9 +360,10 @@ export function backtest(prices: Series, riskPct: Series, curve: number[], start
   const equity: number[] = [], lumpEquity: number[] = [], actions: number[] = [], btcShare: number[] = [];
   for (let i = startIndex; i < prices.length; i++) {
     const p = prices[i];
-    const r = riskPct[i];
+    // no look-ahead: signals from the previous close (i − 1), executed at today's close (as research/sdca.py)
+    const r = i > 0 ? riskPct[i - 1] : NaN;
     const rate0 = Number.isFinite(r) ? curveRate(curve, r) / 100 : 0;
-    const rate = slow ? slowBuyRate(rate0, slow.ltpi[i] ?? 0, slow.mult) : rate0;
+    const rate = slow ? slowBuyRate(rate0, slow.ltpi[i - 1] ?? 0, slow.mult) : rate0;
     let act = rate;
     if (rate > 1e-6 && cash > 0) {
       const amt = cash * rate;
@@ -373,11 +374,11 @@ export function backtest(prices: Series, riskPct: Series, curve: number[], start
       btc -= q; cash += q * p; sells++;
     } else holds++;
     if (ltpiState) {
-      const st = safetyStep(r, ltpiState[i] ?? 0, btc * p, cash, owed);
+      const st = safetyStep(r, ltpiState[i - 1] ?? 0, btc * p, cash, owed);
       if (st.kind === 'sell' && st.usd > 0) { btc -= st.usd / p; cash += st.usd; owed += st.usd; act = Math.min(act, -SAFETY.sellRate); }
       else if (st.kind === 'rebuy' && st.usd > 0) { cash -= st.usd; btc += st.usd / p; owed -= st.usd; spent += st.usd; bought += st.usd / p; act = Math.max(act, 1e-4); }
     }
-    if (athSell && athSell[i] > 0 && btc > 0) { const q = btc * athSell[i]; btc -= q; cash += q * p; act = Math.min(act, -athSell[i]); }
+    if (athSell && athSell[i - 1] > 0 && btc > 0) { const q = btc * athSell[i - 1]; btc -= q; cash += q * p; act = Math.min(act, -athSell[i - 1]); }
     actions.push(act);
     rateSum += rate; if (Number.isFinite(r)) { riskSum += r; n++; }
     const eq = cash + btc * p;

@@ -26,10 +26,10 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
   const [sd] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
   const [tpi0] = usePersisted<TpiSettings>('signals.tpi', TPI_DEFAULTS);
   const [rs0] = usePersisted<RspsSettings>('rsps.settings', RSPS_DEF);
-  const [parking] = usePersisted<{ choice: Parking }>('rsps.parking', { choice: 'hybrid' });
+  const [parking] = usePersisted<{ choice: Parking }>('rsps.parking', { choice: 'btc' });
   const [saved, setSaved] = usePersisted<{ key: string; run: Run } | null>('backtest.rsps', null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [tilt] = usePersisted<boolean>('portfolio.tilt', false);
+  const [tilt] = usePersisted<boolean>('portfolio.tilt', true);
   const cfg = { ...SDCA_DEFAULTS, ...sd }, tpiCfg = { ...TPI_DEFAULTS, ...tpi0 }, rs = { ...RSPS_DEF, ...rs0 };
   const effStart = mode === 'all' || mode === 'rsps' ? (start < '2020-01-01' ? '2020-01-01' : start) : start;
 

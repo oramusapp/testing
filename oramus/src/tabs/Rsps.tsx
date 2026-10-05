@@ -72,11 +72,11 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       {regime === 'closed' && (
         <Card>
           <div className="between"><b>Bramka RSPS zamknięta{scan?.gateSince ? ` od ${scan.gateSince}` : ''}</b>{parkingPending && <span className="pill trim">decyzja</span>}</div>
-          <div className="note-text mt8">Gdzie trzymać część RSPS do ponownego otwarcia bramki? Backtest 2020–10.2026, cały portfel z bezpiecznikiem: stablecoin — CAGR 54%, maks. obsunięcie −24%, Sharpe 2024→ 0,94; hybryda (BTC × trend, dopóki ryzyko wyceny SDCA jest poniżej 80%, potem stablecoin) — CAGR 67%, obsunięcie −24%, Sharpe 2024→ 1,07; BTC × trend — CAGR 73%, obsunięcie −27%, Sharpe 2024→ 1,04. Short w żadnym wariancie nie poprawił wyniku, dlatego zostaje tylko warunkową propozycją.</div>
+          <div className="note-text mt8">Gdzie trzymać część RSPS do ponownego otwarcia bramki? Backtest od 2020, portfel 60/40 (SDCA i weto RSPS na LTPI z BTC, research/run48.py): hybryda (BTC × trend, dopóki ryzyko wyceny SDCA jest poniżej 80%) — CAGR 50,8%, maks. obsunięcie −25,3%, Sharpe 2024→ 1,06; BTC × trend (domyślnie) — CAGR 59,6%, obsunięcie −28,0%, Sharpe 2024→ 1,05. Dodatkowe reguły wyjścia z coinów (szybkie wyjście, trailing stop −15/−20/−25%) pogarszały wynik — dzienna rotacja wychodzi z coina, gdy wypada z top-3 lub traci własny trend. Short w żadnym wariancie nie poprawił wyniku, dlatego zostaje tylko warunkową propozycją.</div>
           <div className="flex mt12">
             <button className="btn small grow" style={parking.choice === 'stable' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('stable'); toast('Wybrano: stablecoin'); }}>Stablecoin</button>
-            <button className="btn small grow" style={parking.choice === 'hybrid' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('hybrid'); toast('Wybrano: hybryda'); }}>Hybryda (domyślnie)</button>
-            <button className="btn small grow" style={parking.choice === 'btc' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('btc'); toast('Wybrano: BTC × trend'); }}>BTC × trend</button>
+            <button className="btn small grow" style={parking.choice === 'hybrid' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('hybrid'); toast('Wybrano: hybryda'); }}>Hybryda</button>
+            <button className="btn small grow" style={parking.choice === 'btc' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('btc'); toast('Wybrano: BTC × trend'); }}>BTC × trend (domyślnie)</button>
           </div>
         </Card>
       )}

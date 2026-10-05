@@ -23,7 +23,7 @@ export const LOOKBACKS = [30, 60, 90];          // relative-strength ensemble
 export const BREADTH_ENTER = 0.7, BREADTH_EXIT = 0.6;   // gate hysteresis
 // Split with the highest Sharpe (1.52, tie 40/50%) and the better Calmar of the two (research/run8.py).
 export const SPLIT_SDCA = 60;
-// Optional tilt (research/run47.py): while LTPI on $TOTAL is positive the target moves to SDCA 40 / RSPS 60.
+// Tilt (research/run47–48.py, on by default since 2.16.0): while LTPI on $TOTAL is positive the target moves to SDCA 40 / RSPS 60.
 // 2020→: CAGR 51.0% → 54.2%, max drawdown −25.0% → −29.7%, Sharpe 2024→ 1.10 → 1.05.
 export const SPLIT_TILT = 40;
 export const splitTarget = (tilt: boolean, totalLtpi: number | undefined) => (tilt && (totalLtpi ?? 0) > 0 ? SPLIT_TILT : SPLIT_SDCA);
@@ -53,7 +53,7 @@ export function useRsps() {
     const c = { ...SDCA_DEFAULTS, ...sdcaCfg };
     return composite(btcModel, c.enabled, freshManual(c)).risk.at(-1) ?? NaN;
   }, [btcModel, sdcaCfg]);
-  const [parking, setParking] = usePersisted<{ choice: Parking; ack?: string }>('rsps.parking', { choice: 'hybrid' });
+  const [parking, setParking] = usePersisted<{ choice: Parking; ack?: string }>('rsps.parking', { choice: 'btc' });
   const [s0, setS] = usePersisted<RspsSettings>('rsps.settings', RSPS_DEF);
   const s = { ...RSPS_DEF, ...s0 };
   const upd = (p: Partial<RspsSettings>) => setS((o) => ({ ...RSPS_DEF, ...o, ...p }));

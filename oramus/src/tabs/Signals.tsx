@@ -29,7 +29,7 @@ interface Order { id: string; sleeve: 'SDCA' | 'RSPS' | 'Rebalans'; side: 'buy' 
 export default function Signals() {
   const { model } = useBtc();
   const R = useRsps();
-  const [tilt, setTilt] = usePersisted<boolean>('portfolio.tilt', false);
+  const [tilt, setTilt] = usePersisted<boolean>('portfolio.tilt', true);
   const splitSdca = splitTarget(tilt, R.pyr.auto?.ltpi);
   const [sd] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
   const [pf, setPf] = usePersisted<Portfolio>('portfolio', { holdings: null, history: [] });
@@ -316,7 +316,7 @@ export default function Signals() {
 
       <Card className="tight">
         <div className="row"><div className="grow"><div>Więcej RSPS, gdy rynek w trendzie</div><div className="faint" style={{ fontSize: 12 }}>LTPI z $TOTAL dodatnie → cel SDCA {SPLIT_TILT}% / RSPS {100 - SPLIT_TILT}% (zamiast {SPLIT_SDCA}/{100 - SPLIT_SDCA}) · teraz cel {splitSdca}/{100 - splitSdca}</div></div><Switch checked={tilt} onChange={setTilt} /></div>
-        <div className="note-text" style={{ padding: '0 14px 12px' }}>Backtest od 2020 (research/run47.py): CAGR 51,0% → 54,2%, ale maks. obsunięcie −25,0% → −29,7% i Sharpe od 2024 1,10 → 1,05. Wyższy zwrot kosztem większego ryzyka; podział stały 50/50 dał 51,9% przy obsunięciu −25,1%.</div>
+        <div className="note-text" style={{ padding: '0 14px 12px' }}>Backtest od 2020 przy parkingu BTC × trend (research/run48.py): CAGR 59,6% → 66,7%, maks. obsunięcie −28,0% → −29,3%, Sharpe od 2024 1,05 → 1,00. Wyższy zwrot kosztem nieco większego ryzyka.</div>
       </Card>
       <Fold id="pf.rules" title="Zasady i historia operacji">
       <div className="section-title">Zasady</div>
