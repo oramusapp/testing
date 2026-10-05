@@ -7,7 +7,7 @@ import { useEffect, useState, useCallback } from 'react';
 const kv = createStore('oramus', 'kv');
 const files = createStore('oramus-files', 'files');
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 const cache = new Map<string, unknown>();
 const listeners = new Map<string, Set<(v: unknown) => void>>();
 
@@ -57,6 +57,11 @@ const MIGRATIONS: Record<number, () => Promise<void>> = {
     const p = cache.get('rsps.parking') as { choice?: string; ack?: string } | undefined;
     await save('rsps.parking', { ...(p ?? {}), choice: 'btc' });
     await save('portfolio.tilt', true);
+  },
+  // 2.18.0: Hyperliquid (HYPE) joins the RSPS candidates (history before its Binance listing comes from Hyperliquid)
+  6: async () => {
+    const st = cache.get('rsps.settings') as { tokens?: string[] } | undefined;
+    if (st?.tokens && !st.tokens.includes('HYPE')) await save('rsps.settings', { ...st, tokens: [...st.tokens, 'HYPE'] });
   }
 };
 

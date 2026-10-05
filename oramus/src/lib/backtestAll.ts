@@ -2,7 +2,7 @@
 // live signals and the research scripts: decisions at the daily close, traded the next day, 0.15% cost per side.
 // RSPS uses today's candidate list (survivorship bias: coins that died are missing), so its result is optimistic.
 import { capWeights, mean, std } from './quant';
-import { klines } from './market';
+import { klinesAny } from './market';
 
 export const COST = 0.0015;
 export const PERIODS = [
@@ -58,7 +58,7 @@ export async function loadCoins(dates: string[], syms: string[], onProgress?: (m
   await Promise.all(syms.map(async (sym) => {
     const close = new Array(dates.length).fill(NaN), quote = new Array(dates.length).fill(NaN);
     try {
-      const k = await klines(sym + 'USDT', 0, start);
+      const k = await klinesAny(sym, 0, start);
       for (const x of k) { const i = pos.get(new Date(x.t).toISOString().slice(0, 10)); if (i != null) { close[i] = x.c; quote[i] = x.q; } }
       out.push({ sym, close, quote });
     } catch { /* coin not on Binance: skipped */ }

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from '../components/ui';
 import { usePersisted } from './db';
-import { klines, lastClosedDay } from './market';
+import { klines, klinesAny, lastClosedDay } from './market';
 import { annVol, capWeights, ratios, linfit } from './quant';
 import { leverageGate, PILLARS, isFresh } from './pyramid';
 import { usePyramid } from './pyramidStore';
@@ -12,7 +12,7 @@ import { useBtc } from './btcStore';
 import { composite, freshManual } from './sdcaModel';
 
 // Large-cap, non-meme candidates (Binance <SYMBOL>USDT). The scanner keeps the 10 most liquid.
-export const DEFAULT_TOKENS = ['ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'TRX', 'LINK', 'AVAX', 'DOT', 'LTC', 'BCH', 'XLM', 'ATOM', 'NEAR', 'UNI', 'AAVE', 'ETC', 'ICP',
+export const DEFAULT_TOKENS = ['ETH', 'HYPE', 'BNB', 'XRP', 'SOL', 'ADA', 'TRX', 'LINK', 'AVAX', 'DOT', 'LTC', 'BCH', 'XLM', 'ATOM', 'NEAR', 'UNI', 'AAVE', 'ETC', 'ICP',
   'FIL', 'POL', 'ALGO', 'XTZ', 'VET', 'HBAR', 'APT', 'SUI', 'TON', 'ARB', 'OP', 'INJ', 'MANA'];
 export const MEME = ['DOGE', 'SHIB', 'PEPE', 'WIF', 'BONK', 'FLOKI', 'TRUMP', 'MEME', 'BOME', 'POPCAT'];
 
@@ -97,7 +97,7 @@ export function useRsps() {
       const rows: ScanRow[] = [];
       await Promise.all(s.tokens.filter((t) => !MEME.includes(t)).map(async (sym) => {
         try {
-          const k = closed(await klines(sym + 'USDT', 400));
+          const k = closed(await klinesAny(sym, 400));
           const c = k.map((x) => x.c);
           if (c.length < 150) throw new Error('za krótka historia');
           const ratio = k.filter((x) => btcMap.has(x.t)).map((x) => x.c / btcMap.get(x.t)!);
