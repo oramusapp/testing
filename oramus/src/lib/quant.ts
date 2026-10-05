@@ -257,8 +257,28 @@ export interface BacktestResult {
   equity: number[]; lumpEquity: number[]; actions: number[]; startIndex: number;
 }
 
-export function backtest(prices: Series, riskPct: Series, curve: number[], startIndex: number, capital: number): BacktestResult {
-  let cash = capital, btc = 0, spent = 0, bought = 0, buys = 0, sells = 0, holds = 0;
+// ---------- SDCA safety (research/run22.py, run23.py) ----------
+// When the long-term trend is negative (LTPI state < 0) while valuation risk is high (≥ 70%), the SDCA
+// sleeve sells 2% of its BTC per day to stablecoin (down to 0% BTC). Stablecoins raised this way are bought
+// back at 20% per day once LTPI turns positive again. The accumulation/distribution curve is unchanged.
+// Backtest 2020→: no change in 2020–2023; 2024→ portfolio drawdown −31.5% → −27.3% at equal CAGR.
+export const SAFETY = { riskMin: 70, cap: 0, sellRate: 0.02, rebuyRate: 0.2 };
+
+/** One day of the safety rule (applied after the curve). Returns the USD to sell (<0 means buy back). */
+export function safetyStep(riskPct: number, ltpi: number, btcUsd: number, cashUsd: number, owed: number): { kind: 'sell' | 'rebuy' | null; usd: number } {
+  const tot = btcUsd + cashUsd;
+  if (ltpi < 0 && Number.isFinite(riskPct) && riskPct >= SAFETY.riskMin) {
+    const share = tot > 0 ? btcUsd / tot : 0;
+    if (share > SAFETY.cap) return { kind: 'sell', usd: Math.min(btcUsd * SAFETY.sellRate, btcUsd * (1 - SAFETY.cap / share)) };
+    return { kind: null, usd: 0 };
+  }
+  if (ltpi > 0 && owed > 0 && cashUsd > 0) return { kind: 'rebuy', usd: Math.min(owed, cashUsd, Math.max(owed * SAFETY.rebuyRate, Math.min(owed, 10))) };
+  return { kind: null, usd: 0 };
+}
+
+/** ltpiState: optional LTPI state per day (aligned with prices) — enables the SDCA safety. */
+export function backtest(prices: Series, riskPct: Series, curve: number[], startIndex: number, capital: number, ltpiState?: Series): BacktestResult {
+  let cash = capital, btc = 0, spent = 0, bought = 0, buys = 0, sells = 0, holds = 0, owed = 0;
   let peak = 0, maxDD = 0, peakL = 0, maxDDL = 0, rateSum = 0, riskSum = 0, n = 0;
   const p0 = prices[startIndex];
   const equity: number[] = [], lumpEquity: number[] = [], actions: number[] = [];
@@ -266,14 +286,21 @@ export function backtest(prices: Series, riskPct: Series, curve: number[], start
     const p = prices[i];
     const r = riskPct[i];
     const rate = Number.isFinite(r) ? curveRate(curve, r) / 100 : 0;
+    let act = rate;
     if (rate > 1e-6 && cash > 0) {
       const amt = cash * rate;
-      cash -= amt; btc += amt / p; spent += amt; bought += amt / p; buys++;
+      cash -= amt; btc += amt / p; spent += amt; bought += amt / p; buys++; owed = Math.max(0, owed - amt);
     } else if (rate < -1e-6 && btc > 0) {
       const q = btc * -rate;
+      owed *= btc > 0 ? (btc - q) / btc : 0;
       btc -= q; cash += q * p; sells++;
     } else holds++;
-    actions.push(rate);
+    if (ltpiState) {
+      const st = safetyStep(r, ltpiState[i] ?? 0, btc * p, cash, owed);
+      if (st.kind === 'sell' && st.usd > 0) { btc -= st.usd / p; cash += st.usd; owed += st.usd; act = Math.min(act, -SAFETY.sellRate); }
+      else if (st.kind === 'rebuy' && st.usd > 0) { cash -= st.usd; btc += st.usd / p; owed -= st.usd; spent += st.usd; bought += st.usd / p; act = Math.max(act, 1e-4); }
+    }
+    actions.push(act);
     rateSum += rate; if (Number.isFinite(r)) { riskSum += r; n++; }
     const eq = cash + btc * p;
     const lq = (capital / p0) * p;

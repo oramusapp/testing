@@ -1,5 +1,13 @@
 export const CHANGELOG = [
   {
+    v: '1.8.0', date: '2026-10-05',
+    items: [
+      'SDCA: bezpiecznik LTPI — przy ujemnym LTPI i ryzyku wyceny ≥ 70% sprzedaż 2% BTC dziennie do stablecoina, odkup po powrocie LTPI na plus',
+      'Sygnały: zlecenia bezpiecznika i odkupu z pilnowaniem kwoty do odkupienia',
+      'Badanie nowych metod dla RSPS (trend Donchian z artykułu Zarattini i in., „turniej” ratio, hybrydy) — obecny RSPS pozostaje najlepszy'
+    ]
+  },
+  {
     v: '1.7.0', date: '2026-10-05',
     items: [
       'LTPI z 10 wskaźników trendu (SMA/EMA 200, MACD tygodniowy, RSI 100, ROC 180, Donchian, Aroon, Supertrend, regresja, HMA) z histerezą ±0,2',

@@ -44,3 +44,21 @@ na zmianach zamknięć, nachylenie regresji, HMA), każdy głosuje ±1; TPI = ś
 Wynik: LTPI z 10 wskaźników i histerezą ±0,2 ≈ reguła SMA 200 (Sharpe OOS 1,03 vs 1,03, mniejsze obsunięcie
 −30,0% vs −31,5%) → używany w aplikacji. MTPI z 10 wskaźników obniżał wynik OOS (0,82–0,95 vs 1,03), więc
 skalowanie BTC zostaje na 4 średnich; MTPI jest wyświetlany informacyjnie (opcjonalnie można go włączyć).
+
+## Runda badań 2026-10 (run19–run23): nowe narzędzia z literatury
+
+Druga strategia (alfa) — porównanie z obecnym RSPS (koszty 0,15%/stronę, IS 2020–2023, OOS 2024→):
+- `run19.py`, `run20.py`: trend per token z zestawu wybić Donchiana i wagami wg zmienności (pomysł z Zarattini, Pagani,
+  Barbon 2025 „Catching Crypto Trends”; parametry nasze, bo treść artykułu była niedostępna z sandboxa),
+  „turniej” ratio (każdy token kontra każdy, styl tabel ratio RSPS), hybryda RSPS × trend Donchiana.
+- `run21.py`: te same selekcje wewnątrz bramek RSPS (szerokość 70/60, veto LTPI).
+Wynik: żadna z metod nie pobiła obecnej selekcji RSPS poza próbą; „turniej” bez bramek rynku miał obsunięcia −80%.
+Największy wpływ ma parkowanie przy zamkniętej bramce (stablecoin OOS Sharpe 0,34 vs BTC×trend 0,88).
+
+SDCA (część bezpieczniejsza) — `run22.py`, `run23.py`:
+- bezpiecznik LTPI: LTPI < 0 i ryzyko ≥ 70% → sprzedaż 2% BTC/dzień do stablecoina, odkup 20%/dzień po LTPI > 0.
+  Portfel SDCA 60 / RSPS 40: IS bez zmian; OOS obsunięcie −31,5% → −27,3% (parking BTC×trend) i −25,8% → −21,0%
+  (parking stable) przy tym samym CAGR. Wdrożony (z przełącznikiem). Próg 70 wybrany spośród 50/60/70 —
+  wszystkie warianty obniżały obsunięcie OOS, ale wybór progu częściowo widział OOS.
+- stopy finansowania (Binance BTCUSDT, kontrariańsko): poprawa tylko dla jednego progu (|z| ≥ 1), brak efektu przy
+  1,5 → zbyt kruche, nie wdrożone. Wolniejsze zakupy przy LTPI < 0 pogarszały wynik; lump sum nie zadziałał.

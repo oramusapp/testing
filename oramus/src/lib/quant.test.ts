@@ -42,3 +42,22 @@ describe('quant', () => {
     const w = capWeights([5, 1, 1]); expect(w[0]).toBeCloseTo(0.5); expect(w[1]).toBeCloseTo(0.25);
   });
 });
+
+import { safetyStep, SAFETY } from './quant';
+describe('SDCA safety', () => {
+  it('sells 2% of BTC when LTPI < 0 and risk ≥ 70', () => {
+    expect(safetyStep(75, -1, 1000, 0, 0)).toEqual({ kind: 'sell', usd: 1000 * SAFETY.sellRate });
+  });
+  it('does nothing below the risk threshold or with LTPI ≥ 0 and nothing owed', () => {
+    expect(safetyStep(60, -1, 1000, 0, 0).kind).toBeNull();
+    expect(safetyStep(90, 1, 1000, 0, 0).kind).toBeNull();
+  });
+  it('buys back 20% of what it sold once LTPI turns positive', () => {
+    expect(safetyStep(80, 1, 0, 500, 500)).toEqual({ kind: 'rebuy', usd: 100 });
+  });
+  it('backtest with an always-negative LTPI ends with less BTC than without', () => {
+    const n = 400, prices = Array.from({ length: n }, (_, i) => 100 + i), risk = Array.from({ length: n }, (_, i) => (i < 50 ? 0 : 80));
+    const a = backtest(prices, risk, DEFAULT_CURVE, 0, 1000), b = backtest(prices, risk, DEFAULT_CURVE, 0, 1000, prices.map(() => -1));
+    expect(b.btc).toBeLessThan(a.btc);
+  });
+});
