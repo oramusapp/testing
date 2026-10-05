@@ -258,3 +258,13 @@ Okna siły względnej RSPS (portfel CAGR / IS / OOS): 30/60/90 — 74,2 / 1,80 /
 Odrzucone: bufor rankingu (trzymaj, dopóki w top 5/6) — 67,6/62,9%; ETH jako druga ławka — 67,8%, DD −35%; top 2/4 z buforem — 66,8/70,1%;
 pasmo rebalansu 5% — bez zmian, 20% — gorzej; przechył 30/70 — 77,5% ale DD −29,3%; SDCA bez sprzedaży z krzywej — DD −51,9%;
 SDCA ×1,5 przy LTPI+ — bez zmian. Informacyjnie (założenie, nie reguła): oprocentowanie stablecoinów 4%/rok — portfel 76,3% zamiast 74,2%.
+
+## RSPS warstwowy wg notatek (run54.py) — wdrożony w 2.24.0
+Notatki: RSPS zarządza ekspozycją na rynek, proporcją między dużymi coinami, dużymi vs małymi jako grupami i małymi vs ich dużym
+„referencyjnym”; „czasem trzyma tylko BTC i ETH, gdy dominacja dużych rośnie”. Duże (lista użytkownika): BTC, ETH, SOL, XRP, SUI
+(HYPE — brak historii w dostępnych tu danych; w aplikacji pobierany z Hyperliquid). Małe = pozostałe z top 10 płynności (point-in-time).
+Portfel 2020→ (CAGR / IS / OOS / DD): baza 2.23.0 — 81,7 / 1,87 / 1,32 / −26,6; tylko duże — 70,4 / 1,70 / 1,43 / −31,4;
+jedna pula duże+małe — 80,0 / 1,86 / 1,32 / −26,6; warstwy (małe, gdy grupa silna) — 79,6 / 1,81 / 1,47 / −27,1; + małe vs referencyjny —
+79,9 / 1,82 / 1,47 / −27,1; warstwy + najpierw duże (wybrane) — 79,8 / 1,79 / 1,49 / −27,3. Wybrany wariant: 2024→ CAGR 54,8 → 65,4%,
+bez roku 2021 57,8 → 63,1%, przy koszcie 0,3% 2024→ 47,9 → 58,6%. Niższy wynik całości tylko przez 2021 (mania małych: 661% → 404%).
+Małe silniejsze od dużych: 27% dni od 2020. Silnik aplikacji (fixture): RSPS CAGR 101,7 → 109,2%, OOS 1,07 → 1,25, DD −31,3 → −32,5%.

@@ -7,7 +7,7 @@ import { composite, freshManual } from '../lib/sdcaModel';
 import { athSellSeries, backtest } from '../lib/quant';
 import { computeTpi, ltpiStateSeries, MTPI_SPEC } from '../lib/tpi';
 import { PERIODS, buyHold, combine, equity, loadCoins, perf, rspsRun, sdcaRun, tpiRun, type Run } from '../lib/backtestAll';
-import { HYBRID_RISK_MAX, MEME, RSPS_DEF, SPLIT_SDCA, SPLIT_TILT, type Parking, type RspsSettings } from '../lib/useRsps';
+import { CORE, HYBRID_RISK_MAX, MEME, RSPS_DEF, SPLIT_SDCA, SPLIT_TILT, type Parking, type RspsSettings } from '../lib/useRsps';
 import { SDCA_DEFAULTS, type SdcaSettings } from './Sdca';
 import { TPI_DEFAULTS, type TpiSettings } from '../lib/pyramidStore';
 import { fmtDate } from '../lib/format';
@@ -58,7 +58,7 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
     };
   }, [model, base, s0, cfg.curve, cfg.safety, cfg.athSell, cfg.slowBuy]);
 
-  const rspsKey = model ? ['r2.23', model.dates.at(-1), effStart, rs.tokens.join(','), rs.universeSize, rs.topN, rs.cap, rs.reserve, parking.choice, cfg.enabled.mvrv, tpiCfg.ltpiSource, tpiCfg.hyst].join('|') : '';
+  const rspsKey = model ? ['r2.24', model.dates.at(-1), effStart, rs.tokens.join(','), rs.universeSize, rs.topN, rs.cap, rs.reserve, parking.choice, cfg.enabled.mvrv, tpiCfg.ltpiSource, tpiCfg.hyst].join('|') : '';
   const rspsRunRes = rspsCache?.key === rspsKey ? rspsCache.run : saved?.key === rspsKey ? saved.run : null;
 
   async function runRsps() {
@@ -67,11 +67,11 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
     try {
       const i0 = Math.max(0, model.dates.findIndex((d) => d >= '2019-01-01'));
       const dates = model.dates.slice(i0), btc = model.prices.slice(i0);
-      const coins = await loadCoins(dates, [...rs.tokens.filter((t) => !MEME.includes(t)), ...((rs.reserve ?? 'hierarchy') !== 'stable' ? ['PAXG'] : [])], (m) => setBusy(m));
+      const coins = await loadCoins(dates, [...new Set([...CORE, ...rs.tokens])].filter((t) => !MEME.includes(t)).concat( (rs.reserve ?? 'hierarchy') !== 'stable' ? ['PAXG'] : []), (m) => setBusy(m));
       setBusy('Liczenie…');
       const st = Math.max(0, dates.findIndex((d) => d >= effStart));
       const run = rspsRun(dates, btc, coins, base.ltpiBtc.slice(i0), base.comp.risk.slice(i0), st,
-        { universe: rs.universeSize, topN: rs.topN, cap: rs.cap / 100, parking: parking.choice, hybridMax: HYBRID_RISK_MAX, every: 1, reserve: rs.reserve ?? 'hierarchy' });
+        { core: CORE, universe: rs.universeSize, topN: rs.topN, cap: rs.cap / 100, parking: parking.choice, hybridMax: HYBRID_RISK_MAX, every: 1, reserve: rs.reserve ?? 'hierarchy' });
       const lite = { dates: run.dates, ret: run.ret, expo: run.expo };
       rspsCache = { key: rspsKey, run: lite }; setSaved({ key: rspsKey, run: lite });
       toast(`RSPS: ${coins.length} tokenów z Binance`);
@@ -97,6 +97,9 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
   const labels = view ? view.main[0].run.dates : [];
   const btcPrices = model ? new Map(model.dates.map((d, i) => [d, model.prices[i]])) : new Map<string, number>();
   const bh: Run | null = labels.length ? buyHold(labels, labels.map((d) => btcPrices.get(d)!)) : null;
+  // benchmark from the notes: RSPS should beat $TOTAL (whole market, cap-weighted index) on the upside
+  const totPrices = model && base ? new Map(model.dates.map((d, i) => [d, base.tp[i]])) : new Map<string, number>();
+  const th: Run | null = labels.length && tpiPrices ? buyHold(labels, labels.map((d) => totPrices.get(d)!)) : null;
 
 
   return (
@@ -116,11 +119,11 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
           <Card className="mt12">
             <div className="eyebrow" style={{ margin: 0 }}>Kapitał (skala log) · start {fmtDate(labels[0])}</div>
             <Chart labels={labels} log height={240}
-              lines={[{ values: equity(bh.ret), color: '#8e8e93', width: 1.1 }, ...view.main.map((m, k) => ({ values: equity(m.run.ret), color: m.color, width: k === 0 ? 1.8 : 1.2 }))]}
+              lines={[{ values: equity(bh.ret), color: '#8e8e93', width: 1.1 }, ...(th ? [{ values: equity(th.ret), color: '#5e8fd6', width: 1.1 }] : []), ...view.main.map((m, k) => ({ values: equity(m.run.ret), color: m.color, width: k === 0 ? 1.8 : 1.2 }))]}
               tip={(i) => `${fmtDate(labels[i])} · ` + view.main.map((m) => `${m.name} ${equity(m.run.ret.slice(0, i + 1)).at(-1)!.toFixed(2)}×`).join(' · ')} />
-            <div className="legend">{view.main.map((m) => <span key={m.name}><i style={{ background: m.color }} />{m.name}</span>)}<span><i style={{ background: '#8e8e93' }} />BTC kup i trzymaj</span></div>
+            <div className="legend">{view.main.map((m) => <span key={m.name}><i style={{ background: m.color }} />{m.name}</span>)}<span><i style={{ background: '#8e8e93' }} />BTC kup i trzymaj</span>{th && <span><i style={{ background: '#5e8fd6' }} />$TOTAL (benchmark z notatek)</span>}</div>
           </Card>
-          {[...view.main.map((m) => ({ name: m.name, run: m.run })), { name: 'BTC kup i trzymaj', run: bh }].map((m) => (
+          {[...view.main.map((m) => ({ name: m.name, run: m.run })), { name: 'BTC kup i trzymaj', run: bh }, ...(th ? [{ name: '$TOTAL kup i trzymaj (benchmark RSPS z notatek)', run: th }] : [])].map((m) => (
             <Card key={m.name} className="tight">
               <div className="row"><b>{m.name}</b><span className="faint" style={{ fontSize: 12 }}>CAGR · Sharpe · Sortino · maks. DD · Dale · ekspozycja</span></div>
               {PERIODS.map((p) => {
@@ -134,7 +137,7 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
       <div className="note-text mt12">
         Bez patrzenia w przyszłość: każdy dzień używa tylko danych do zamknięcia swojej świecy (00:00 UTC) — model wyceny przeliczany co rok na danych sprzed 1 stycznia, percentyle tylko z przeszłości, TPI z wcześniejszych zamknięć; decyzja na zamknięciu, transakcja następnego dnia. Zasady jak w sygnałach: decyzja na zamknięciu dnia, transakcja następnego dnia, koszt 0,15% za stronę. SDCA: krzywa, bezpiecznik LTPI (liczone z BTC), tempo zakupów przy LTPI− i (jeśli włączona) sprzedaż przy ATH — od 100% stablecoinów w dniu startu.
         LTPI · MTPI: BTC, gdy stan TPI jest dodatni, w przeciwnym razie stablecoin. Kupowany jest BTC; $TOTAL (cały rynek) służy wyłącznie do odczytu kierunku i trendu (TPI), jak w notatkach — nie jest aktywem do kupienia. Próg stanu wg ustawień (domyślnie 0).
-        RSPS: weto LTPI liczone z BTC; codzienna rotacja siły względnej wśród {rs.universeSize - 1} najpłynniejszych altów (plus BTC), bramka szerokości 70%/60%, LTPI− → stablecoin, parking: {parking.choice === 'stable' ? 'stablecoin' : parking.choice === 'btc' ? 'BTC × trend' : `hybryda (ryzyko < ${HYBRID_RISK_MAX}%)`}.
+        RSPS: weto LTPI liczone z BTC; codzienna rotacja siły względnej: duże coiny (ETH, SOL, XRP, SUI, HYPE) zawsze, małe spośród {rs.universeSize - 1} najpłynniejszych tylko, gdy ich grupa jest silniejsza od dużych (plus BTC), bramka szerokości 70%/60%, LTPI− → stablecoin, parking: {parking.choice === 'stable' ? 'stablecoin' : parking.choice === 'btc' ? 'BTC × trend' : `hybryda (ryzyko < ${HYBRID_RISK_MAX}%)`}.
         Używa dzisiejszej listy kandydatów, więc tokeny, które zniknęły z rynku, są pominięte — wynik RSPS jest optymistyczny (błąd przeżywalności).
         Całość: {SPLIT_SDCA}% SDCA / {100 - SPLIT_SDCA}% RSPS{tilt ? ` (przechył: ${SPLIT_TILT}/${100 - SPLIT_TILT}, gdy LTPI z $TOTAL dodatnie)` : ''} z rebalansem przy odchyleniu ±10 p.p. Dale = liczba lat potrzebna do odrobienia maks. obsunięcia przy danym CAGR (miara z raportów 42 Macro; mniej = lepiej). Wyniki historyczne nie gwarantują przyszłych.
       </div>

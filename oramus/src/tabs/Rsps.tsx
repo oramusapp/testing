@@ -53,6 +53,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
           <div className="stat" onClick={() => setLevOpen(true)} style={{ cursor: 'pointer' }}><div className="k">Propozycje</div><div className="v">{(gate.allowed ? 1 : 0) + (shortProposal ? 1 : 0)}</div><div className="s">dźwignia {gate.checks.filter((c) => c.ok).length}/{gate.checks.length} · short {shortProposal ? 'tak' : 'nie'}</div></div>
         </div>
         <div className="row compact" style={{ padding: '10px 0 0' }}><span className="dim">LTPI (BTC) · weto RSPS</span><span className={R0.ltpi > 0 ? 'green' : 'red'} style={{ fontWeight: 600 }}>{R0.ltpi > 0 ? 'pozytywne' : 'negatywne → stablecoin'}</span></div>
+        <div className="row compact" style={{ padding: '6px 0 0' }}><span className="dim">Małe coiny vs duże (grupy)</span><span className={scan?.smallOn ? 'green' : 'dim'} style={{ fontWeight: 600 }}>{scan?.smallOn == null ? '—' : scan.smallOn ? 'małe silniejsze → dopuszczone' : 'duże silniejsze → tylko duże'}</span></div>
       </Card>
 
       {(gate.allowed || shortProposal) && <div className="section-title">Propozycje w sygnale</div>}
@@ -77,7 +78,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
           <div className="note-text mt8">Gdzie trzymać część RSPS do ponownego otwarcia bramki? Backtest od 2020, portfel 60/40 (SDCA i weto RSPS na LTPI z BTC, research/run48.py): hybryda (BTC × trend, dopóki ryzyko wyceny SDCA jest poniżej 80%) — CAGR 50,8%, maks. obsunięcie −25,3%, Sharpe 2024→ 1,06; BTC × trend (domyślnie) — CAGR 59,6%, obsunięcie −28,0%, Sharpe 2024→ 1,05. Dodatkowe reguły wyjścia z coinów (szybkie wyjście, trailing stop −15/−20/−25%) pogarszały wynik — dzienna rotacja wychodzi z coina, gdy wypada z top-3 lub traci własny trend. Short w żadnym wariancie nie poprawił wyniku, dlatego zostaje tylko warunkową propozycją. Od 2.22.0 udział BTC to 3-stanowy VAMS (trend ≥ 0,75 → 100%, 0,5 → 50%, niżej 0) zamiast liniowego trendu (research/run51.py: portfel CAGR 71,4 → 72,8%, obsunięcie −26,7 → −26,1%, Sharpe 2024→ 1,25 → 1,28).</div>
           <div className="flex mt12">
             <button className="btn small grow" style={parking.choice === 'stable' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('stable'); toast('Wybrano: stablecoin'); }}>Stablecoin</button>
-            <button className="btn small grow" style={parking.choice === 'hybrid' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('hybrid'); toast('Wybrano: hybryda'); }}>Hybryda</button>
+            <button className="btn small grow" style={parking.choice === 'hybrid' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('hybrid'); toast('Wybrano: hybryda'); }}>Hybryda (miesza wycenę z trendem — wbrew notatkom)</button>
             <button className="btn small grow" style={parking.choice === 'btc' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('btc'); toast('Wybrano: BTC × trend'); }}>BTC × trend (domyślnie)</button>
           </div>
         </Card>
@@ -128,7 +129,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
                     const w = r.bench ? sleeve.find((x) => x.sym === 'BTC')?.w : regime === 'rsps' ? picks.sel.find((x) => x.sym === r.sym)?.w : undefined;
                     return (
                       <tr key={r.sym} style={{ opacity: r.inUniverse ? 1 : 0.45, background: w ? 'var(--accent-soft)' : undefined }}>
-                        <td style={{ paddingLeft: 16 }}><b>{r.sym}</b>{r.error && <div className="red" style={{ fontSize: 11 }}>{r.error}</div>}</td>
+                        <td style={{ paddingLeft: 16 }}><b>{r.sym}</b>{r.core && <span className="faint" style={{ fontSize: 11 }}> duży</span>}{r.error && <div className="red" style={{ fontSize: 11 }}>{r.error}</div>}</td>
                         <td className={r.bench ? 'dim' : r.ratioUp ? 'green' : 'red'}>{r.error || r.bench ? (r.bench ? '—' : '') : r.ratioUp ? '▲' : '▼'}</td>
                         <td>{r.bench ? <span className="dim">wzorzec</span> : signed(r.score)}</td><td>{r.error ? '' : r.trend.toFixed(2)}</td>
                         <td className={r.ret >= 0 ? 'green' : 'red'}>{pct(r.ret, 0, true)}</td><td className="dim">{pct(r.vol, 0)}</td>
@@ -152,7 +153,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
               </table>
             </div>
             <div className="note-text" style={{ padding: '6px 16px 0' }}>Informacyjnie, jak w lekcji o wyborze aktywów: Omega = suma zysków / suma strat (&gt; 1 = więcej zysków), Sortino karze tylko spadki, Sharpe całą zmienność. Korelacja dziennych zwrotów z BTC (90 dni): blisko 1 oznacza, że token porusza się prawie jak BTC, więc dywersyfikacja niewiele daje. Ranking według Omega zamiast siły ratio dał w backteście gorszy wynik poza próbą (Sharpe 0,74 vs 0,88), więc nie steruje wyborem.</div>
-            <div className="note-text" style={{ padding: '10px 16px 14px' }}>Zamknięcie {scan.closeDate} UTC. Siła = średnia z momentum ratio do BTC z 7/21/42 dni podzielonego przez zmienność. Przegląd codziennie po zamknięciu 00:00 UTC. Wybór: siła &gt; 0 i trend tokena ≥ 0,5; maks. {s.topN} pozycje, limit {s.cap}% na token. Wyszarzone = poza top {s.universeSize}.</div>
+            <div className="note-text" style={{ padding: '10px 16px 14px' }}>Zamknięcie {scan.closeDate} UTC. Siła = średnia z momentum ratio do BTC z 7/21/42 dni podzielonego przez zmienność. Przegląd codziennie po zamknięciu 00:00 UTC. Wybór: siła &gt; 0 i trend tokena ≥ 0,5; maks. {s.topN} pozycje, limit {s.cap}% na token. Wyszarzone = poza top {s.universeSize}. Warstwy wg notatek: duże coiny (ETH, SOL, XRP, SUI, HYPE) są zawsze kandydatami i mają pierwszeństwo; małe (pozostałe płynne) wchodzą tylko, gdy ich grupa jest silniejsza od dużych (indeks równowagowy nad średnią 50 d i momentum 7/21/42 d &gt; 0). Backtest od 2020 (research/run54.py): portfel 2024→ CAGR 54,8 → 65,4%, bez roku 2021 57,8 → 63,1%, obsunięcie −26,6 → −27,1%; w samym 2021 (mania małych coinów) mniej.</div>
           </>
         )}
       </Card>

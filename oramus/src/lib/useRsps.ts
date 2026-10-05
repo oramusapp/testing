@@ -14,6 +14,9 @@ import { composite, freshManual } from './sdcaModel';
 // Large-cap, non-meme candidates (Binance <SYMBOL>USDT). The scanner keeps the 10 most liquid.
 export const DEFAULT_TOKENS = ['ETH', 'HYPE', 'BNB', 'XRP', 'SOL', 'ADA', 'TRX', 'LINK', 'AVAX', 'DOT', 'LTC', 'BCH', 'XLM', 'ATOM', 'NEAR', 'UNI', 'AAVE', 'ETC', 'ICP',
   'FIL', 'POL', 'ALGO', 'XTZ', 'VET', 'HBAR', 'APT', 'SUI', 'TON', 'ARB', 'OP', 'INJ', 'MANA'];
+/** Fixed large caps (user list; notes: RSPS balances large caps, then large vs small caps as groups). Always candidates
+ *  when they have enough history; the other liquid tokens are the small-cap group (research/run54.py, variant V5). */
+export const CORE = ['ETH', 'SOL', 'XRP', 'SUI', 'HYPE'];
 export const MEME = ['DOGE', 'SHIB', 'PEPE', 'WIF', 'BONK', 'FLOKI', 'TRUMP', 'MEME', 'BOME', 'POPCAT'];
 
 // Parameters chosen on 2020–2023 data, tested out of sample 2024-01…2026-10 on Binance data (research/run9–13.py).
@@ -34,8 +37,8 @@ export const SPLIT_SDCA = 60;
 // 2020→: CAGR 51.0% → 54.2%, max drawdown −25.0% → −29.7%, Sharpe 2024→ 1.10 → 1.05.
 export const SPLIT_TILT = 40;
 export const splitTarget = (tilt: boolean, totalLtpi: number | undefined) => (tilt && (totalLtpi ?? 0) > 0 ? SPLIT_TILT : SPLIT_SDCA);
-export interface ScanRow { sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; bench?: boolean; sharpe?: number; sortino?: number; omega?: number; corrBtc?: number; }
-export interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; gateOpen: boolean; gateSince?: string; gold?: { price: number; trend: number; ratioUp?: boolean; ratioMom?: boolean } }
+export interface ScanRow { core?: boolean; sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; bench?: boolean; sharpe?: number; sortino?: number; omega?: number; corrBtc?: number; }
+export interface Scan { smallOn?: boolean; time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; gateOpen: boolean; gateSince?: string; gold?: { price: number; trend: number; ratioUp?: boolean; ratioMom?: boolean } }
 interface LogEntry { time: number; regime: string; lev?: number; }
 
 export type RegimeId = 'defense' | 'rsps' | 'closed';
@@ -48,6 +51,27 @@ const trendOf = (c: number[]) => {
   const n = c.length - 1;
   return [20, 50, 100, 200].map((L) => (n >= L && c[n] > c.slice(n - L + 1).reduce((a, b) => a + b, 0) / L ? 1 : 0) as number).reduce((a, b) => a + b, 0) / 4;
 };
+
+/** Small caps vs large caps as groups: equal-weight daily log-return index of the small-cap group minus the large-cap
+ *  group (BTC + fixed large caps); "strong" = index above its 50-day mean AND mean 7/21/42-day change > 0. Uses today's
+ *  members over the past (the backtest uses point-in-time members). */
+export function smallGroupStrong(btc: { t: number; c: number }[], hist: Map<string, Map<number, number>>, core: string[], small: string[]): boolean {
+  if (!small.length) return false;
+  const ts = btc.map((x) => x.t), n = ts.length;
+  const btcM = new Map(btc.map((x) => [x.t, x.c]));
+  const lr = (m: Map<number, number> | undefined, i: number) => { const a = m?.get(ts[i - 1]), b = m?.get(ts[i]); return a && b ? Math.log(b / a) : NaN; };
+  const avg = (xs: number[]) => { const v = xs.filter(Number.isFinite); return v.length ? v.reduce((p, q) => p + q, 0) / v.length : NaN; };
+  const g: number[] = []; let acc = 0;
+  for (let i = 1; i < n; i++) {
+    const big = avg([lr(btcM, i), ...core.map((s) => lr(hist.get(s), i))]), sm = avg(small.map((s) => lr(hist.get(s), i)));
+    acc += Number.isFinite(big) && Number.isFinite(sm) ? sm - big : 0; g.push(acc);
+  }
+  const m = g.length - 1;
+  if (m < 50) return false;
+  const ma = g.slice(m - 49).reduce((p, q) => p + q, 0) / 50;
+  const mom = RS_LOOKBACKS.reduce((p, L) => p + g[m] - g[m - L], 0) / RS_LOOKBACKS.length;
+  return g[m] > ma && mom > 0;
+}
 
 let scanInFlight = false;
 
@@ -105,7 +129,8 @@ export function useRsps() {
       const btc = closed(await klines('BTCUSDT', 400));
       const btcMap = new Map(btc.map((k) => [k.t, k.c]));
       const rows: ScanRow[] = [];
-      await Promise.all(s.tokens.filter((t) => !MEME.includes(t)).map(async (sym) => {
+      const hist = new Map<string, Map<number, number>>();   // closes by candle time, for the large- vs small-cap group index
+      await Promise.all([...new Set([...CORE, ...s.tokens])].filter((t) => !MEME.includes(t)).map(async (sym) => {
         try {
           const k = closed(await klinesAny(sym, 400));
           const c = k.map((x) => x.c);
@@ -113,8 +138,9 @@ export function useRsps() {
           const ratio = k.filter((x) => btcMap.has(x.t)).map((x) => x.c / btcMap.get(x.t)!);
           const r50 = ratio.slice(-51, -1).reduce((p, v) => p + v, 0) / 50;
           const vol = annVol(c, 30);
+          hist.set(sym, new Map(k.map((x) => [x.t, x.c])));
           rows.push({
-            sym, price: c.at(-1)!, ret: (c.at(-1)! / c[c.length - 31] - 1) * 100, vol: vol * 100,
+            core: CORE.includes(sym), sym, price: c.at(-1)!, ret: (c.at(-1)! / c[c.length - 31] - 1) * 100, vol: vol * 100,
             liq: k.slice(-30).reduce((p, x) => p + (x.q ?? 0), 0) / 30, ratioUp: ratio.at(-1)! > r50, trend: trendOf(c),
             score: rsScore(ratio, vol),   // research definition: ratio log change / coin volatility, 7/21/42
             ...ratios(c, 365),
@@ -130,6 +156,8 @@ export function useRsps() {
       const ok = rows.filter((r) => !r.error).sort((x, y) => y.liq - x.liq);
       ok.slice(0, s.universeSize - 1).forEach((r) => (r.inUniverse = true));   // BTC is one of the top-N (as in the research)
       const uni = ok.filter((r) => r.inUniverse);
+      ok.filter((r) => r.core).forEach((r) => (r.inUniverse = true));   // fixed large caps are always candidates
+      const smallOn = smallGroupStrong(btc, hist, ok.filter((r) => r.core).map((r) => r.sym), uni.filter((r) => !r.core).map((r) => r.sym));
       const br = uni.length ? uni.filter((r) => r.ratioUp).length / uni.length : NaN;
       rows.sort((x, y) => (y.inUniverse ? 1 : 0) - (x.inUniverse ? 1 : 0) || (y.score || -99) - (x.score || -99));
       // hysteresis: open at ≥ 70%, stay open until breadth falls below 60%
@@ -149,7 +177,7 @@ export function useRsps() {
           gold = { price: gk.at(-1)!, trend: trendOf(gk), ratioUp: lr[n] > m50, ratioMom: n > 90 && ([30, 60, 90].reduce((a, L) => a + lr[n] - lr[n - L], 0) / 3) > 0 };
         }
       } catch { /* gold optional */ }
-      setScan({ time: Date.now(), closeDate: lastClosedDay(), rows, breadth: br, btcTrend: trendOf(bc), gateOpen, gateSince, gold });
+      setScan({ smallOn, time: Date.now(), closeDate: lastClosedDay(), rows, breadth: br, btcTrend: trendOf(bc), gateOpen, gateSince, gold });
       if (!silent) toast('Skan zakończony');
     } catch (e) {
       if (!silent) toast('Brak połączenia z Binance: ' + (e as Error).message);
@@ -158,7 +186,9 @@ export function useRsps() {
 
   const picks = useMemo(() => {
     const uni = (scan?.rows ?? []).filter((r) => r.inUniverse && !r.bench && Number.isFinite(r.score));
-    const sel = uni.filter((r) => r.score > 0 && r.trend >= 0.5).sort((x, y) => y.score - x.score).slice(0, s.topN);
+    // tiers (notes): large caps first; small caps only while their group beats the large caps (scan.smallOn)
+    const ok = uni.filter((r) => r.score > 0 && r.trend >= 0.5 && (r.core || scan?.smallOn !== false)).sort((x, y) => y.score - x.score);
+    const sel = [...ok.filter((r) => r.core), ...ok.filter((r) => !r.core)].slice(0, s.topN);
     const w = capWeights(sel.map((r) => r.score / (r.vol / 100)), s.cap / 100).map((x) => Math.min(x, s.cap / 100));
     const shorts = uni.filter((r) => r.score < 0 && r.trend <= 0.25).sort((x, y) => x.score - y.score).slice(0, 3);
     return { sel: sel.map((r, i) => ({ sym: r.sym, w: w[i] })), shorts };

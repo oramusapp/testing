@@ -1,4 +1,5 @@
 export const CHANGELOG = [
+  { v: '2.24.0', date: '2026-10-05', items: ['RSPS warstwowy wg notatek: duże coiny (ETH, SOL, XRP, SUI, HYPE) zawsze kandydatami i z pierwszeństwem; małe tylko, gdy ich grupa bije duże', 'Backtest: benchmark $TOTAL kup i trzymaj (z notatek)', 'Parking „hybryda” oznaczony jako niezgodny z regułą notatek (wycena + trend)'] },
   { v: '2.23.0', date: '2026-10-05', items: ['RSPS: siła względem BTC z okien 7/21/42 dni zamiast 30/60/90 (backtest: lepiej w 2020–23, 2024→, bez roku 2021 i przy podwójnych kosztach)'] },
   { v: '2.22.0', date: '2026-10-05', items: ['RSPS: BTC w rezerwie wg 3-stanowego VAMS (0 / 50 / 100% przy trendzie < 0,5 / 0,5 / ≥ 0,75) zamiast liniowego trendu', 'SDCA: zakup × 2, gdy BTC zamyka się poniżej Probable Range (średnia 20 d − 1,5σ)', 'Backtest: kolumna Dale Test (lata odrabiania maks. obsunięcia przy CAGR)'] },
   { v: '2.21.0', date: '2026-10-05', items: ['LTPI·MTPI → Makro: karta cotygodniowych odczytów 42 Macro (Risk Matrix, VAMS, Weather Model, płynność, GRID, Positioning, KISS, Dr. Mo); punktacja zasila filar Makro przez 7 dni, przypomnienie co tydzień'] },
