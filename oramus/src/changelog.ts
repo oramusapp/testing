@@ -1,5 +1,13 @@
 export const CHANGELOG = [
   {
+    v: '1.6.1', date: '2026-10-05',
+    items: [
+      'Ręczne odczyty σ wpisywane jako liczba (np. 0,5 lub −1,75) zamiast wyboru',
+      'Przy każdym pytaniu opis, kiedy wpisać plus, a kiedy minus',
+      'Aktualizacje instalują się same przy otwarciu aplikacji (dane zostają)'
+    ]
+  },
+  {
     v: '1.6.0', date: '2026-10-04',
     items: [
       'Sygnały: wyniki portfela od startu (TWR całości, SDCA i RSPS, porównanie z BTC, obsunięcie, zmienność, Sharpe)',

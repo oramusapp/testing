@@ -61,8 +61,25 @@ export function PyramidCard({ p }: { p: P }) {
   );
 }
 
-const SIGMAS = [-2, -1, 0, 1, 2];
-const SIGMA_LABEL = ['≤ −2σ', '−1σ', '0', '+1σ', '≥ +2σ'];
+/** Free numeric σ entry (e.g. 0.5, -1.75); accepts comma or dot, clipped to ±3σ. */
+function SigmaInput({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
+  const [txt, setTxt] = useState(value == null ? '' : String(value));
+  useEffect(() => { setTxt(value == null ? '' : String(value)); }, [value]);
+  const commit = () => {
+    const t = txt.replace(',', '.').replace('−', '-').trim();
+    if (t === '') return onChange(null);
+    const n = parseFloat(t);
+    if (Number.isFinite(n)) { const c = Math.max(-3, Math.min(3, Math.round(n * 100) / 100)); setTxt(String(c)); onChange(c); }
+    else setTxt(value == null ? '' : String(value));
+  };
+  return (
+    <span className="flex" style={{ gap: 4 }}>
+      <input className="input" style={{ width: 96, textAlign: 'center' }} inputMode="decimal" placeholder="np. -1,75" value={txt}
+        onChange={(e) => setTxt(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+      <span className="dim">σ</span>
+    </span>
+  );
+}
 
 function PillarSheet({ p, id, onClose }: { p: P; id: PillarId | null; onClose: () => void }) {
   const def = PILLARS.find((x) => x.id === id);
@@ -76,7 +93,7 @@ function PillarSheet({ p, id, onClose }: { p: P; id: PillarId | null; onClose: (
     setAnswers(cur?.answers?.length === n ? cur.answers : new Array(n).fill(null));
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!def || !id) return null;
-  const answer = (i: number, raw: number) => {
+  const answer = (i: number, raw: number | null) => {
     const next = [...answers]; next[i] = raw; setAnswers(next);
     // pillar z = mean of direction-adjusted readings
     const vals = next.map((v, k) => (v == null ? null : def.rubric![k].invert ? -v : v)).filter((x): x is number => x != null);
@@ -105,31 +122,22 @@ function PillarSheet({ p, id, onClose }: { p: P; id: PillarId | null; onClose: (
                     <div style={{ padding: '12px 14px 8px' }}>
                       <div style={{ fontWeight: 600, fontSize: 14.5 }}>{q.q}{q.invert ? <span className="faint" style={{ fontWeight: 400 }}> · wyżej = gorzej</span> : null}</div>
                       <div className="faint" style={{ fontSize: 12.5, margin: '2px 0 4px' }}>{q.measure}</div>
+                      <div style={{ fontSize: 12.5, margin: '0 0 4px', lineHeight: 1.45 }}><span className="green">Plus (+):</span> <span className="dim">{q.plus}</span><br /><span className="red">Minus (−):</span> <span className="dim">{q.minus}</span><br /><span className="dim">0 = typowo, w okolicy średniej.</span></div>
                       <a href={q.url} target="_blank" rel="noopener noreferrer" className="accent" style={{ fontSize: 13, textDecoration: 'none' }}>↗ {q.label}</a>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, padding: '0 10px 10px' }}>
-                      {SIGMAS.map((sv, k) => {
-                        const eff = q.invert ? -sv : sv, on = answers[i] === sv;
-                        return (
-                          <button key={sv} className="btn small" onClick={() => answer(i, sv)}
-                            style={{ height: 38, padding: 0, fontSize: 12.5, ...(on ? { background: eff > 0 ? 'var(--green-soft)' : eff < 0 ? 'var(--red-soft)' : 'var(--accent-soft)', color: eff > 0 ? 'var(--green)' : eff < 0 ? 'var(--red)' : 'var(--accent)', borderColor: 'currentColor' } : {}) }}>
-                            {SIGMA_LABEL[k]}
-                          </button>
-                        );
-                      })}
+                    <div className="flex" style={{ padding: '0 14px 12px', gap: 8 }}>
+                      <span className="dim" style={{ fontSize: 13 }}>Odczyt</span>
+                      <SigmaInput value={answers[i]} onChange={(v) => answer(i, v)} />
+                      {answers[i] != null && <span className="num" style={{ fontSize: 13, color: tone(q.invert ? -(answers[i] as number) : (answers[i] as number)) }}>→ {fz(q.invert ? -(answers[i] as number) : (answers[i] as number))}</span>}
                     </div>
                   </Card>
                 ))}
               </div>
-              <div className="note-text mt8">z filaru = średnia odczytów (ze znakiem odwróconym tam, gdzie „wyżej = gorzej”). Pytania jakościowe oceniaj w tej samej skali σ.</div>
+              <div className="note-text mt8">Wpisz odczyt w σ dla mierzonej wielkości (dowolna liczba od −3 do +3, np. 0,5 lub −1,75). z filaru = średnia odczytów, ze znakiem odwróconym tam, gdzie „wyżej = gorzej”. Możesz go poprawić poniżej.</div>
             </>
           )}
           <div className="section-title">z filaru</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
-            {SIGMAS.map((sv, k) => (
-              <button key={sv} className="btn small" onClick={() => setZ(sv)} style={Math.abs(z - sv) < 1e-9 ? { background: 'var(--accent-soft)', color: 'var(--accent)', borderColor: 'var(--accent)' } : undefined}>{SIGMA_LABEL[k]}</button>
-            ))}
-          </div>
+          <div className="flex" style={{ justifyContent: 'center', gap: 8 }}><SigmaInput value={z} onChange={(v) => setZ(v ?? 0)} /></div>
           <div className="center mt8"><span className="num" style={{ color: tone(z), fontWeight: 600 }}>{fz(z)}</span> <span className="dim">· {fp(z)} · {zLabel(z)}</span></div>
           <div className="field mt12"><label>Notatka (opcjonalnie)</label><input className="input" value={note} placeholder="np. DXY przy dolnej wstędze" onChange={(e) => setNote(e.target.value)} /></div>
           <button className="btn primary block" onClick={() => { p.setPillar(id, z, note || undefined, answers.every((x) => x != null) && answers.length ? (answers as number[]) : undefined); toast('Zapisano'); onClose(); }}>Zapisz</button>
