@@ -217,6 +217,62 @@ export function parseTvCsv(text: string): [string, number][] {
   if (gaps > 5) throw new Error('to nie wygląda na interwał 1D (duże przerwy między świecami)');
   return rows;
 }
+// ---------- daily snapshot of the official total market cap (free, keyless) ----------
+// No free source serves the full daily history, so after every 00:00 UTC close the app records the current value
+// (CoinGecko /global, fallbacks CoinMarketCap keyless, CoinPaprika, CoinLore). A snapshot taken h hours after the close
+// stands for that close; late ones (h > SNAP_ON_TIME_H) are kept but left out of the comparison with the index.
+export interface TotalSnap { date: string; value: number; at: number; lagH: number; source: string }
+export const SNAP_ON_TIME_H = 3;
+const SNAP_SOURCES: { name: string; url: string; pick: (j: any) => number }[] = [   // eslint-disable-line @typescript-eslint/no-explicit-any
+  { name: 'CoinGecko', url: 'https://api.coingecko.com/api/v3/global', pick: (j) => j?.data?.total_market_cap?.usd },
+  { name: 'CoinMarketCap', url: 'https://pro-api.coinmarketcap.com/public-api/v1/global-metrics/quotes/latest', pick: (j) => j?.data?.quote?.USD?.total_market_cap },
+  { name: 'CoinPaprika', url: 'https://api.coinpaprika.com/v1/global', pick: (j) => j?.market_cap_usd },
+  { name: 'CoinLore', url: 'https://api.coinlore.net/api/global/', pick: (j) => +j?.[0]?.total_mcap }
+];
+export async function loadTotalSnaps(): Promise<TotalSnap[]> { return (await get<TotalSnap[]>('total.snaps', cacheStore)) ?? []; }
+/** Records today's snapshot for the last closed day once (keeps the earliest one after the close). */
+export async function snapshotTotal(now = Date.now()): Promise<TotalSnap[]> {
+  const snaps = await loadTotalSnaps();
+  const date = lastClosedDay(now);
+  if (snaps.some((x) => x.date === date)) return snaps;
+  for (const src of SNAP_SOURCES) {
+    try {
+      const v = src.pick(await getJSON(src.url, 10000));
+      if (!(v > 1e11)) continue;   // sanity: total market cap is far above $100B
+      const closeT = Date.parse(date + 'T00:00:00Z') + DAY;
+      const out = [...snaps, { date, value: v, at: now, lagH: Math.round(((now - closeT) / 3600000) * 10) / 10, source: src.name }].slice(-3000);
+      await set('total.snaps', out, cacheStore);
+      return out;
+    } catch { /* next source */ }
+  }
+  return snaps;
+}
+/** Agreement between the official snapshots and the index used by the TPIs: daily log changes on consecutive on-time days
+ *  from the same source. */
+export function snapAgreement(snaps: TotalSnap[], index: TotalHistory | null) {
+  const im = new Map(index?.rows ?? []);
+  const ok = snaps.filter((x) => x.lagH <= SNAP_ON_TIME_H).sort((a, b) => (a.date < b.date ? -1 : 1));
+  const a: number[] = [], b: number[] = [];
+  for (let i = 1; i < ok.length; i++) {
+    const p = ok[i - 1], c = ok[i];
+    if (c.source !== p.source || Date.parse(c.date) - Date.parse(p.date) !== DAY) continue;
+    const i0 = im.get(p.date), i1 = im.get(c.date);
+    if (!i0 || !i1) continue;
+    a.push(Math.log(c.value / p.value)); b.push(Math.log(i1 / i0));
+  }
+  const n = a.length;
+  const mean = (x: number[]) => x.reduce((s, v) => s + v, 0) / x.length;
+  let corr = NaN, mad = NaN;
+  if (n >= 2) {
+    const ma = mean(a), mb = mean(b);
+    const cov = a.reduce((s, v, k) => s + (v - ma) * (b[k] - mb), 0), va = a.reduce((s, v) => s + (v - ma) ** 2, 0), vb = b.reduce((s, v) => s + (v - mb) ** 2, 0);
+    corr = va > 0 && vb > 0 ? cov / Math.sqrt(va * vb) : NaN;
+    mad = mean(a.map((v, k) => Math.abs(v - b[k])));
+  }
+  const last = ok.at(-1); const il = last ? im.get(last.date) : undefined;
+  return { n, corr, mad, onTime: ok.length, total: snaps.length, levelRatio: last && il ? last.value / il : NaN, last };
+}
+
 /** TradingView rows where they exist; before them and after them the built-in index, chain-linked to the TV level. */
 export function mergeTvTotal(own: TotalHistory | null, tv: TvTotal | null): TotalHistory | null {
   if (!tv || !tv.rows.length) return own;

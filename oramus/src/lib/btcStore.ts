@@ -1,12 +1,12 @@
 // Shared BTC history + SDCA model, loaded once and used by both SDCA and RSPS tabs.
 import { useEffect, useState } from 'react';
 import { get, set, createStore } from 'idb-keyval';
-import { loadBtcHistory, refreshBtcHistory, loadTotalHistory, refreshTotalHistory, alignTotal, loadTvTotal, saveTvTotal, mergeTvTotal, type TvTotal, lastClosedDay, msToNextUtcClose, type BtcHistory, type TotalHistory } from './market';
+import { loadBtcHistory, refreshBtcHistory, loadTotalHistory, refreshTotalHistory, alignTotal, loadTvTotal, saveTvTotal, mergeTvTotal, snapshotTotal, loadTotalSnaps, type TvTotal, type TotalSnap, lastClosedDay, msToNextUtcClose, type BtcHistory, type TotalHistory } from './market';
 import type { SdcaModel } from './sdcaModel';
 
 const cacheStore = createStore('oramus-model', 'model');
 /** tpiPrices: $TOTAL aligned to model.dates — the input of LTPI / MTPI (course notes: "The TPI is built for $TOTAL"). */
-interface State { tv?: TvTotal | null; history: BtcHistory | null; model: SdcaModel | null; total: TotalHistory | null; tpiPrices: number[] | null; status: string; busy: boolean; }
+interface State { snaps?: TotalSnap[]; tv?: TvTotal | null; history: BtcHistory | null; model: SdcaModel | null; total: TotalHistory | null; tpiPrices: number[] | null; status: string; busy: boolean; }
 let state: State = { history: null, model: null, total: null, tpiPrices: null, status: 'Ładowanie danych…', busy: true };
 const subs = new Set<(s: State) => void>();
 const emit = (patch: Partial<State>) => {
@@ -39,8 +39,8 @@ let lastRefresh = 0;
 export async function startBtc() {
   if (started) return; started = true;
   try {
-    const [h, t, tv] = await Promise.all([loadBtcHistory(), loadTotalHistory(), loadTvTotal()]);
-    emit({ history: h, total: t, tv });
+    const [h, t, tv, snaps] = await Promise.all([loadBtcHistory(), loadTotalHistory(), loadTvTotal(), loadTotalSnaps()]);
+    emit({ history: h, total: t, tv, snaps });
     await compute(h);
     await refresh();
   } catch (e) { emit({ status: 'Błąd: ' + (e as Error).message, busy: false }); }
@@ -68,6 +68,7 @@ export async function refresh() {
   const h = await refreshBtcHistory(state.history, (m) => emit({ status: 'Aktualizacja: ' + m }));
   emit({ history: h });
   if (state.total) { emit({ status: 'Aktualizacja: $TOTAL…' }); emit({ total: await refreshTotalHistory(state.total) }); }
+  try { emit({ snaps: await snapshotTotal() }); } catch { /* offline: next close */ }
   await compute(h);
   const last = h.rows[h.rows.length - 1][0];
   emit({ busy: false, status: `Załadowano ${h.rows.length.toLocaleString('pl-PL')} świec dziennych · do ${last}` + (h.updated ? '' : ' · offline (dane wbudowane)') });

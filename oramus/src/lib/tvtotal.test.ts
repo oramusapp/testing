@@ -24,3 +24,16 @@ describe('TradingView $TOTAL import', () => {
     expect(m.approxFrom).toBe('2024-01-03');
   });
 });
+
+import { snapAgreement } from './market';
+describe('official total market cap snapshots', () => {
+  it('compares on-time consecutive same-source days with the index', () => {
+    const snaps = [0, 1, 2, 3].map((i) => ({ date: `2024-01-0${i + 1}`, value: 3e12 * 1.01 ** i, at: 0, lagH: i === 3 ? 9 : 1, source: 'CoinGecko' }));
+    const idx = { rows: [0, 1, 2, 3].map((i) => [`2024-01-0${i + 1}`, 2.7e12 * 1.01 ** i] as [string, number]), updated: 0, source: 'x' };
+    const a = snapAgreement(snaps, idx);
+    expect(a.onTime).toBe(3);   // the 9 h late one is left out
+    expect(a.n).toBe(2);
+    expect(a.mad).toBeCloseTo(0, 10);
+    expect(a.levelRatio).toBeCloseTo(3 / 2.7, 6);
+  });
+});

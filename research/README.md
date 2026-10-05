@@ -307,3 +307,8 @@ CSV z wykresu 1D (TradingView: „Export chart data”, plany płatne od Essenti
 jest; przed nią i po ostatnim imporcie własny indeks jest przypięty do poziomu TradingView. Backtesty w tym README nadal używają
 własnego indeksu (45 aktywów Coin Metrics) — po otrzymaniu pliku CSV trzeba je powtórzyć. $TOTAL wpływa na: przechył podziału
 SDCA/RSPS (LTPI $TOTAL), MTPI i propozycję shortu, zakładkę LTPI·MTPI oraz benchmark w backteście; SDCA i RSPS używają LTPI z BTC.
+
+## Codzienny zapis oficjalnej kapitalizacji (2.28.0)
+Darmowe źródła bez klucza dają tylko bieżącą wartość (CoinGecko /global, CoinMarketCap keyless, CoinPaprika, CoinLore), więc aplikacja
+zapisuje ją po każdym zamknięciu i porównuje dzienne zmiany z indeksem TPI (korelacja, średnia różnica) — kontrola, nie wejście TPI.
+TPI: import TradingView (jeśli jest) albo indeks Coin Metrics. Odczyt jest z chwili pobrania; zapisy > 3 h po 00:00 UTC są pomijane w porównaniu.
