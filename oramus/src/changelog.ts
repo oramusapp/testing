@@ -1,5 +1,13 @@
 export const CHANGELOG = [
   {
+    v: '1.7.0', date: '2026-10-05',
+    items: [
+      'LTPI z 10 wskaźników trendu (SMA/EMA 200, MACD tygodniowy, RSI 100, ROC 180, Donchian, Aroon, Supertrend, regresja, HMA) z histerezą ±0,2',
+      'MTPI z 10 wskaźników (EMA 21/50, MACD, RSI 14, ROC 30, Donchian 20, Aroon 25, Supertrend, regresja 30, HMA 21) z podglądem głosów',
+      'Wybór źródła LTPI i skalowania BTC; domyślne warianty według backtestu'
+    ]
+  },
+  {
     v: '1.6.1', date: '2026-10-05',
     items: [
       'Ręczne odczyty σ wpisywane jako liczba (np. 0,5 lub −1,75) zamiast wyboru',

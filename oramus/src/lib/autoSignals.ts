@@ -1,8 +1,10 @@
 // Automatic pillar inputs, recomputed after every daily (00:00 UTC) candle close.
 import { adf, ADF_CRIT, logReturns, mean, std, sma } from './quant';
+import { computeTpi, MTPI_SPEC, LTPI_SPEC, type TpiResult } from './tpi';
 
 export interface AutoSignals {
   date: string;
+  mtpi: TpiResult; ltpiTpi: TpiResult; ltpiSma: number;
   trendEnsemble: number; ltpi: number; sdcaRisk: number; mvrvRisk: number;
   adfStat: number; adfTrending: boolean; tStat90: number;
   vol30: number; volMedian365: number; volBelowMedian: boolean;
@@ -28,13 +30,12 @@ function adfAt(p: number[], i: number, w = 90) {
   return adf(p.slice(i - w + 1, i + 1).map(Math.log)).stat;
 }
 
-/** Same automatic conditions as the backtested strict leverage gate (research/run7.py). */
-function gateAt(p: number[], risk: number[], i: number) {
-  const s200 = sma(p.slice(i - 199, i + 1), 200).at(-1)!;
+/** Same automatic conditions as the backtested strict leverage gate (research/run7.py); LTPI from the chosen source. */
+function gateAt(p: number[], risk: number[], i: number, ltpiAt: (i: number) => number) {
   const vols: number[] = [];
   for (let k = i - 364; k <= i; k++) vols.push(volAt(p, k));
   const med = [...vols].sort((a, b) => a - b)[Math.floor(vols.length / 2)];
-  return trendAt(p, i) >= 1 && adfAt(p, i) > ADF_CRIT['5%'] && p[i] > s200 && risk[i] < 50 && volAt(p, i) < med;
+  return trendAt(p, i) >= 1 && adfAt(p, i) > ADF_CRIT['5%'] && ltpiAt(i) > 0 && risk[i] < 50 && volAt(p, i) < med;
 }
 
 /** z-score of the latest 90-day log return against the distribution of 90-day returns over the last 8 years. */
@@ -46,11 +47,18 @@ function momentumZ(p: number[], h = 90, years = 8) {
   return (rs[rs.length - 1] - mean(rs)) / std(rs);
 }
 
-export function computeAuto(dates: string[], prices: number[], compositeRisk: number[], mvrvSeries: number[], compositeZ: number[], mvrvZ: number[]): AutoSignals {
+export function computeAuto(dates: string[], prices: number[], compositeRisk: number[], mvrvSeries: number[], compositeZ: number[], mvrvZ: number[], ltpiSource: 'ensemble' | 'sma200' = 'ensemble'): AutoSignals {
   const i = prices.length - 1;
   const trendEnsemble = trendAt(prices, i);
   const s200 = sma(prices.slice(-200), 200).at(-1)!;
-  const ltpi = prices[i] > s200 ? 1 : -1;
+  const ltpiSma = prices[i] > s200 ? 1 : -1;
+  const W = 1500, off = prices.length - Math.min(W, prices.length);
+  const mtpi = computeTpi(prices, MTPI_SPEC, W);
+  const ltpiTpi = computeTpi(prices, LTPI_SPEC, W);
+  const ltpiAt = (k: number) => ltpiSource === 'ensemble'
+    ? (ltpiTpi.stateSeries[k - off] ?? 0)
+    : (prices[k] > sma(prices.slice(k - 199, k + 1), 200).at(-1)! ? 1 : -1);
+  const ltpi = ltpiAt(i);
   const sdcaRisk = compositeRisk[i];
   const mvrvRisk = mvrvSeries[i];
   const adfStat = adfAt(prices, i);
@@ -62,11 +70,11 @@ export function computeAuto(dates: string[], prices: number[], compositeRisk: nu
   for (let k = i - 364; k <= i; k++) vols.push(volAt(prices, k));
   const volMedian365 = [...vols].sort((a, b) => a - b)[Math.floor(vols.length / 2)];
   let persistDays = 0;
-  for (let k = i; k > i - 40 && k > 600; k--) { if (gateAt(prices, compositeRisk, k)) persistDays++; else break; }
+  for (let k = i; k > i - 40 && k > 600; k--) { if (gateAt(prices, compositeRisk, k, ltpiAt)) persistDays++; else break; }
   const zMom = momentumZ(prices);
   const zVal = compositeZ[i];
   return {
-    date: dates[i], trendEnsemble, ltpi, sdcaRisk, mvrvRisk, adfStat, adfTrending, tStat90, vol30, volMedian365,
+    date: dates[i], mtpi, ltpiTpi, ltpiSma, trendEnsemble, ltpi, sdcaRisk, mvrvRisk, adfStat, adfTrending, tStat90, vol30, volMedian365,
     volBelowMedian: vol30 < volMedian365, persistDays,
     zMom, zVal,
     system: Number.isFinite(zVal) ? mean([zMom, zVal]) : zMom,

@@ -6,6 +6,8 @@ import { useBtc, refresh } from '../lib/btcStore';
 import { usePersisted } from '../lib/db';
 import { INDICATORS, composite, RAIL_TAUS } from '../lib/sdcaModel';
 import { BANDS, DEFAULT_CURVE, backtest, curveRate, riskZone } from '../lib/quant';
+import { computeTpi, LTPI_SPEC } from '../lib/tpi';
+import { TpiCard } from '../components/Tpi';
 import { usd as usdFull, usdShort, pct, signed, fmtDate, uid } from '../lib/format';
 
 // whole dollars once amounts get large so stat tiles stay readable
@@ -45,6 +47,9 @@ export default function Sdca() {
   const cfg = { ...SDCA_DEFAULTS, ...s };
 
   const comp = useMemo(() => (model ? composite(model, cfg.enabled, cfg.manualRisk) : null), [model, cfg.enabled, cfg.manualRisk]);
+  const ltpiRes = useMemo(() => (model ? computeTpi(model.prices, LTPI_SPEC) : null), [model]);
+  const [tpiCfg0] = usePersisted<{ ltpiSource: 'ensemble' | 'sma200' }>('signals.tpi', { ltpiSource: 'ensemble' });
+  const tpiCfg = { ltpiSource: tpiCfg0.ltpiSource ?? 'ensemble' };
   const startIdx = useMemo(() => {
     if (!model) return 0;
     const i = model.dates.findIndex((d) => d >= cfg.startDate);
@@ -66,7 +71,7 @@ export default function Sdca() {
   const zone = riskZone(riskToday);
   const priceRisk = model.risk.price[last];
   const band = BANDS.find((b) => priceRisk / 100 >= b.from && priceRisk / 100 < b.to) ?? (priceRisk < 1 ? BANDS[0] : BANDS[BANDS.length - 1]);
-  const ltpiProxy = price > model.prices.slice(-200).reduce((a, b) => a + b, 0) / 200 ? 1 : -1;
+  const ltpiProxy = tpiCfg.ltpiSource === 'sma200' ? (price > model.prices.slice(-200).reduce((a, b) => a + b, 0) / 200 ? 1 : -1) : (ltpiRes?.state ?? 0);
   const ltpiValue = ltpi.mode === 'manual' ? ltpi.manual : ltpiProxy;
 
   let actionTitle = 'HOLD — brak transakcji', actionSub = `Krzywa ≈ 0% przy dzisiejszym ryzyku`, actionTone = 'dim';
@@ -237,13 +242,14 @@ export default function Sdca() {
         <div className="between">
           <div><div className={'mid-number ' + (ltpiValue > 0 ? 'green' : ltpiValue < 0 ? 'red' : 'dim')}>{signed(ltpiValue)}</div>
             <div className="dim" style={{ fontSize: 13 }}>{ltpiValue > 0 ? 'Trend długoterminowy pozytywny' : ltpiValue < 0 ? 'Sygnał „emergency exit” — LTPI negatywne' : 'Neutralnie'}</div></div>
-          <Seg value={ltpi.mode} onChange={(m) => setLtpi({ ...ltpi, mode: m })} options={[{ v: 'proxy', l: 'Proxy' }, { v: 'manual', l: 'Ręcznie' }]} />
+          <Seg value={ltpi.mode} onChange={(m) => setLtpi({ ...ltpi, mode: m })} options={[{ v: 'proxy', l: 'Auto' }, { v: 'manual', l: 'Ręcznie' }]} />
         </div>
         {ltpi.mode === 'manual' ? (
           <div className="mt12"><input type="range" min={-1} max={1} step={0.05} value={ltpi.manual} onChange={(e) => setLtpi({ ...ltpi, manual: +e.target.value })} />
             <div className="note-text">Wpisz wartość LTPI z własnego systemu (−1 … +1). Wartość jest używana przez silnik reżimów w zakładce RSPS.</div></div>
-        ) : <div className="note-text mt12">Proxy: cena powyżej 200-dniowej średniej = +1, poniżej = −1 (ta sama reguła co w backteście 2020–2026). To przybliżenie, nie oryginalny LTPI — przełącz na „Ręcznie”, aby użyć własnego.</div>}
+        ) : <div className="note-text mt12">{tpiCfg.ltpiSource === 'sma200' ? 'Źródło: cena vs SMA 200 (zmienisz w zakładce RSPS).' : 'Źródło: LTPI z 10 wskaźników trendu z histerezą ±0,2 (szczegóły poniżej i w zakładce RSPS).'} Przełącz na „Ręcznie”, aby użyć własnego LTPI.</div>}
       </Card>
+      {ltpi.mode !== 'manual' && ltpiRes && tpiCfg.ltpiSource === 'ensemble' && <TpiCard title="Składniki LTPI" res={ltpiRes} stateLabel note="Każdy wskaźnik głosuje +1 (trend w górę) lub −1; LTPI to średnia głosów." />}
 
       <div className="section-title">Dziennik transakcji</div>
       <Card className="tight">

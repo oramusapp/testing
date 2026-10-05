@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { Screen, Card, Row, NumInput, Sheet, toast } from '../components/ui';
 import { IcInfo, IcRefresh, IcShield, IcLayers, IcX, IcPlus } from '../components/icons';
 import { PyramidCard } from '../components/Pyramid';
+import { TpiCard } from '../components/Tpi';
+import { usePersisted } from '../lib/db';
+import { TPI_DEFAULTS, type TpiSettings } from '../lib/pyramidStore';
+import { Seg } from '../components/ui';
 import { LEV_MAX } from '../lib/pyramid';
 import { useRsps, DEFAULT_TOKENS, MEME, RSPS_DEF, SPLIT_SDCA } from '../lib/useRsps';
 import { pct, signed, usd } from '../lib/format';
@@ -20,6 +24,8 @@ export default function Rsps() {
   const [info, setInfo] = useState(false);
   const [tokOpen, setTokOpen] = useState(false);
   const [levOpen, setLevOpen] = useState(false);
+  const [tpi0, setTpi] = usePersisted<TpiSettings>('signals.tpi', TPI_DEFAULTS);
+  const tpi = { ...TPI_DEFAULTS, ...tpi0 };
   const R = { ...REGIMES[regime], desc: regime === 'closed' ? (parking.choice === 'stable' ? 'Część RSPS w stablecoinach (Twój wybór).' : `Część RSPS w BTC skalowanym trendem (${btcTrend.toFixed(2)}).`) : REGIMES[regime].desc };
   const rspsCap = s.capital * (1 - SPLIT_SDCA / 100), sdcaCap = s.capital * SPLIT_SDCA / 100;
 
@@ -76,6 +82,19 @@ export default function Rsps() {
       )}
 
       <PyramidCard p={pyr} />
+
+      <div className="section-title">Trend · MTPI i LTPI</div>
+      {pyr.auto && <TpiCard title="LTPI · długoterminowy (10 wskaźników)" res={pyr.auto.ltpiTpi} stateLabel
+        note={tpi.ltpiSource === 'ensemble' ? 'Steruje: LTPI < 0 → portfel RSPS w stablecoinach, warunek propozycji dźwigni.' : 'Informacyjnie — wybrane źródło LTPI to cena vs SMA 200.'} />}
+      {pyr.auto && <TpiCard title="MTPI · średnioterminowy (10 wskaźników)" res={pyr.auto.mtpi}
+        note={tpi.mtpiSizing === 'ensemble' ? 'Steruje skalowaniem BTC w portfelu RSPS (MTPI przeliczony na 0…1).' : 'Informacyjnie — skalowanie BTC używa 4 średnich (wariant z backtestu).'} />}
+      <Card className="tight">
+        <div className="row"><div className="grow"><div>Źródło LTPI</div><div className="faint" style={{ fontSize: 12 }}>Backtest: ensemble ≈ SMA 200 (Sharpe OOS 1,03 vs 1,03), mniejsze obsunięcie</div></div>
+          <Seg value={tpi.ltpiSource} onChange={(v) => setTpi({ ...tpi, ltpiSource: v })} options={[{ v: 'ensemble', l: '10 wsk. ★' }, { v: 'sma200', l: 'SMA 200' }]} /></div>
+        <div className="row"><div className="grow"><div>Skalowanie BTC</div><div className="faint" style={{ fontSize: 12 }}>Backtest: MTPI z 10 wsk. obniżał wynik OOS (Sharpe 0,82–0,95 vs 1,03)</div></div>
+          <Seg value={tpi.mtpiSizing} onChange={(v) => setTpi({ ...tpi, mtpiSizing: v })} options={[{ v: 'ma4', l: '4 średnie ★' }, { v: 'ensemble', l: 'MTPI' }]} /></div>
+        <div className="note-text" style={{ padding: '4px 16px 14px' }}>★ = wariant wybrany w backteście (research/run17–18.py).</div>
+      </Card>
 
       <div className="section-title">Alokacja</div>
       <Card>

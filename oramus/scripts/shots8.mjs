@@ -1,0 +1,15 @@
+import { chromium, devices } from 'playwright-core';
+const out = process.argv[2];
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const ctx = await b.newContext({ ...devices['iPhone 14 Pro'], colorScheme: 'dark' });
+const p = await ctx.newPage();
+const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+await p.goto('http://localhost:4173/', { waitUntil: 'networkidle' });
+await p.waitForSelector('.tabbar');
+await p.click('.tabbar button:nth-child(2)'); await p.waitForTimeout(3000);
+await p.evaluate(() => { const el = [...document.querySelectorAll('.section-title')].find(e => e.textContent.includes('MTPI')); const sc = el.closest('.screen'); sc.scrollTo(0, el.getBoundingClientRect().top + sc.scrollTop - 110); });
+await p.waitForTimeout(300);
+await p.screenshot({ path: out + '/t0.png' }); console.log(JSON.stringify(errs)); await p.click('text=Pokaż wskaźniki >> nth=0', { timeout: 5000 }).catch(() => {}); await p.waitForTimeout(300);
+await p.screenshot({ path: out + '/t1.png' });
+console.log(errs);
+await b.close();
