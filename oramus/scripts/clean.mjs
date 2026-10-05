@@ -5,5 +5,5 @@ const root = new URL('../../', import.meta.url).pathname;
 const keep = new Set(['.git', '.github', 'oramus', 'README.md', '.gitignore', 'docs']);
 for (const f of readdirSync(root)) {
   if (keep.has(f)) continue;
-  if (/^(index\.html|sw\.js|workbox-.*\.js|manifest\.webmanifest|registerSW\.js|assets|icon.*|apple-touch-icon\.png)$/.test(f)) rmSync(root + f, { recursive: true, force: true });
+  if (/^(index\.html|sw\.js|workbox-.*\.js|manifest\.webmanifest|registerSW\.js|assets|icon.*|apple-touch-icon\.png|credits)$/.test(f)) rmSync(root + f, { recursive: true, force: true });
 }

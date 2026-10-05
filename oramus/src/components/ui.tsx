@@ -27,9 +27,24 @@ export function Screen({ title, subtitle, actions, children, flush, nav }: { tit
   );
 }
 
-export const Footer = () => (
-  <footer className="copyright">© {new Date().getFullYear()} @thenotoriousg · Wszelkie prawa zastrzeżone</footer>
-);
+const CREDITS = [
+  { src: 'credits/knight.jpg', alt: 'The Real World · Crypto Investing' },
+  { src: 'credits/masterclass.jpg', alt: 'Crypto Investing Masterclass · Prof. Adam' },
+  { src: 'credits/signals.jpg', alt: "In Prof. Adam's signals we believe" }
+];
+export function Footer() {
+  const [big, setBig] = useState<string | null>(null);
+  return (
+    <footer className="copyright">
+      <div className="credits">
+        {CREDITS.map((c) => <button key={c.src} onClick={() => setBig(c.src)} aria-label={c.alt}><img src={c.src} alt={c.alt} loading="lazy" /></button>)}
+      </div>
+      <div className="credits-note">Credits: Prof. Adam · Crypto Investing Masterclass · The Real World</div>
+      <div>© {new Date().getFullYear()} @thenotoriousg · Wszelkie prawa zastrzeżone</div>
+      {big && <div className="credits-view" onClick={() => setBig(null)}><img src={big} alt="" /></div>}
+    </footer>
+  );
+}
 
 export const Card = ({ children, className = '', title }: { children: ReactNode; className?: string; title?: ReactNode }) => (
   <div className={'card ' + className}>{title && <div className="eyebrow">{title}</div>}{children}</div>
