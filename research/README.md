@@ -73,3 +73,68 @@ Przetestowane reguły z notatek użytkownika (ten sam protokół):
 - SUPT (podział optymalny wg Omega na 2020–2023): 30% SDCA — sprzeczne z rolą SDCA jako części bezpieczniejszej, OOS Sharpe niższy.
 Wdrożone jako narzędzia (bez zmiany reguł): trzy pochodne TPI, spójność czasowa składników, istotność TPI,
 arkusz wyceny z-score, kalkulator tempa akumulacji, Omega/Sortino/Sharpe.
+
+## Macierz TPI + reżim rynku (run26.py, slajd z kursu)
+BTC 2020→: dźwignia 2× przy LTPI+, MTPI+ i trendzie zwiększała obsunięcie (−57…−86%) bez poprawy Sharpe → tylko odczyt.
+Kupowanie przy MTPI < 0 w reżimie powrotu do średniej (błąd ze slajdu) pogarszało OOS (0,87 → 0,72; 0,63 → 0,52).
+Reżim: ADF (90 d) wskazywał trend w 96% dni → słaby; iloraz wariancji 10/1 d (90 d) dzieli 25/75 → użyty w aplikacji.
+
+## Wycena: logarytm ceny względem podaży BTC (run27.py, slajd z kursu)
+S1 = OLS ln(cena) ~ podaż, S2 = dopasowanie do miesięcznych dołków (jak na slajdzie); fit co rok tylko na przeszłości.
+Jako 3. składnik wyceny SDCA: portfel 60/40 obsunięcie −27,3% → −25,2%, ale CAGR 72,8% → 68,8%, Sharpe OOS 1,04 → 1,00.
+Zamiast modelu ceny: wyraźnie gorzej. Prosta w podaży zakłada wykładniczy wzrost przy podaży zbliżającej się do 21 mln
+(model w 10.2026 nadal „średnio drogo” 66% vs 8% w modelu ceny) → nie wdrożone.
+
+## Dopasowanie modelu wyceny SDCA: stopień wielomianu (run28.py, slajdy o przeuczeniu)
+Regresja kwantylowa log ceny na wielomianie w log czasu, refit co rok tylko na przeszłości:
+stopień 1 (prawo potęgowe): najmniejszy błąd mediany w kolejnym roku (0,247), ale portfel OOS DD −39,7% (nie uznał 2024–25 za drogie);
+stopień 2 (obecny): błąd 0,259, portfel OOS Sharpe 1,04, DD −27,3% — najlepszy; stopień 3: błąd 0,324, gorzej wszędzie (przeuczony);
+średnia stopni 1 i 2: OOS DD −37,8%. Zostaje stopień 2.
+
+## Sezonowość BTC (run29.py, slajd o dekompozycji)
+Średnie dzienne log-zwroty wg miesiąca: korelacja 2013–19 vs 2020–26 = 0,19; Kruskal-Wallis p = 0,14 i 0,44 (brak różnic).
+Dni tygodnia: korelacja 0,31, p = 0,79 i 0,17. Filtr „miesiące dodatnie w 2013–19” od 2020: Sharpe 0,84 vs 0,92 (B&H).
+Tylko październik dodatni w obu okresach (t 2,4 i 3,0) — możliwy przypadek przy 12 testach. Nie wdrożone do sygnałów.
+
+## Probabilistyczny zakres wyników: wartość × trend (run30.py, run31.py)
+Zwrot BTC po 90 dniach (2014→, wycena bez look-ahead × LTPI z histerezą): tanio + LTPI+: P10 −9%, mediana +9%, 68% dodatnich;
+środek + LTPI+: mediana +25%, 78%; środek + LTPI−: mediana −14%, 31% (najgorzej); wszystkie dni: mediana +7%, 57%.
+Próg bezpiecznika SDCA (LTPI < 0 i ryzyko ≥ R, z odkupem): R = 30…60 obniżają DD, ale też CAGR i Sharpe; R = 70 najlepszy → bez zmian.
+W aplikacji: stożek prawdopodobieństwa w SDCA.
+
+## Uznaniowa analiza techniczna (run32.py, slajdy: formacje, świece, struktura, linie trendu)
+BTCUSDT 1D OHLC 2018→: żadna formacja świecowa (objęcie hossy/bessy, młot, spadająca gwiazda, doji, trzech żołnierzy,
+trzy wrony) nie daje istotnie innego zwrotu 5/20-dniowego niż wszystkie dni (|t| < 1,4; formacje „niedźwiedzie” 50–57% dni na plusie).
+Struktura HH/HL (pivot ±3/5/10/20) jako filtr long: Sharpe OOS 0,09–0,62 vs 0,89 (4 średnie) i 0,78 (B&H). Zgodne z lekcją: nie wdrażamy.
+
+## Oscylatory: Stochastic i CCI, trend vs powrót do średniej (run33.py)
+BTCUSDT 1D: jako trend (powyżej środka = long) Sharpe IS/OOS 0,86–1,48 / 0,68–0,96; jako powrót do średniej (kup przy
+wyprzedaniu, sprzedaj przy wykupieniu) 0,20–0,30 / 0,32–0,70 — zgodne z lekcją (TPI = trend, nie mean reversion).
+Dodanie Stochastic 14 i CCI 20 do MTPI (12 głosów): IS 1,26 → 1,10, OOS 1,02 → 0,90 → nie dodane.
+
+## Badanie zdarzeń (run34.py, slajdy SentimenTrader / OddStats)
+BTC 2014→, sygnały co najmniej 30–90 dni od siebie, z vs wszystkie dni: skok zmienności 30 d > 2× mediana (n=6) z ≈ 0,4–0,7;
+spadek dzienny ≤ −10% (n=36) z ≈ 1,1–1,6; przebicia SMA 200 (n=21–25) |z| < 0,7; nowy ATH (n=14): 1 tydz. z = 3,6, dalej < 2.
+Zdarzenia F&G (< 12 / > 90) liczy aplikacja na historii F&G z telefonu (w sandboxie brak dostępu do alternative.me).
+
+## Składniki on-chain w wycenie SDCA (run35.py, lekcje o wycenie i alpha decay)
+Coin Metrics: NUPL, MVRV Z, Puell, hash ribbon; z ceny: mnożnik 2Y MA, Pi Cycle. Każdy jako percentyl względem historii
+sprzed roku (z detrendem log-czasu i bez). Spearman z przyszłym zwrotem 365 d, 2015–25: cena −0,32, MVRV (obecny, detrend) −0,12,
+NUPL surowy −0,27, MVRV Z surowy −0,25, Puell −0,24, 2Y MA surowy −0,29, Pi Cycle −0,15, hash ribbon −0,26.
+Korelacja z obecnym composite: NUPL/MVRV Z/2Y MA 0,93–0,94 (redundantne), Puell 0,71, Pi Cycle 0,78, hash ribbon 0,33.
+SDCA z bezpiecznikiem, OOS 2024→ Sharpe: obecny 0,98; + MVRV Z 1,01; + NUPL 0,95; + 2Y MA 0,94; + Puell 0,82 (DD −49%);
++ Pi Cycle 0,68; + hash ribbon 0,90; wszystkie 8: 0,77. Cena + NUPL surowy: FULL CAGR 57,6 → 62,3%, ale OOS DD −34,8 → −37,4%;
+cena + MVRV Z surowy: OOS 1,03, DD −28,7%, IS 1,65 → 1,66. Różnice małe względem szumu → bez zmian w modelu.
+Detrend w oknie rozszerzanym osłabia predykcję (2015–19 odwrotny znak) — zgodne z uwagą z lekcji, że NUPL powinien być odporny na alpha decay.
+
+## Sprzedaż w dni nowego ATH (run36.py, run37.py, lekcja „Rate of Distribution”)
+Na każdym nowym ATH przy ryzyku ≥ 70% sprzedaj u × g^k BTC (k = sprzedaże w cyklu, reset po −50% od ATH). Harmonogramy ze slajdu
+(nasza interpretacja, slajd podaje tylko nazwy): Linear+2, Expon, Incr1, Incr2, ×1,1. SDCA z bezpiecznikiem 2020→:
+obecna IS 1,65 / OOS 0,98, DD OOS −34,8%; wszystkie harmonogramy OOS 1,14–1,22, DD −28,7%, IS 1,50–1,63.
+Siatka u 0,5–1,5% × g 1,0–1,2: OOS 1,02–1,22, FULL Sharpe 1,39–1,48 (obecna 1,37). Wybrane ×1,1, u = 1% (środek plateau).
+Lata: 2021 +16,0% → +12,6%, 2025 +0,8% → +4,5%, 2026 +13,4% → +23,7%. Portfel 60/40 (parking BTC×trend): OOS Sharpe 1,04 → 1,18,
+DD −27,3% → −24,4%, FULL CAGR 72,8 → 73,7%. Tylko dwie hossy w próbie → w aplikacji jako opcja, domyślnie wyłączona.
+
+## Rotacja bety w RSPS (run38.py, notatki TPI: „increase beta” / „reduce beta”)
+Alty RSPS → BTC lub stablecoin, gdy ryzyko wyceny ≥ 60/70/80%: IS Sharpe 1,82 → 1,16–1,23, FULL CAGR 84 → 39–45%.
+Sezon altów 2021 wypadł przy wysokiej wycenie BTC, więc cięcie bety po wycenie usuwa główne źródło alfy. Nie wdrożone.

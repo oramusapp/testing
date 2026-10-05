@@ -276,8 +276,33 @@ export function safetyStep(riskPct: number, ltpi: number, btcUsd: number, cashUs
   return { kind: null, usd: 0 };
 }
 
-/** ltpiState: optional LTPI state per day (aligned with prices) — enables the SDCA safety. */
-export function backtest(prices: Series, riskPct: Series, curve: number[], startIndex: number, capital: number, ltpiState?: Series): BacktestResult {
+// ---------- SDCA sales on all-time-high days (research/run36.py, run37.py) ----------
+// Masterclass, rate of distribution: "perhaps combining ATH days/weeks with valuation would be an optimal
+// strategy". On every new all-time-high close while valuation risk ≥ 70%, the SDCA sleeve sells
+// unit × growth^k of its BTC, where k = ATH sales already made this cycle (slide schedule "×1.1").
+// The counter resets once price is 50% below its ATH. Proceeds stay in stablecoin for the curve to reinvest.
+export const ATH_SELL = { unit: 0.01, growth: 1.1, riskMin: 70, reset: 0.5 };
+
+/** Fraction of BTC to sell on each day (0 on non-ATH days) and the per-cycle sale counter. */
+export function athSellSeries(prices: Series, riskPct: Series): { frac: number[]; k: number[] } {
+  const frac: number[] = [], ks: number[] = [];
+  let ath = 0, k = 0;
+  for (let i = 0; i < prices.length; i++) {
+    const p = prices[i];
+    if (ath > 0 && p < ath * (1 - ATH_SELL.reset)) k = 0;
+    const isAth = ath > 0 && p > ath;
+    ath = Math.max(ath, p);
+    ks.push(k);
+    if (isAth && Number.isFinite(riskPct[i]) && riskPct[i] >= ATH_SELL.riskMin) {
+      frac.push(Math.min(1, ATH_SELL.unit * ATH_SELL.growth ** k)); k++;
+    } else frac.push(0);
+  }
+  return { frac, k: ks };
+}
+
+/** ltpiState: optional LTPI state per day (aligned with prices) — enables the SDCA safety.
+ *  athSell: optional per-day fraction of BTC to sell (athSellSeries().frac). */
+export function backtest(prices: Series, riskPct: Series, curve: number[], startIndex: number, capital: number, ltpiState?: Series, athSell?: number[]): BacktestResult {
   let cash = capital, btc = 0, spent = 0, bought = 0, buys = 0, sells = 0, holds = 0, owed = 0;
   let peak = 0, maxDD = 0, peakL = 0, maxDDL = 0, rateSum = 0, riskSum = 0, n = 0;
   const p0 = prices[startIndex];
@@ -300,6 +325,7 @@ export function backtest(prices: Series, riskPct: Series, curve: number[], start
       if (st.kind === 'sell' && st.usd > 0) { btc -= st.usd / p; cash += st.usd; owed += st.usd; act = Math.min(act, -SAFETY.sellRate); }
       else if (st.kind === 'rebuy' && st.usd > 0) { cash -= st.usd; btc += st.usd / p; owed -= st.usd; spent += st.usd; bought += st.usd / p; act = Math.max(act, 1e-4); }
     }
+    if (athSell && athSell[i] > 0 && btc > 0) { const q = btc * athSell[i]; btc -= q; cash += q * p; act = Math.min(act, -athSell[i]); }
     actions.push(act);
     rateSum += rate; if (Number.isFinite(r)) { riskSum += r; n++; }
     const eq = cash + btc * p;
@@ -439,4 +465,80 @@ export function ratios(closes: number[], n = 365): { sharpe: number; sortino: nu
   const dn = Math.sqrt(r.reduce((a, b) => a + Math.min(b, 0) ** 2, 0) / r.length);
   const g = r.reduce((a, b) => a + Math.max(b, 0), 0), l = r.reduce((a, b) => a - Math.min(b, 0), 0);
   return { sharpe: sd ? (m * 365) / (sd * Math.sqrt(365)) : NaN, sortino: dn ? (m * 365) / (dn * Math.sqrt(365)) : NaN, omega: l ? g / l : NaN };
+}
+
+/** Variance ratio of q-day vs 1-day log returns over the last n days (> 1 = trending, < 1 = mean reverting). */
+export function varianceRatio(prices: number[], q = 10, n = 90): number {
+  const lr = prices.slice(-(n + q + 1)).map((p, i, a) => (i ? Math.log(p / a[i - 1]) : NaN)).slice(1);
+  if (lr.length < n + q) return NaN;
+  const d = lr.slice(-n), sums: number[] = [];
+  for (let i = lr.length - n; i < lr.length; i++) { let s = 0; for (let k = i - q + 1; k <= i; k++) s += lr[k]; sums.push(s); }
+  const v = (a: number[]) => { const m = a.reduce((x, y) => x + y, 0) / a.length; return a.reduce((x, y) => x + (y - m) ** 2, 0) / (a.length - 1); };
+  return v(sums) / (q * v(d));
+}
+
+/** Pearson correlation, R² and least-squares line y = a + b·x. */
+export function linfit(x: number[], y: number[]): { n: number; r: number; r2: number; a: number; b: number } {
+  const n = Math.min(x.length, y.length);
+  if (n < 3) return { n, r: NaN, r2: NaN, a: NaN, b: NaN };
+  const mx = x.slice(0, n).reduce((s, v) => s + v, 0) / n, my = y.slice(0, n).reduce((s, v) => s + v, 0) / n;
+  let sxy = 0, sxx = 0, syy = 0;
+  for (let i = 0; i < n; i++) { sxy += (x[i] - mx) * (y[i] - my); sxx += (x[i] - mx) ** 2; syy += (y[i] - my) ** 2; }
+  const b = sxy / sxx, r = sxy / Math.sqrt(sxx * syy);
+  return { n, r, r2: r * r, a: my - b * mx, b };
+}
+
+/** BTC forward return over h days grouped by the Fear & Greed reading on the start day. */
+export function fgForward(hist: [string, number][], dates: string[], prices: number[], h = 20) {
+  const idx = new Map(dates.map((d, i) => [d, i]));
+  const pts: { fg: number; r: number }[] = [];
+  for (const [d, v] of hist) { const i = idx.get(d); if (i == null || i + h >= prices.length) continue; pts.push({ fg: v, r: prices[i + h] / prices[i] - 1 }); }
+  const edges: [number, number, string][] = [[0, 25, 'Skrajny strach 0–24'], [25, 45, 'Strach 25–44'], [45, 56, 'Neutralnie 45–55'], [56, 76, 'Chciwość 56–75'], [76, 90, 'Skrajna chciwość 76–89'], [90, 101, 'Powyżej 90']];
+  const all = pts.map((p) => p.r), mAll = all.reduce((s, v) => s + v, 0) / Math.max(all.length, 1);
+  const buckets = edges.map(([lo, hi, label]) => {
+    const r = pts.filter((p) => p.fg >= lo && p.fg < hi).map((p) => p.r).sort((a, b) => a - b);
+    const m = r.length ? r.reduce((s, v) => s + v, 0) / r.length : NaN;
+    return { label, lo, hi, n: r.length, mean: m, median: r.length ? r[Math.floor(r.length / 2)] : NaN, pos: r.length ? r.filter((v) => v > 0).length / r.length : NaN };
+  });
+  return { n: pts.length, mean: mAll, buckets, fit: linfit(pts.map((p) => p.fg), pts.map((p) => p.r)) };
+}
+
+/** Spearman rank correlation (robust to outliers and monotonic non-linear relations). */
+export function spearman(x: number[], y: number[]): number {
+  const n = Math.min(x.length, y.length);
+  const rank = (a: number[]) => { const o = a.map((v, i) => [v, i] as const).sort((p, q) => p[0] - q[0]); const r = new Array(a.length); let i = 0;
+    while (i < o.length) { let j = i; while (j + 1 < o.length && o[j + 1][0] === o[i][0]) j++; for (let k = i; k <= j; k++) r[o[k][1]] = (i + j) / 2 + 1; i = j + 1; } return r as number[]; };
+  return linfit(rank(x.slice(0, n)), rank(y.slice(0, n))).r;
+}
+/** Inverse of the standard normal CDF (Acklam's approximation). */
+export function probit(p: number): number {
+  const a = [-39.6968302866538, 220.946098424521, -275.928510446969, 138.357751867269, -30.6647980661472, 2.50662827745924];
+  const b = [-54.4760987982241, 161.585836858041, -155.698979859887, 66.8013118877197, -13.2806815528857];
+  const c = [-0.00778489400243029, -0.322396458041136, -2.40075827716184, -2.54973253934373, 4.37466414146497, 2.93816398269878];
+  const d = [0.00778469570904146, 0.32246712907004, 2.445134137143, 3.75440866190742];
+  const q = Math.min(Math.max(p, 1e-12), 1 - 1e-12);
+  if (q < 0.02425) { const t = Math.sqrt(-2 * Math.log(q)); return (((((c[0] * t + c[1]) * t + c[2]) * t + c[3]) * t + c[4]) * t + c[5]) / ((((d[0] * t + d[1]) * t + d[2]) * t + d[3]) * t + 1); }
+  if (q > 1 - 0.02425) return -probit(1 - q);
+  const t = q - 0.5, r = t * t;
+  return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * t / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+}
+
+/** Least-squares polynomial fit of degree d; returns coefficients (c0 + c1·x + …), R² and adjusted R². */
+export function polyfit(x: number[], y: number[], d: number): { c: number[]; r2: number; adjR2: number; sd: number } {
+  const n = Math.min(x.length, y.length), k = d + 1;
+  const m = x.slice(0, n).reduce((a, v) => a + v, 0) / n, sc = Math.max(...x.slice(0, n).map((v) => Math.abs(v - m))) || 1;
+  const u = x.slice(0, n).map((v) => (v - m) / sc);                       // centred and scaled for numerical stability
+  const A = Array.from({ length: k }, (_, i) => Array.from({ length: k }, (_, j) => u.reduce((a, v) => a + v ** (i + j), 0)));
+  const b = Array.from({ length: k }, (_, i) => u.reduce((a, v, t) => a + y[t] * v ** i, 0));
+  for (let i = 0; i < k; i++) {                                            // Gauss-Jordan
+    let p = i; for (let r = i + 1; r < k; r++) if (Math.abs(A[r][i]) > Math.abs(A[p][i])) p = r;
+    [A[i], A[p]] = [A[p], A[i]]; [b[i], b[p]] = [b[p], b[i]];
+    for (let r = 0; r < k; r++) if (r !== i) { const f = A[r][i] / A[i][i]; for (let c = i; c < k; c++) A[r][c] -= f * A[i][c]; b[r] -= f * b[i]; }
+  }
+  const cu = b.map((v, i) => v / A[i][i]);
+  const f = (v: number) => cu.reduce((a, c, i) => a + c * ((v - m) / sc) ** i, 0);
+  const my = y.slice(0, n).reduce((a, v) => a + v, 0) / n;
+  const ssr = y.slice(0, n).reduce((a, v, t) => a + (v - f(x[t])) ** 2, 0), sst = y.slice(0, n).reduce((a, v) => a + (v - my) ** 2, 0);
+  const r2 = 1 - ssr / sst;
+  return { c: cu, r2, adjR2: 1 - (1 - r2) * (n - 1) / Math.max(n - k, 1), sd: Math.sqrt(ssr / Math.max(n - k, 1)), ...{ f } } as { c: number[]; r2: number; adjR2: number; sd: number; f: (v: number) => number };
 }

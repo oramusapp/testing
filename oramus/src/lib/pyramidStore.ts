@@ -14,7 +14,7 @@ export const TPI_DEFAULTS: TpiSettings = { ltpiSource: 'ensemble', mtpiSizing: '
 
 export type ManualMap = Partial<Record<PillarId, { z: number; updated: number; note?: string; answers?: number[] }>>;
 export interface Overrides { onchain?: boolean; sentiment?: boolean; stats?: boolean; system?: boolean; }
-interface FG { value: number; label: string; time: number; fetched: number; mu?: number; sd?: number; n?: number; }
+export interface FG { value: number; label: string; time: number; fetched: number; mu?: number; sd?: number; n?: number; hist?: [string, number][]; }
 
 export function usePyramid() {
   const { model, history } = useBtc();
@@ -27,7 +27,7 @@ export function usePyramid() {
 
   // Fear & Greed publishes once a day; refetch when the last fetch predates the latest UTC close
   useEffect(() => {
-    const due = !fg || fg.mu == null || new Date(fg.fetched).toISOString().slice(0, 10) <= lastClosedDay();
+    const due = !fg || fg.mu == null || !fg.hist || new Date(fg.fetched).toISOString().slice(0, 10) <= lastClosedDay();
     if (due) void fearGreed().then((v) => { if (v) setFg({ ...v, fetched: Date.now() }); });
   }, [history?.updated]); // eslint-disable-line react-hooks/exhaustive-deps
 

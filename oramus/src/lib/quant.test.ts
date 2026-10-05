@@ -70,3 +70,64 @@ describe('risk-adjusted ratios', () => {
     expect(r.omega).toBeGreaterThan(1); expect(r.sharpe).toBeGreaterThan(0); expect(r.sortino).toBeGreaterThan(r.sharpe);
   });
 });
+
+import { varianceRatio } from './quant';
+describe('variance ratio', () => {
+  it('is > 1 for a persistent trend in returns and < 1 for alternating returns', () => {
+    let p = 100; const trend: number[] = [p], alt: number[] = [p];
+    for (let i = 0; i < 300; i++) { p *= 1 + 0.01 * Math.sign(Math.sin(i / 15)); trend.push(p); }
+    p = 100; for (let i = 0; i < 300; i++) { p *= i % 2 ? 1.02 : 0.98; alt.push(p); }
+    expect(varianceRatio(trend)).toBeGreaterThan(1); expect(varianceRatio(alt)).toBeLessThan(1);
+  });
+});
+
+import { normCdf as Phi } from './quant';
+describe('normal table (lesson values)', () => {
+  it('matches the z-table', () => {
+    expect(Phi(-2.6)).toBeCloseTo(0.0047, 4); expect(Phi(0.54)).toBeCloseTo(0.7054, 4); expect(Phi(-1)).toBeCloseTo(0.1587, 4);
+    expect(Phi(1) - Phi(-1)).toBeCloseTo(0.6827, 3); expect(Phi(2) - Phi(-2)).toBeCloseTo(0.9545, 3);
+  });
+});
+
+import { linfit } from './quant';
+describe('linear fit', () => {
+  it('recovers a perfect line and r = ±1', () => {
+    const f = linfit([1, 2, 3, 4], [3, 5, 7, 9]); expect(f.r).toBeCloseTo(1); expect(f.a).toBeCloseTo(1); expect(f.b).toBeCloseTo(2);
+    expect(linfit([1, 2, 3], [3, 2, 1]).r).toBeCloseTo(-1);
+  });
+});
+
+import { spearman, probit } from './quant';
+describe('spearman and probit', () => {
+  it('spearman = 1 for a monotonic curve, probit inverts Φ', () => {
+    expect(spearman([1, 2, 3, 4, 5], [1, 8, 27, 64, 125])).toBeCloseTo(1);
+    expect(probit(0.975)).toBeCloseTo(1.96, 2); expect(probit(0.5)).toBeCloseTo(0, 6);
+  });
+});
+
+import { polyfit } from './quant';
+describe('polyfit', () => {
+  it('fits a parabola exactly with degree 2', () => {
+    const x = [-2, -1, 0, 1, 2, 3], y = x.map((v) => 1 + 2 * v + 0.5 * v * v);
+    const f = polyfit(x, y, 2) as ReturnType<typeof polyfit> & { f: (v: number) => number };
+    expect(f.r2).toBeCloseTo(1, 6); expect(f.f(4)).toBeCloseTo(1 + 8 + 8, 6);
+  });
+});
+
+import { athSellSeries } from './quant';
+
+describe('athSellSeries', () => {
+  it('sells growing fractions on ATH days with high risk and resets after a 50% drawdown', () => {
+    const prices = [100, 110, 105, 120, 130, 60, 140, 150];
+    const risk = [80, 80, 80, 80, 40, 80, 80, 80];
+    const { frac, k } = athSellSeries(prices, risk);
+    expect(frac[0]).toBe(0);                          // first day: no prior high
+    expect(frac[1]).toBeCloseTo(0.01);                // 1st sale
+    expect(frac[2]).toBe(0);                          // not an ATH
+    expect(frac[3]).toBeCloseTo(0.011);               // 2nd sale ×1.1
+    expect(frac[4]).toBe(0);                          // ATH but risk < 70
+    expect(k[5]).toBe(0);                             // 60 < 130 × 0.5 → reset
+    expect(frac[6]).toBeCloseTo(0.01);
+    expect(frac[7]).toBeCloseTo(0.011);
+  });
+});

@@ -98,7 +98,7 @@ export async function refreshBtcHistory(h: BtcHistory, onProgress?: (msg: string
 }
 
 /** Crypto Fear & Greed index (alternative.me), 0 = extreme fear … 100 = extreme greed. */
-export async function fearGreed(): Promise<{ value: number; label: string; time: number; mu: number; sd: number; n: number } | null> {
+export async function fearGreed(): Promise<{ value: number; label: string; time: number; mu: number; sd: number; n: number; hist: [string, number][] } | null> {
   try {
     // full history (limit=0) so the reading can be standardised against its own distribution
     const j = await getJSON('https://api.alternative.me/fng/?limit=0');
@@ -107,7 +107,8 @@ export async function fearGreed(): Promise<{ value: number; label: string; time:
     if (!d || all.length < 30) return null;
     const mu = all.reduce((a, b) => a + b, 0) / all.length;
     const sd = Math.sqrt(all.reduce((a, b) => a + (b - mu) ** 2, 0) / (all.length - 1));
-    return { value: +d.value, label: d.value_classification, time: +d.timestamp * 1000, mu, sd, n: all.length };
+    const hist = (j.data as { value: string; timestamp: string }[]).map((x) => [new Date(+x.timestamp * 1000).toISOString().slice(0, 10), +x.value] as [string, number]).filter((x) => Number.isFinite(x[1])).reverse();
+    return { value: +d.value, label: d.value_classification, time: +d.timestamp * 1000, mu, sd, n: all.length, hist };
   } catch { return null; }
 }
 

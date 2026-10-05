@@ -8,7 +8,7 @@ import { uid } from '../lib/format';
 const HEAD_W = 44, HEAD_H = 26;
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
-export default function Excel() {
+export default function Excel({ nav }: { nav?: React.ReactNode }) {
   const [files] = usePersisted<FileMeta[]>('excel.files', []);
   const [open, setOpen] = useState<{ meta: FileMeta; book: Book } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,7 +45,7 @@ export default function Excel() {
 
   return (
     <>
-      <Screen title="Excel" subtitle="Czytnik i edytor arkuszy · formuły liczone na żywo">
+      <Screen nav={nav} title="Excel" subtitle="Czytnik i edytor arkuszy · formuły liczone na żywo">
         <div className="flex mb12">
           <button className="btn primary grow" onClick={() => input.current?.click()} disabled={loading}><IcFile width={18} />{loading ? 'Otwieranie…' : 'Otwórz plik'}</button>
           <button className="btn grow" onClick={create}><IcPlus width={18} />Nowy skoroszyt</button>

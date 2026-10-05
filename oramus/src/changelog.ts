@@ -1,4 +1,52 @@
 export const CHANGELOG = [
+  { v: '2.9.0', date: '2026-10-05', items: ['SDCA: opcjonalna sprzedaż w dni nowego szczytu (ATH) przy ryzyku ≥ 70%, harmonogram ×1,1 z lekcji o tempie dystrybucji; zlecenie także w Portfelu', 'Badania: składniki on-chain (NUPL, MVRV Z, Puell, 2Y MA, Pi Cycle, hash ribbon) nie poprawiają wyceny; rotacja bety w RSPS pogarsza wynik'] },
+  { v: '2.8.1', date: '2026-10-05', items: ['Źródła wskaźników rozłożone na więcej stron: najwyżej 2–3 wskaźniki na jedną stronę (Glassnode, Blockchain.com, Yahoo Finance, CoinMarketCap, CoinGecko obok dotychczasowych)'] },
+  { v: '2.8.0', date: '2026-10-05', items: ['RSPS: badanie zdarzeń (F&G poniżej/powyżej progu, duży spadek dzienny, skok zmienności, nowy szczyt, przebicie SMA 200) — zwroty po 1 tyg.–3 mies., % dodatnich i z-score, bez nakładających się sygnałów'] },
+  { v: '2.7.2', date: '2026-10-05', items: ['Piramida · sentyment: Smart Money / Dumb Money (SentimenTrader) lub sentix', 'Badanie: Stochastic i CCI — jako trend lepsze niż jako powrót do średniej, ale nie poprawiają MTPI'] },
+  { v: '2.7.1', date: '2026-10-05', items: ['Piramida · analiza techniczna: wynik testu formacji świecowych i struktury rynku na BTC (bez przewagi)'] },
+  { v: '2.7.0', date: '2026-10-05', items: ['SDCA: probabilistyczny zakres wyników na 30/90 dni (stożek) według dzisiejszej strefy wyceny i stanu LTPI, z porównaniem do wszystkich dni'] },
+  { v: '2.6.0', date: '2026-10-05', items: ['Statystyka: histogram ze średnią, medianą, dominantą i skośnością; dekompozycja szeregu (trend, sezonowość, losowe)', 'LTPI · MTPI: sezonowość BTC według miesięcy (informacyjnie; backtest nie potwierdził stabilnej sezonowości)'] },
+  { v: '2.5.0', date: '2026-10-05', items: ['Statystyka: regresja wielomianowa 2. i 3. stopnia ze skorygowanym R², skala log₁₀ dla y', 'Badanie: stopień modelu wyceny SDCA (1 / 2 / 3) — zostaje 2., stopień 3 przeuczony'] },
+  {
+    v: '2.4.0', date: '2026-10-05',
+    items: [
+      'Piramida · Makro: rentowność US10Y względem kanału regresji',
+      'Piramida · Sentyment (ręczna korekta): F&G, Google Trends, Lunacy (DIX, GEX + CNN F&G) z opisem plus/minus',
+      'Statystyka: pasma ±1σ/±2σ wokół regresji i wykres z-score w czasie z liniami ±1/±2/±3σ'
+    ]
+  },
+  {
+    v: '2.3.0', date: '2026-10-05',
+    items: [
+      'Statystyka: korelacja rangowa Spearmana, wykrywanie punktów odstających i r bez nich',
+      'Statystyka: wykres Q-Q względem rozkładu normalnego (sprawdzenie, czy z-score i tablica z są wiarygodne)'
+    ]
+  },
+  {
+    v: '2.2.0', date: '2026-10-05',
+    items: [
+      'RSPS: Sentyment — zwrot BTC po 20 dniach według przedziałów Fear & Greed, liczony na pełnej historii F&G',
+      'RSPS: korelacja tokenów z BTC (90 dni) w tabeli jakości aktywów',
+      'Statystyka: tryb Korelacja — wykres punktowy, r, R² i prosta regresji'
+    ]
+  },
+  { v: '2.1.1', date: '2026-10-05', items: ['Statystyka: tryb „znane μ i σ”, wykres rozkładu z pasmami 68–95–99,7 i zacieniowanym polem, prawdopodobieństwo przedziału'] },
+  {
+    v: '2.1.0', date: '2026-10-05',
+    items: [
+      'LTPI · MTPI: macierz decyzji (LTPI + MTPI + reżim rynku: trend / powrót do średniej) z wynikiem backtestu',
+      'Inne: kalkulator statystyczny — σ (÷N i ÷N−1), z-score i pole z tablicy rozkładu normalnego, krok po kroku'
+    ]
+  },
+  { v: '2.0.1', date: '2026-10-05', items: ['Stopka: credits (Prof. Adam · Crypto Investing Masterclass · The Real World) z podglądem zdjęć'] },
+  {
+    v: '2.0.0', date: '2026-10-05',
+    items: [
+      'Nowy układ: Strategia (podzakładki SDCA, RSPS, LTPI · MTPI), Portfel (dawniej Sygnały), Inne (Notatnik i Excel)',
+      'LTPI i MTPI z ustawieniami i trybem ręcznym w jednej podzakładce; SDCA i RSPS pokazują skrót stanu',
+      'Wszystkie dane, notatki i arkusze zostają bez zmian'
+    ]
+  },
   {
     v: '1.9.0', date: '2026-10-05',
     items: [

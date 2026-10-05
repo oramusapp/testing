@@ -5,10 +5,10 @@ import { IcRefresh, IcInfo, IcPlus, IcTrash } from '../components/icons';
 import { useBtc, refresh } from '../lib/btcStore';
 import { usePersisted } from '../lib/db';
 import { INDICATORS, composite, RAIL_TAUS } from '../lib/sdcaModel';
-import { BANDS, DEFAULT_CURVE, SAFETY, backtest, curveRate, riskZone, safetyStep } from '../lib/quant';
-import { computeTpi, LTPI_SPEC, ltpiStateSeries } from '../lib/tpi';
+import { ATH_SELL, BANDS, DEFAULT_CURVE, SAFETY, athSellSeries, backtest, curveRate, riskZone, safetyStep } from '../lib/quant';
+import { ltpiStateSeries } from '../lib/tpi';
 import { ValuationCard, AccumulationCalc } from '../components/Valuation';
-import { TpiCard } from '../components/Tpi';
+import { ConeCard } from '../components/Cone';
 import { usd as usdFull, usdShort, pct, signed, fmtDate, uid } from '../lib/format';
 
 // whole dollars once amounts get large so stat tiles stay readable
@@ -25,10 +25,11 @@ export interface SdcaSettings {
   logScale: boolean;
   range: 'all' | '8y' | '4y' | '1y';
   safety: boolean;
+  athSell?: boolean;
 }
 export const SDCA_DEFAULTS: SdcaSettings = {
   enabled: { price: true, sharpe: false, mvrv: true, manual: false },
-  manualRisk: null, curve: DEFAULT_CURVE, startDate: '2015-01-01', capital: 10000, cash: 0, btcHeld: 0, logScale: false, range: 'all', safety: true
+  manualRisk: null, curve: DEFAULT_CURVE, startDate: '2015-01-01', capital: 10000, cash: 0, btcHeld: 0, logScale: false, range: 'all', safety: true, athSell: false
 };
 export interface LtpiState { mode: 'proxy' | 'manual'; manual: number; }
 interface Trade { id: string; date: string; side: 'buy' | 'sell'; usd: number; price: number; }
@@ -36,10 +37,10 @@ interface Trade { id: string; date: string; side: 'buy' | 'sell'; usd: number; p
 const ZONE_COLORS = { buy: '#2fbf71', acc: '#9ccc5a', trim: '#e5ac4f', sell: '#ef6461', dim: '#888' };
 const riskColor = (v: number) => ZONE_COLORS[riskZone(v).tone];
 
-export default function Sdca() {
+export default function Sdca({ nav }: { nav?: React.ReactNode }) {
   const { model, status, busy } = useBtc();
   const [s, setS] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
-  const [ltpi, setLtpi] = usePersisted<LtpiState>('signals.ltpi', { mode: 'proxy', manual: 0 });
+  const [ltpi] = usePersisted<LtpiState>('signals.ltpi', { mode: 'proxy', manual: 0 });
   const [trades, setTrades] = usePersisted<Trade[]>('sdca.journal', []);
   const [pyrHist] = usePersisted<{ date: string; z: number; p: number; coverage: number }[]>('pyramid.history', []);
   const [view, setView] = useState<'rainbow' | 'risk' | 'curve'>('rainbow');
@@ -49,7 +50,6 @@ export default function Sdca() {
   const cfg = { ...SDCA_DEFAULTS, ...s };
 
   const comp = useMemo(() => (model ? composite(model, cfg.enabled, cfg.manualRisk) : null), [model, cfg.enabled, cfg.manualRisk]);
-  const ltpiRes = useMemo(() => (model ? computeTpi(model.prices, LTPI_SPEC, model.prices.length) : null), [model]);
   const [tpiCfg0] = usePersisted<{ ltpiSource: 'ensemble' | 'sma200' }>('signals.tpi', { ltpiSource: 'ensemble' });
   const tpiCfg = { ltpiSource: tpiCfg0.ltpiSource ?? 'ensemble' };
   const startIdx = useMemo(() => {
@@ -63,10 +63,11 @@ export default function Sdca() {
     if (ltpi.mode === 'manual') s0[s0.length - 1] = ltpi.manual;     // manual LTPI applies to today only
     return s0;
   }, [model, tpiCfg.ltpiSource, ltpi.mode, ltpi.manual]);
-  const bt = useMemo(() => (model && comp ? backtest(model.prices, comp.risk, cfg.curve, startIdx, cfg.capital || 10000, cfg.safety ? ltpiSeries ?? undefined : undefined) : null), [model, comp, cfg.curve, startIdx, cfg.capital, cfg.safety, ltpiSeries]);
+  const ath = useMemo(() => (model && comp ? athSellSeries(model.prices, comp.risk) : null), [model, comp]);
+  const bt = useMemo(() => (model && comp ? backtest(model.prices, comp.risk, cfg.curve, startIdx, cfg.capital || 10000, cfg.safety ? ltpiSeries ?? undefined : undefined, cfg.athSell ? ath?.frac : undefined) : null), [model, comp, cfg.curve, startIdx, cfg.capital, cfg.safety, ltpiSeries, cfg.athSell, ath]);
 
   if (!model || !comp) {
-    return <Screen title="SDCA" subtitle="Strategic Dollar Cost Averaging · BTC"><Card><div className="dim">{status}</div></Card></Screen>;
+    return <Screen nav={nav} title="SDCA" subtitle="Strategic Dollar Cost Averaging · BTC"><Card><div className="dim">{status}</div></Card></Screen>;
   }
 
   const n = model.dates.length;
@@ -79,7 +80,7 @@ export default function Sdca() {
   const zone = riskZone(riskToday);
   const priceRisk = model.risk.price[last];
   const band = BANDS.find((b) => priceRisk / 100 >= b.from && priceRisk / 100 < b.to) ?? (priceRisk < 1 ? BANDS[0] : BANDS[BANDS.length - 1]);
-  const ltpiProxy = tpiCfg.ltpiSource === 'sma200' ? (price > model.prices.slice(-200).reduce((a, b) => a + b, 0) / 200 ? 1 : -1) : (ltpiRes?.state ?? 0);
+  const ltpiProxy = tpiCfg.ltpiSource === 'sma200' ? (price > model.prices.slice(-200).reduce((a, b) => a + b, 0) / 200 ? 1 : -1) : (ltpiSeries?.at(-1) ?? 0);
   const ltpiValue = ltpi.mode === 'manual' ? ltpi.manual : ltpiProxy;
 
   let actionTitle = 'HOLD — brak transakcji', actionSub = `Krzywa ≈ 0% przy dzisiejszym ryzyku`, actionTone = 'dim';
@@ -103,6 +104,17 @@ export default function Sdca() {
     actionTone = 'red';
   }
 
+  // ATH-day sale (optional): new all-time-high close while risk ≥ 70%
+  const athFrac = ath?.frac[last] ?? 0, athK = ath?.k[last] ?? 0;
+  const athOn = !!cfg.athSell && athFrac > 0;
+  if (athOn) {
+    const curveSell = rate < -0.001 ? -rate / 100 : 0, safe = safetyOn ? SAFETY.sellRate : 0;
+    const f = curveSell + safe + athFrac;
+    actionTitle = cfg.btcHeld > 0 ? `SPRZEDAJ ${(cfg.btcHeld * f).toFixed(6)} BTC` : `SPRZEDAJ ${(f * 100).toFixed(2)}% BTC`;
+    actionSub = `Nowy szczyt (ATH) przy ryzyku ${riskToday.toFixed(1)}%: sprzedaż ${(athFrac * 100).toFixed(2)}% BTC (${athK + 1}. w tym cyklu)` + (curveSell || safe ? ' · razem z krzywą/bezpiecznikiem' : '');
+    actionTone = 'red';
+  }
+
   // visible range for charts
   const span = { all: n, '8y': 365 * 8, '4y': 365 * 4, '1y': 365 }[cfg.range];
   const from = Math.max(0, n - span);
@@ -116,7 +128,7 @@ export default function Sdca() {
   const avgCost = bought.length ? invested / bought.reduce((a, t) => a + t.usd / t.price, 0) : NaN;
 
   return (
-    <Screen title="SDCA" subtitle={<>Strategic Dollar Cost Averaging · BTC<br /><span className="faint">{status}</span></>}
+    <Screen nav={nav} title="SDCA" subtitle={<>Strategic Dollar Cost Averaging · BTC<br /><span className="faint">{status}</span></>}
       actions={<>
         <button className="icon-btn" onClick={() => setInfo(true)} aria-label="Opis"><IcInfo width={19} /></button>
         <button className="icon-btn" onClick={() => refresh()} disabled={busy} aria-label="Odśwież"><IcRefresh width={19} style={busy ? { animation: 'spin 1s linear infinite' } : undefined} /></button>
@@ -129,14 +141,17 @@ export default function Sdca() {
         <div className="dim mt8" style={{ fontSize: 14 }}>{actionSub}</div>
         <div className="hr" />
         <Row className="compact" label="Composite Risk dziś" value={pct(riskToday)} />
-        <Row className="compact" label="Wycena z (konwencja TRW)" value={<span style={{ color: zToday >= 1.5 ? 'var(--green)' : zToday <= -1.5 ? 'var(--red)' : undefined }}>{signed(zToday)}σ <span className="dim">· + = tanio</span></span>} />
+        <Row className="compact" label="Wycena z (TRW)" value={<span style={{ color: zToday >= 1.5 ? 'var(--green)' : zToday <= -1.5 ? 'var(--red)' : undefined }}>{signed(zToday)}σ <span className="dim">· + = tanio</span></span>} />
         <Row className="compact" label="Krzywa dziś" value={signed(rate) + '%/dzień'} />
         <Row className="compact" label="Bezpiecznik LTPI" value={<span className={safetyOn ? 'red' : 'dim'}>{!cfg.safety ? 'wyłączony' : safetyOn ? 'aktywny — sprzedaż' : ltpiValue > 0 ? 'nieaktywny · LTPI +' : `czuwa (ryzyko ≥ ${SAFETY.riskMin}% i LTPI < 0)`}</span>} />
+        {cfg.athSell && <Row className="compact" label="Sprzedaż przy ATH" value={<span className={athOn ? 'red' : 'dim'}>{athOn ? `dziś ${(athFrac * 100).toFixed(2)}% BTC` : `czuwa · ${athK} sprzedaży w cyklu`}</span>} />}
         <Row className="compact" label="Cena BTC" value={usd(price)} />
         {pyrHist.length > 0 && Number.isFinite(pyrHist.at(-1)!.z) && <Row className="compact" label="Piramida analizy" value={<span style={{ color: pyrHist.at(-1)!.z >= 0.25 ? 'var(--green)' : pyrHist.at(-1)!.z <= -0.25 ? 'var(--red)' : 'var(--amber)' }}>{signed(pyrHist.at(-1)!.z)}σ <span className="dim">· P {Math.round(pyrHist.at(-1)!.p * 100)}% · pokrycie {Math.round(pyrHist.at(-1)!.coverage * 100)}%</span></span>} />}
         <Row className="compact" label="Rezerwa gotówki" value={<NumInput className="inline-input" value={cfg.cash} onChange={(v) => upd({ cash: v ?? 0 })} suffix="$" />} />
         <Row className="compact" label="Posiadane BTC" value={<NumInput className="inline-input" value={cfg.btcHeld} onChange={(v) => upd({ btcHeld: v ?? 0 })} />} />
       </Card>
+
+      {ltpiSeries && <ConeCard dates={model.dates} prices={model.prices} risk={comp.risk} ltpi={ltpiSeries} />}
 
       {/* ---- charts ---- */}
       <Seg value={view} onChange={setView} options={[{ v: 'rainbow', l: 'EQM Rainbow' }, { v: 'risk', l: 'Composite Risk' }, { v: 'curve', l: 'Accum/Dist' }]} />
@@ -261,23 +276,20 @@ export default function Sdca() {
         ))}
       </Card>
 
-      <div className="section-title">LTPI — długoterminowy trend</div>
-      <Card>
-        <div className="between">
-          <div><div className={'mid-number ' + (ltpiValue > 0 ? 'green' : ltpiValue < 0 ? 'red' : 'dim')}>{signed(ltpiValue)}</div>
-            <div className="dim" style={{ fontSize: 13 }}>{ltpiValue > 0 ? 'Trend długoterminowy pozytywny' : ltpiValue < 0 ? 'Sygnał „emergency exit” — LTPI negatywne' : 'Neutralnie'}</div></div>
-          <Seg value={ltpi.mode} onChange={(m) => setLtpi({ ...ltpi, mode: m })} options={[{ v: 'proxy', l: 'Auto' }, { v: 'manual', l: 'Ręcznie' }]} />
-        </div>
-        {ltpi.mode === 'manual' ? (
-          <div className="mt12"><input type="range" min={-1} max={1} step={0.05} value={ltpi.manual} onChange={(e) => setLtpi({ ...ltpi, manual: +e.target.value })} />
-            <div className="note-text">Wpisz wartość LTPI z własnego systemu (−1 … +1). Wartość jest używana przez silnik reżimów w zakładce RSPS.</div></div>
-        ) : <div className="note-text mt12">{tpiCfg.ltpiSource === 'sma200' ? 'Źródło: cena vs SMA 200 (zmienisz w zakładce RSPS).' : 'Źródło: LTPI z 10 wskaźników trendu z histerezą ±0,2 (szczegóły poniżej i w zakładce RSPS).'} Przełącz na „Ręcznie”, aby użyć własnego LTPI.</div>}
+      <div className="section-title">Bezpiecznik LTPI</div>
+      <Card className="tight">
+        <div className="row"><span>LTPI dziś</span><span className={ltpiValue > 0 ? 'green' : ltpiValue < 0 ? 'red' : 'dim'} style={{ fontWeight: 600 }}>{signed(ltpiValue)} · {ltpiValue > 0 ? 'trend długoterminowy pozytywny' : ltpiValue < 0 ? 'negatywny' : 'neutralnie'}</span></div>
+        <div className="note-text" style={{ padding: '0 16px 12px' }}>Składniki, ustawienia i tryb ręczny: podzakładka LTPI · MTPI.</div>
       </Card>
       <Card className="tight">
         <div className="row"><div className="grow"><div>Bezpiecznik LTPI</div><div className="faint" style={{ fontSize: 12 }}>Ochrona części bezpieczniejszej portfela</div></div><Switch checked={cfg.safety} onChange={(v) => upd({ safety: v })} /></div>
-        <div className="note-text" style={{ padding: '0 14px 12px' }}>Gdy LTPI jest ujemne, a ryzyko wyceny ≥ {SAFETY.riskMin}%, SDCA sprzedaje {SAFETY.sellRate * 100}% BTC dziennie do stablecoina. Gdy LTPI wróci na plus, te stablecoiny są odkupywane w BTC (po {SAFETY.rebuyRate * 100}% dziennie; zakładka Sygnały pilnuje kwoty). Krzywa akumulacji działa bez zmian. Backtest od 2020: wynik 2020–2023 bez zmian, 2024–2026 obsunięcie portfela −31,5% → −27,3% przy tym samym CAGR.</div>
+        <div className="note-text" style={{ padding: '0 14px 12px' }}>Gdy LTPI jest ujemne, a ryzyko wyceny ≥ {SAFETY.riskMin}%, SDCA sprzedaje {SAFETY.sellRate * 100}% BTC dziennie do stablecoina. Gdy LTPI wróci na plus, te stablecoiny są odkupywane w BTC (po {SAFETY.rebuyRate * 100}% dziennie; zakładka Portfel pilnuje kwoty). Krzywa akumulacji działa bez zmian. Backtest od 2020: wynik 2020–2023 bez zmian, 2024–2026 obsunięcie portfela −31,5% → −27,3% przy tym samym CAGR.</div>
       </Card>
-      {ltpi.mode !== 'manual' && ltpiRes && tpiCfg.ltpiSource === 'ensemble' && <TpiCard title="Składniki LTPI" res={ltpiRes} stateLabel note="Każdy wskaźnik głosuje +1 (trend w górę) lub −1; LTPI to średnia głosów." />}
+
+      <Card className="tight">
+        <div className="row"><div className="grow"><div>Sprzedaż w dni nowego szczytu (ATH)</div><div className="faint" style={{ fontSize: 12 }}>Propozycja z lekcji o tempie dystrybucji · domyślnie wyłączona</div></div><Switch checked={!!cfg.athSell} onChange={(v) => upd({ athSell: v })} /></div>
+        <div className="note-text" style={{ padding: '0 14px 12px' }}>W każdy dzień zamknięcia powyżej dotychczasowego szczytu, gdy ryzyko wyceny ≥ {ATH_SELL.riskMin}%, SDCA sprzedaje {ATH_SELL.unit * 100}% BTC × {String(ATH_SELL.growth).replace('.', ',')}^k, gdzie k to liczba takich sprzedaży w tym cyklu (harmonogram „×1,1” ze slajdu). Licznik zeruje się, gdy cena spadnie {ATH_SELL.reset * 100}% poniżej szczytu. Krzywa i bezpiecznik działają bez zmian. Backtest 2020→ z bezpiecznikiem: OOS 2024→ Sharpe 0,98 → 1,22, obsunięcie −34,8% → −28,7%; 2020–2023 Sharpe 1,65 → 1,63 (2021: +16% → +13%). Poprawa w całej siatce parametrów (0,5–1,5%, ×1,0–×1,2), ale to tylko dwie hossy — mało danych, dlatego decyzja należy do Ciebie.</div>
+      </Card>
 
       <div className="section-title">Dziennik transakcji</div>
       <Card className="tight">
