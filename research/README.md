@@ -312,3 +312,9 @@ SDCA/RSPS (LTPI $TOTAL), MTPI i propozycję shortu, zakładkę LTPI·MTPI oraz b
 Darmowe źródła bez klucza dają tylko bieżącą wartość (CoinGecko /global, CoinMarketCap keyless, CoinPaprika, CoinLore), więc aplikacja
 zapisuje ją po każdym zamknięciu i porównuje dzienne zmiany z indeksem TPI (korelacja, średnia różnica) — kontrola, nie wejście TPI.
 TPI: import TradingView (jeśli jest) albo indeks Coin Metrics. Odczyt jest z chwili pobrania; zapisy > 3 h po 00:00 UTC są pomijane w porównaniu.
+
+## Short-lista małych tokenów (2.29.0)
+Reguła z kursu: mały token może trafić do RSPS, gdy ma perpy na Hyperliquid i ≥ ~10 mln $ wolumenu dziennie; maks. ~10% wagi.
+W aplikacji: lista użytkownika, kwalifikacja sprawdzana przy każdym skanie (Hyperliquid metaAndAssetCtxs, dayNtlVlm), min. 91 dni
+historii, wybór tylko wg siły i trendu (bez pierwszeństwa), limit 10% na token (nadwyżka → rezerwa), bez wpływu na top 10 płynności
+i szerokość rynku. Nie jest częścią backtestu: lista powstaje z bieżących propozycji, więc nie ma jej uczciwej historii point-in-time.

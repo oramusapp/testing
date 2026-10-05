@@ -55,16 +55,27 @@ export async function hyperliquidKlines(coin: string, startTime: number): Promis
 
 /** Coins whose Binance spot history is too short: earlier days come from Hyperliquid (Binance days take priority). */
 export const HL_FALLBACK = ['HYPE'];
-export async function klinesAny(sym: string, days = 400, startTime?: number): Promise<{ t: number; c: number; q: number }[]> {
+export async function klinesAny(sym: string, days = 400, startTime?: number, hl = HL_FALLBACK.includes(sym)): Promise<{ t: number; c: number; q: number }[]> {
   const from = startTime ?? Date.now() - days * DAY;
   let bin: { t: number; c: number; q: number }[] = [];
-  try { bin = await klines(sym + 'USDT', days, startTime); } catch (e) { if (!HL_FALLBACK.includes(sym)) throw e; }
-  if (!HL_FALLBACK.includes(sym) || (bin.length && bin[0].t <= from + 2 * DAY)) return bin;
+  try { bin = await klines(sym + 'USDT', days, startTime); } catch (e) { if (!hl) throw e; }
+  if (!hl || (bin.length && bin[0].t <= from + 2 * DAY)) return bin;
   try {
     const hl = await hyperliquidKlines(sym, from);
     const have = new Set(bin.map((k) => k.t));
     return [...hl.filter((k) => !have.has(k.t) && (!bin.length || k.t < bin[0].t)), ...bin].sort((a, b) => a.t - b.t);
   } catch { return bin; }
+}
+
+/** Hyperliquid perps: listed coins with their 24 h notional volume (USD). Used for the small-token short-list rule. */
+export async function hlPerps(): Promise<Map<string, { vol: number; delisted: boolean }>> {
+  const ctl = new AbortController(); const id = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const r = await fetch('https://api.hyperliquid.xyz/info', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal, body: JSON.stringify({ type: 'metaAndAssetCtxs' }) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const [meta, ctxs] = await r.json() as [{ universe: { name: string; isDelisted?: boolean }[] }, { dayNtlVlm?: string }[]];
+    return new Map(meta.universe.map((u, i) => [u.name.toUpperCase(), { vol: parseFloat(ctxs[i]?.dayNtlVlm ?? '0') || 0, delisted: !!u.isDelisted }]));
+  } finally { clearTimeout(id); }
 }
 
 export async function ticker(symbols: string[]) {

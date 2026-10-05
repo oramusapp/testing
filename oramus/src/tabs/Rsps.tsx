@@ -24,6 +24,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
   const { pyr, s, upd, scan, scanFresh, busy, runScan, breadth, btcTrend, regime, gate, picks, sleeve, shortProposal, log, parking, parkingPending, confirmParking } = R0;
   const [info, setInfo] = useState(false);
   const [tokOpen, setTokOpen] = useState(false);
+  const [smallOpen, setSmallOpen] = useState(false);
   const [levOpen, setLevOpen] = useState(false);
   const R = { ...REGIMES[regime], desc: regime === 'closed' ? (parking.choice === 'stable' ? 'Część RSPS w stablecoinach (Twój wybór).' : parking.choice === 'hybrid' ? (R0.sdcaRisk < HYBRID_RISK_MAX ? `Hybryda: BTC wg VAMS ${Math.round(vams3(btcTrend) * 100)}% (trend ${btcTrend.toFixed(2)}), bo ryzyko wyceny ${R0.sdcaRisk.toFixed(0)}% < ${HYBRID_RISK_MAX}%.` : `Hybryda: stablecoin, bo ryzyko wyceny ${R0.sdcaRisk.toFixed(0)}% ≥ ${HYBRID_RISK_MAX}%.`) : `Część RSPS w BTC wg 3-stanowego VAMS: ${Math.round(vams3(btcTrend) * 100)}% (trend ${btcTrend.toFixed(2)}).`) : REGIMES[regime].desc };
   const split = R0.split;   // same split as in Portfel (tilt 40/60 while LTPI on $TOTAL is positive)
@@ -117,6 +118,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       <div className="section-title">Skaner (top {s.universeSize} wg płynności, bez memów)</div>
       <Card className="tight">
         <div className="row"><span>Lista kandydatów</span><button className="text-btn" onClick={() => setTokOpen(true)}>{s.tokens.length} · Edytuj</button></div>
+        <div className="row"><div className="grow"><div>Short-lista małych tokenów</div><div className="faint" style={{ fontSize: 12 }}>perpy na Hyperliquid, ≥ 10 mln $ wolumenu dziennie, maks. 10% wagi</div></div><button className="text-btn" onClick={() => setSmallOpen(true)}>{(s.small ?? []).length} · Edytuj</button></div>
         {!scan && <div style={{ padding: 16 }}><button className="btn primary block" onClick={() => runScan()} disabled={busy}>{busy ? 'Skanowanie…' : 'Skanuj rynek (Binance)'}</button></div>}
         {scan && (
           <>
@@ -128,7 +130,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
                     const w = r.bench ? sleeve.find((x) => x.sym === 'BTC')?.w : regime === 'rsps' ? picks.sel.find((x) => x.sym === r.sym)?.w : undefined;
                     return (
                       <tr key={r.sym} style={{ opacity: r.inUniverse ? 1 : 0.45, background: w ? 'var(--accent-soft)' : undefined }}>
-                        <td style={{ paddingLeft: 16 }}><b>{r.sym}</b>{r.core && <span className="faint" style={{ fontSize: 11 }}> stały</span>}{r.error && <div className="red" style={{ fontSize: 11 }}>{r.error}</div>}</td>
+                        <td style={{ paddingLeft: 16 }}><b>{r.sym}</b>{r.small && <span className="faint" style={{ fontSize: 11 }}> mały{r.hlVol ? ` · ${Math.round(r.hlVol / 1e6)} mln $` : ''}</span>}{r.core && <span className="faint" style={{ fontSize: 11 }}> stały</span>}{r.error && <div className="red" style={{ fontSize: 11 }}>{r.error}</div>}</td>
                         <td className={r.bench ? 'dim' : r.ratioUp ? 'green' : 'red'}>{r.error || r.bench ? (r.bench ? '—' : '') : r.ratioUp ? '▲' : '▼'}</td>
                         <td>{r.bench ? <span className="dim">wzorzec</span> : signed(r.score)}</td><td>{r.error ? '' : r.trend.toFixed(2)}</td>
                         <td className={r.ret >= 0 ? 'green' : 'red'}>{pct(r.ret, 0, true)}</td><td className="dim">{pct(r.vol, 0)}</td>
@@ -182,6 +184,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
         </Card>
       </Sheet>
       <TokenSheet open={tokOpen} onClose={() => setTokOpen(false)} tokens={s.tokens} onChange={(t) => upd({ tokens: t })} />
+      <TokenSheet small open={smallOpen} onClose={() => { setSmallOpen(false); void runScan(true); }} tokens={s.small ?? []} onChange={(t) => upd({ small: t })} />
       <Sheet open={info} onClose={() => setInfo(false)} title="Jak działa RSPS">
         <div className="note-text" style={{ fontSize: 14.5 }}>
           <p><b className="accent">Podział kapitału.</b> SDCA {split}% (zakładka SDCA) + RSPS {100 - split}% — ten sam cel co w Portfelu ({SPLIT_SDCA}/{100 - SPLIT_SDCA}, przy przechyle {SPLIT_TILT}/{100 - SPLIT_TILT}, gdy LTPI z $TOTAL dodatnie). Rebalans przy odchyleniu ±10 p.p. Dźwignia i shorty nie są częścią alokacji, pojawiają się tylko jako propozycje w sygnale.</p>
@@ -195,7 +198,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
   );
 }
 
-function TokenSheet({ open, onClose, tokens, onChange }: { open: boolean; onClose: () => void; tokens: string[]; onChange: (t: string[]) => void }) {
+function TokenSheet({ open, onClose, tokens, onChange, small }: { open: boolean; onClose: () => void; tokens: string[]; onChange: (t: string[]) => void; small?: boolean }) {
   const [txt, setTxt] = useState('');
   const add = () => {
     const sym = txt.trim().toUpperCase().replace(/USDT$/, '');
@@ -205,12 +208,14 @@ function TokenSheet({ open, onClose, tokens, onChange }: { open: boolean; onClos
     setTxt('');
   };
   return (
-    <Sheet open={open} onClose={onClose} title="Kandydaci RSPS" right={<button className="text-btn" onClick={() => onChange(DEFAULT_TOKENS)}>Reset</button>}>
-      <div className="flex mb12"><input className="input" placeholder="Symbol, np. HBAR" value={txt} onChange={(e) => setTxt(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} autoCapitalize="characters" /><button className="btn primary" onClick={add}><IcPlus width={18} /></button></div>
+    <Sheet open={open} onClose={onClose} title={small ? 'Short-lista małych tokenów' : 'Kandydaci RSPS'} right={<button className="text-btn" onClick={() => onChange(small ? [] : DEFAULT_TOKENS)}>{small ? 'Wyczyść' : 'Reset'}</button>}>
+      <div className="flex mb12"><input className="input" placeholder={small ? 'Symbol z Hyperliquid, np. ENA' : 'Symbol, np. HBAR'} value={txt} onChange={(e) => setTxt(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} autoCapitalize="characters" /><button className="btn primary" onClick={add}><IcPlus width={18} /></button></div>
       <Card className="tight">
         {tokens.map((t) => <div key={t} className="row"><b>{t}</b><button className="icon-btn plain" onClick={() => onChange(tokens.filter((x) => x !== t))}><IcX width={18} /></button></div>)}
       </Card>
-      <div className="note-text">Pary {'<SYMBOL>'}USDT z Binance. Skaner bierze {RSPS_DEF.universeSize} najpłynniejszych z tej listy. Mem coiny są blokowane.</div>
+      {small
+        ? <div className="note-text">Token wchodzi do wyboru tylko, gdy ma perpy na Hyperliquid z wolumenem ≥ 10 mln $ (24 h) i co najmniej 91 dni historii; sprawdzane przy każdym skanie. Wybór decyduje siła względem BTC i własny trend — jak dla innych kandydatów, bez pierwszeństwa. Maks. 10% części RSPS na token; to, co obetnie limit, trafia do rezerwy. Nie zajmuje miejsc w top {RSPS_DEF.universeSize} płynności i nie liczy się do szerokości rynku. Backtest go nie obejmuje (brak uczciwej historii takiej listy). Mem coiny są blokowane.</div>
+        : <div className="note-text">Pary {'<SYMBOL>'}USDT z Binance. Skaner bierze {RSPS_DEF.universeSize} najpłynniejszych z tej listy. Mem coiny są blokowane.</div>}
     </Sheet>
   );
 }

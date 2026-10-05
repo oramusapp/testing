@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from '../components/ui';
 import { usePersisted } from './db';
-import { klines, klinesAny, lastClosedDay } from './market';
+import { klines, klinesAny, lastClosedDay, hlPerps } from './market';
 import { annVol, capWeights, ratios, linfit, vams3 } from './quant';
 import { leverageGate, PILLARS, isFresh } from './pyramid';
 import { usePyramid } from './pyramidStore';
@@ -18,12 +18,16 @@ export const DEFAULT_TOKENS = ['ETH', 'HYPE', 'BNB', 'XRP', 'SOL', 'ADA', 'TRX',
  *  the most liquid tokens (point in time). Tiers from the notes (large vs small caps as groups) lowered the honest,
  *  point-in-time result (research/run57–58.py), so they are not used; adding these coins to the pool is neutral (run58). */
 export const CORE = ['ETH', 'SOL', 'XRP', 'SUI', 'HYPE'];
+/** Small-token short-list (course rule): a token qualifies while it has a perps market on Hyperliquid with ≥ $10M daily
+ *  volume; it competes on strength like every candidate, with at most 10% of the RSPS part. Not in the backtest — there is
+ *  no point-in-time history of such a hand-made list, so its effect cannot be measured honestly. */
+export const SMALL_MIN_VOL = 10e6, SMALL_CAP = 0.10;
 export const MEME = ['DOGE', 'SHIB', 'PEPE', 'WIF', 'BONK', 'FLOKI', 'TRUMP', 'MEME', 'BOME', 'POPCAT'];
 
 // Parameters chosen on 2020–2023 data, tested out of sample 2024-01…2026-10 on Binance data (research/run9–13.py).
 /** reserve: where the RSPS share that is not in coins sits — stablecoin, tokenized gold (PAXG) or PAXG only while gold trends up. */
 export type Reserve = 'stable' | 'gold' | 'goldTrend' | 'hierarchy';
-export interface RspsSettings { tokens: string[]; universeSize: number; topN: number; cap: number; capital: number; reserve?: Reserve; }
+export interface RspsSettings { small?: string[]; tokens: string[]; universeSize: number; topN: number; cap: number; capital: number; reserve?: Reserve; }
 export const RSPS_DEF: RspsSettings = { tokens: DEFAULT_TOKENS, universeSize: 10, topN: 3, cap: 50, capital: 10000, reserve: 'hierarchy' };
 export const GOLD = 'PAXG';
 /** "Strong gold" for the reserve hierarchy: own 4-SMA trend ≥ 0.5 (and, if GOLD_VS_BTC, stronger than BTC on the PAXG/BTC ratio). */
@@ -38,7 +42,7 @@ export const SPLIT_SDCA = 60;
 // 2020→: CAGR 51.0% → 54.2%, max drawdown −25.0% → −29.7%, Sharpe 2024→ 1.10 → 1.05.
 export const SPLIT_TILT = 40;
 export const splitTarget = (tilt: boolean, totalLtpi: number | undefined) => (tilt && (totalLtpi ?? 0) > 0 ? SPLIT_TILT : SPLIT_SDCA);
-export interface ScanRow { core?: boolean; sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; bench?: boolean; sharpe?: number; sortino?: number; omega?: number; corrBtc?: number; }
+export interface ScanRow { small?: boolean; hlVol?: number; core?: boolean; sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; bench?: boolean; sharpe?: number; sortino?: number; omega?: number; corrBtc?: number; }
 export interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; gateOpen: boolean; gateSince?: string; gold?: { price: number; trend: number; ratioUp?: boolean; ratioMom?: boolean } }
 interface LogEntry { time: number; regime: string; lev?: number; }
 
@@ -109,16 +113,26 @@ export function useRsps() {
       const btc = closed(await klines('BTCUSDT', 400));
       const btcMap = new Map(btc.map((k) => [k.t, k.c]));
       const rows: ScanRow[] = [];
-      await Promise.all([...new Set([...CORE, ...s.tokens])].filter((t) => !MEME.includes(t)).map(async (sym) => {
+      const smallList = (s.small ?? []).map((x) => x.toUpperCase()).filter((x) => !CORE.includes(x) && !s.tokens.includes(x));
+      let perps: Map<string, { vol: number; delisted: boolean }> | null = null;
+      if (smallList.length) { try { perps = await hlPerps(); } catch { perps = null; } }
+      await Promise.all([...new Set([...CORE, ...s.tokens, ...smallList])].filter((t) => !MEME.includes(t)).map(async (sym) => {
+        const isSmall = smallList.includes(sym);
+        const hp = perps?.get(sym);
         try {
-          const k = closed(await klinesAny(sym, 400));
+          if (isSmall) {
+            if (!perps) throw new Error('brak danych z Hyperliquid');
+            if (!hp || hp.delisted) throw new Error('brak perpów na Hyperliquid');
+            if (hp.vol < SMALL_MIN_VOL) throw new Error(`wolumen ${(hp.vol / 1e6).toFixed(1)} mln $ < 10 mln $`);
+          }
+          const k = closed(await klinesAny(sym, 400, undefined, isSmall || undefined));
           const c = k.map((x) => x.c);
-          if (c.length < 150) throw new Error('za krótka historia');
+          if (c.length < (isSmall ? 91 : 150)) throw new Error('za krótka historia');
           const ratio = k.filter((x) => btcMap.has(x.t)).map((x) => x.c / btcMap.get(x.t)!);
           const r50 = ratio.slice(-51, -1).reduce((p, v) => p + v, 0) / 50;
           const vol = annVol(c, 30);
           rows.push({
-            core: CORE.includes(sym), sym, price: c.at(-1)!, ret: (c.at(-1)! / c[c.length - 31] - 1) * 100, vol: vol * 100,
+            small: isSmall || undefined, hlVol: hp?.vol, core: CORE.includes(sym), sym, price: c.at(-1)!, ret: (c.at(-1)! / c[c.length - 31] - 1) * 100, vol: vol * 100,
             liq: k.slice(-30).reduce((p, x) => p + (x.q ?? 0), 0) / 30, ratioUp: ratio.at(-1)! > r50, trend: trendOf(c),
             score: rsScore(ratio, vol),   // research definition: ratio log change / coin volatility, 14/28/56
             ...ratios(c, 365),
@@ -128,13 +142,14 @@ export function useRsps() {
               return linfit(ra, rb).r;
             })()
           });
-        } catch (e) { rows.push({ sym, price: NaN, ret: NaN, vol: NaN, liq: 0, ratioUp: false, trend: 0, score: NaN, error: (e as Error).message }); }
+        } catch (e) { rows.push({ small: isSmall || undefined, hlVol: hp?.vol, sym, price: NaN, ret: NaN, vol: NaN, liq: 0, ratioUp: false, trend: 0, score: NaN, error: (e as Error).message }); }
       }));
       // point-in-time universe: the N most liquid (30-day average quote volume)
-      const ok = rows.filter((r) => !r.error).sort((x, y) => y.liq - x.liq);
+      const ok = rows.filter((r) => !r.error && !r.small).sort((x, y) => y.liq - x.liq);   // short-list does not take top-N places
       ok.slice(0, s.universeSize - 1).forEach((r) => (r.inUniverse = true));   // BTC is one of the top-N (as in the research)
       const uni = ok.filter((r) => r.inUniverse);
       ok.filter((r) => r.core).forEach((r) => (r.inUniverse = true));   // fixed coins are always candidates (no priority)
+      rows.filter((r) => r.small && !r.error).forEach((r) => (r.inUniverse = true));   // qualifying short-list tokens
       const br = uni.length ? uni.filter((r) => r.ratioUp).length / uni.length : NaN;
       rows.sort((x, y) => (y.inUniverse ? 1 : 0) - (x.inUniverse ? 1 : 0) || (y.score || -99) - (x.score || -99));
       // hysteresis: open at ≥ 70%, stay open until breadth falls below 60%
@@ -164,7 +179,8 @@ export function useRsps() {
   const picks = useMemo(() => {
     const uni = (scan?.rows ?? []).filter((r) => r.inUniverse && !r.bench && Number.isFinite(r.score));
     const sel = uni.filter((r) => r.score > 0 && r.trend >= 0.5).sort((x, y) => y.score - x.score).slice(0, s.topN);
-    const w = capWeights(sel.map((r) => r.score / (r.vol / 100)), s.cap / 100).map((x) => Math.min(x, s.cap / 100));
+    // short-list tokens are capped at 10%; what the cap cuts stays unallocated and goes to the reserve (gold / BTC / stable)
+    const w = capWeights(sel.map((r) => r.score / (r.vol / 100)), s.cap / 100).map((x, i) => Math.min(x, s.cap / 100, sel[i].small ? SMALL_CAP : 1));
     const shorts = uni.filter((r) => r.score < 0 && r.trend <= 0.25).sort((x, y) => x.score - y.score).slice(0, 3);
     return { sel: sel.map((r, i) => ({ sym: r.sym, w: w[i] })), shorts };
   }, [scan, s.topN, s.cap]);
