@@ -27,7 +27,7 @@ interface Portfolio { holdings: Holdings | null; history: { time: number; text: 
 interface Order { id: string; sleeve: 'SDCA' | 'RSPS' | 'Rebalans'; side: 'buy' | 'sell' | 'move'; sym: string; usd: number; units: number; why: string; }
 
 export default function Signals() {
-  const { model } = useBtc();
+  const { model, tpiPrices } = useBtc();
   const R = useRsps();
   const [sd] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
   const [pf, setPf] = usePersisted<Portfolio>('portfolio', { holdings: null, history: [] });
@@ -40,8 +40,8 @@ export default function Signals() {
   const [editOpen, setEditOpen] = useState(false);
   const [flowOpen, setFlowOpen] = useState(false);
   const cfg = { ...SDCA_DEFAULTS, ...sd };
-  const [tpiSrc] = usePersisted<{ ltpiSource: 'ensemble' | 'sma200' }>('signals.tpi', { ltpiSource: 'ensemble' });
-  const ltpiSeries = useMemo(() => (model && (cfg.safety || (cfg.slowBuy ?? 1) < 1) ? ltpiStateSeries(model.prices, tpiSrc.ltpiSource ?? 'ensemble') : undefined), [model, cfg.safety, cfg.slowBuy, tpiSrc.ltpiSource]);
+  const [tpiSrc] = usePersisted<{ ltpiSource: 'ensemble' | 'sma200'; hyst?: number }>('signals.tpi', { ltpiSource: 'ensemble' });
+  const ltpiSeries = useMemo(() => (model && (cfg.safety || (cfg.slowBuy ?? 1) < 1) ? ltpiStateSeries(tpiPrices ?? model.prices, tpiSrc.ltpiSource ?? 'ensemble', tpiSrc.hyst ?? 0) : undefined), [model, tpiPrices, cfg.safety, cfg.slowBuy, tpiSrc.ltpiSource, tpiSrc.hyst]);
   const owed = pf.safetyOwed ?? 0;
 
   const sdcaState = useMemo(() => {
@@ -307,7 +307,7 @@ export default function Signals() {
 
       {(R.gate.allowed || R.shortProposal || volEst > 0.6) && <div className="section-title">Propozycje (poza portfelami)</div>}
       {R.gate.allowed && <Card><b className="green">Dźwignia {LEV_MAX}× na BTC</b><div className="note-text mt8">Spełnione wszystkie 10 warunków. Tylko propozycja.</div></Card>}
-      {R.shortProposal && <Card><b className="red">Short altów: {R.picks.shorts.map((r) => r.sym).join(', ')}</b><div className="note-text mt8">Pełny trend spadkowy BTC. 15–30% portfela RSPS jako zabezpieczenie (kontrakty perpetual). Tylko propozycja.</div></Card>}
+      {R.shortProposal && <Card><b className="red">Short altów: {R.picks.shorts.map((r) => r.sym).join(', ')}</b><div className="note-text mt8">MTPI ($TOTAL) poniżej zera i spada — wg notatek „rozważ short”. 15–30% portfela RSPS jako zabezpieczenie (kontrakty perpetual). Tylko propozycja.</div></Card>}
       {volEst > 0.6 && <Card><b className="amber">Zmienność portfela ≈ {pct(volEst * 100, 0)} rocznie</b><div className="note-text mt8">Szacunek ostrożny (pełna korelacja). Propozycja: ekspozycja ok. {pct(Math.min(1, 0.6 / volEst) * exposure * 100, 0)}, reszta w stablecoinach. W backteście limit zmienności nie poprawiał istotnie wyników.</div></Card>}
 
       <Fold id="pf.rules" title="Zasady i historia operacji">

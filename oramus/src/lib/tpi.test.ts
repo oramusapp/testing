@@ -19,6 +19,9 @@ describe('TPI parity with research/tpi.py', () => {
     });
   }
   it('hysteresis holds the state inside the ±0.2 band', () => {
-    expect(hysteresis([0.1, 0.3, 0.1, -0.1, -0.3, 0.15])).toEqual([0, 1, 1, 1, -1, -1]);
+    expect(hysteresis([0.1, 0.3, 0.1, -0.1, -0.3, 0.15], 0.2)).toEqual([0, 1, 1, 1, -1, -1]);
+  });
+  it('default threshold 0 follows the sign (course notes)', () => {
+    expect(hysteresis([0.1, 0.3, -0.1, 0, 0.15])).toEqual([1, 1, -1, -1, 1]);
   });
 });

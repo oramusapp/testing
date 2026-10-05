@@ -50,6 +50,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
           <div className="stat"><div className="k">Szerokość rynku</div><div className="v">{Number.isFinite(breadth) ? pct(breadth * 100, 0) : '—'}<span className="dim" style={{ fontSize: 13 }}> {scan?.gateOpen ? '· otwarta' : '· zamknięta'}</span></div><div className="s">{scanFresh ? `wejście ≥ 70%, wyjście < 60%` : 'skan nieaktualny'}</div></div>
           <div className="stat" onClick={() => setLevOpen(true)} style={{ cursor: 'pointer' }}><div className="k">Propozycje</div><div className="v">{(gate.allowed ? 1 : 0) + (shortProposal ? 1 : 0)}</div><div className="s">dźwignia {gate.checks.filter((c) => c.ok).length}/{gate.checks.length} · short {shortProposal ? 'tak' : 'nie'}</div></div>
         </div>
+        <div className="row compact" style={{ padding: '10px 0 0' }}><span className="dim">LTPI ($TOTAL) · weto RSPS</span><span className={R0.ltpi > 0 ? 'green' : 'red'} style={{ fontWeight: 600 }}>{R0.ltpi > 0 ? 'pozytywne' : 'negatywne → stablecoin'}</span></div>
       </Card>
 
       {(gate.allowed || shortProposal) && <div className="section-title">Propozycje w sygnale</div>}
@@ -64,7 +65,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
         <Card>
           <div className="between"><b className="red">Short altów jako zabezpieczenie</b><span className="pill sell">propozycja</span></div>
           <div className="mt8"><b>{picks.shorts.map((r) => r.sym).join(', ')}</b> <span className="dim">· 15–30% części RSPS, kontrakty perpetual</span></div>
-          <div className="note-text mt8">Warunek: pełny trend spadkowy BTC (trend ≤ 0,25), tokeny najsłabsze względem BTC i we własnym trendzie spadkowym. W backteście zarabiał w latach bessy (+21,8 p.p. w 2022, +16,1 p.p. w 2025), tracił w odbiciach (−18,8 p.p. w 2020). Sam obniżał Sharpe; w portfelu z SDCA zmniejszał obsunięcie z −37% do −31%. Nie jest wliczony w alokację.</div>
+          <div className="note-text mt8">Warunek z notatek: MTPI ($TOTAL) poniżej zera i spada („below zero and falling → consider shorting”); tokeny najsłabsze względem BTC i we własnym trendzie spadkowym. Wcześniejsze backtesty shortu (warunek trendu BTC): zarabiał w bessie (+21,8 p.p. w 2022), tracił w odbiciach (−18,8 p.p. w 2020) i w portfelu nie poprawił wyniku (research/run39.py). Nie jest wliczony w alokację.</div>
         </Card>
       )}
 
@@ -85,13 +86,6 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
         <SentimentCard fg={pyr.fg} />
         <EventStudyCard fg={pyr.fg} />
       </Fold>
-
-      <div className="section-title">Trend</div>
-      <Card className="tight">
-        <div className="row"><span>LTPI</span><span className={R0.ltpi > 0 ? 'green' : 'red'} style={{ fontWeight: 600 }}>{R0.ltpi > 0 ? 'pozytywne' : 'negatywne'}</span></div>
-        <div className="row"><span>MTPI</span><span className="num">{pyr.auto ? signed(pyr.auto.mtpi.value) : '—'}</span></div>
-        <div className="note-text" style={{ padding: '0 16px 12px' }}>Szczegóły, składniki i ustawienia: podzakładka LTPI · MTPI.</div>
-      </Card>
 
       <div className="section-title">Alokacja</div>
       <Card>

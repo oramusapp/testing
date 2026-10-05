@@ -28,7 +28,7 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
       ? { t: 'Long + dźwignia dopuszczalna (maks. 2×)', tone: 'green', d: 'LTPI i MTPI dodatnie, rynek w trendzie. W tym systemie dźwignia pozostaje tylko propozycją przy spełnieniu ścisłych warunków (RSPS → Propozycje).' }
       : { t: 'Long spot', tone: 'green', d: trending ? 'MTPI dodatnie, ale LTPI nie jest dodatnie: tylko spot, bez dźwigni.' : 'MTPI dodatnie, rynek z powrotem do średniej: tylko spot, bez dźwigni.' };
   return (
-    <Screen nav={nav} title="LTPI · MTPI" subtitle="Sygnały podążania za trendem · zamknięcie 00:00 UTC">
+    <Screen nav={nav} title="LTPI · MTPI" subtitle="Trend całego rynku ($TOTAL) · zamknięcie 00:00 UTC">
       <Card className="hero">
         <div className="between"><div className="eyebrow" style={{ margin: 0 }}>LTPI — długoterminowy trend</div>
           <Seg value={ltpi.mode} onChange={(m) => setLtpi({ ...ltpi, mode: m })} options={[{ v: 'proxy', l: 'Auto' }, { v: 'manual', l: 'Ręcznie' }]} /></div>
@@ -37,7 +37,7 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
         {ltpi.mode === 'manual' ? (
           <div className="mt12"><input type="range" min={-1} max={1} step={0.05} value={ltpi.manual} onChange={(e) => setLtpi({ ...ltpi, manual: +e.target.value })} />
             <div className="note-text">Wpisz LTPI z własnego systemu (−1 … +1). Używają go: bezpiecznik SDCA, reżim RSPS i Portfel.</div></div>
-        ) : <div className="note-text mt12">{tpi.ltpiSource === 'sma200' ? 'Źródło: cena vs SMA 200.' : 'Źródło: 10 wskaźników trendu z histerezą ±0,2.'} Steruje: bezpiecznikiem SDCA (LTPI &lt; 0 i ryzyko ≥ 70%) oraz RSPS (LTPI &lt; 0 → stablecoiny).</div>}
+        ) : <div className="note-text mt12">{`Liczone z $TOTAL (kapitalizacja całego rynku), jak w notatkach. ${tpi.ltpiSource === 'sma200' ? 'Źródło: $TOTAL vs SMA 200.' : '10 wskaźników trendu'}; stan ${(tpi.hyst ?? 0) > 0 ? 'z histerezą ±0,2' : 'zmienia się przy przejściu przez 0 (notatki)'}.`} Steruje: bezpiecznikiem SDCA (LTPI &lt; 0 i ryzyko ≥ 70%) oraz RSPS (LTPI &lt; 0 → stablecoiny).</div>}
       </Card>
 
       {cell && (
@@ -72,7 +72,9 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
           <Seg value={tpi.ltpiSource} onChange={(v) => setTpi({ ...tpi, ltpiSource: v })} options={[{ v: 'ensemble', l: '10 wsk. ★' }, { v: 'sma200', l: 'SMA 200' }]} /></div>
         <div className="row"><div className="grow"><div>Skalowanie BTC</div><div className="faint" style={{ fontSize: 12 }}>Backtest: MTPI z 10 wsk. obniżał wynik OOS (Sharpe 0,82–0,95 vs 1,03)</div></div>
           <Seg value={tpi.mtpiSizing} onChange={(v) => setTpi({ ...tpi, mtpiSizing: v })} options={[{ v: 'ma4', l: '4 średnie ★' }, { v: 'ensemble', l: 'MTPI' }]} /></div>
-        <div className="note-text" style={{ padding: '4px 16px 14px' }}>★ = wariant wybrany w backteście (research/run17–18.py).</div>
+        <div className="row"><div className="grow"><div>Próg zmiany stanu</div><div className="faint" style={{ fontSize: 12 }}>Notatki: sprzedaż poniżej 0, kupno powyżej 0. Histereza ±0,2 ogranicza fałszywe zmiany</div></div>
+          <Seg value={String(tpi.hyst ?? 0)} onChange={(v) => setTpi({ ...tpi, hyst: +v })} options={[{ v: '0', l: '0 · notatki' }, { v: '0.2', l: '±0,2' }]} /></div>
+        <div className="note-text" style={{ padding: '4px 16px 14px' }}>LTPI i MTPI liczone są z $TOTAL — indeksu kapitalizacji całego rynku (45 aktywów z Coin Metrics, w tym stablecoiny; ok. 90% prawdziwego $TOTAL), bo według notatek „TPI is built for $TOTAL”. Backtest od 2020 (research/run44.py): MTPI z $TOTAL lepszy niż z BTC (Sharpe 2024→ 0,91 vs 0,63 przy ±0,2); LTPI z $TOTAL w portfelu nieco słabszy (Sharpe 2024→ 0,88–0,92 vs 1,09, CAGR 49–50% vs 54%). ★ = wariant wybrany w backteście na BTC (research/run17–18.py).</div>
       </Card>
 
       <div className="section-title">Jak czytać TPI</div>

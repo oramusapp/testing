@@ -166,3 +166,17 @@ Spearman z zwrotem 90 d: 2014–19 0,28, 2020→ 0,07; filtr TA > 0: Sharpe 1,00
 Słaby, dodatni → filar z najniższą wagą, liczony automatycznie (TOTAL i wolumen tylko w ręcznej korekcie).
 Breadth thrust krypto (≥ 90–100% top-10 na plus w 3–4 z 8 dni, 2019→, n = 54–84): |z| < 1 dla 7/30/90 d → odrzucone.
 Pełna lista pokrycia notatek: NOTES_COVERAGE.md.
+
+## TPI na $TOTAL — zgodność z notatkami (total.py, run44.py)
+Notatki: „The TPI is built for $TOTAL”. $TOTAL = łańcuchowy indeks kapitalizacji 45 aktywów Coin Metrics (z USDT, USDC, DAI),
+ok. 90% prawdziwego $TOTAL (11.2021: 2,66 vs ok. 3,0 bln; 10.2025: 4,04 vs ok. 4,2 bln). TPI long BTC / stable 2020→:
+MTPI z $TOTAL ±0,2: OOS Sharpe 0,91 (z BTC 0,63), FULL CAGR 52% (45%); LTPI z $TOTAL ±0,2: OOS 0,30 (z BTC 0,54); próg 0: 0,52 (0,47).
+Portfel (SDCA z bezpiecznikiem i zakupami × 0,25 + RSPS z wetem tego samego LTPI, parking hybrydowy): LTPI z BTC ±0,2 — OOS 1,09,
+CAGR 53,9%, DD −23,8%; z $TOTAL ±0,2 — 0,92, 49,7%, −26,9%; z $TOTAL próg 0 — 0,88, 48,8%, −27,0%.
+Wdrożone zgodnie z notatkami: LTPI i MTPI liczone z $TOTAL, domyślny próg 0 („sell below zero, buy above zero”), histereza ±0,2 jako opcja;
+short jako propozycja przy MTPI < 0 i spadającym (notatki: „below zero and falling → consider shorting”).
+
+## Backtest w aplikacji (zakładka Strategia → Backtest)
+Silnik RSPS w aplikacji (lib/backtestAll.ts) odtwarza research przy tych samych danych: stablecoin IS 1,37 / OOS 0,33, CAGR 36%, DD −40%
+(research 1,29 / 0,34 / 34% / −40%); BTC×trend 1,88 / 0,88 / 87% / −33% (research 1,82 / 0,88 / 84% / −35%). Ujednolicone definicje:
+siła względna = zmiana log relacji do BTC / zmienność coina (30/60/90), BTC liczony do top-10 płynności, nieprzydzielona część wg parkingu.

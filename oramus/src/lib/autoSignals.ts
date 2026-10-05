@@ -78,20 +78,22 @@ function momentumZ(p: number[], h = 90, years = 8) {
   return (rs[rs.length - 1] - mean(rs)) / std(rs);
 }
 
-export function computeAuto(dates: string[], prices: number[], compositeRisk: number[], mvrvSeries: number[], compositeZ: number[], mvrvZ: number[], ltpiSource: 'ensemble' | 'sma200' = 'ensemble'): AutoSignals {
+export function computeAuto(dates: string[], prices: number[], compositeRisk: number[], mvrvSeries: number[], compositeZ: number[], mvrvZ: number[], ltpiSource: 'ensemble' | 'sma200' = 'ensemble', tpiPrices?: number[], hyst = 0): AutoSignals {
+  // LTPI / MTPI are built on $TOTAL (course notes); BTC-specific inputs (trend sizing, ADF, volatility, momentum) stay on BTC
+  const tp = tpiPrices && tpiPrices.length === prices.length ? tpiPrices : prices;
   const i = prices.length - 1;
   const trendEnsemble = trendAt(prices, i);
-  const s200 = sma(prices.slice(-200), 200).at(-1)!;
-  const ltpiSma = prices[i] > s200 ? 1 : -1;
+  const s200 = sma(tp.slice(-200), 200).at(-1)!;
+  const ltpiSma = tp[i] > s200 ? 1 : -1;
   const W = 1500, off = prices.length - Math.min(W, prices.length);
-  const mtpi = computeTpi(prices, MTPI_SPEC, W);
-  const ltpiTpi = computeTpi(prices, LTPI_SPEC, W);
+  const mtpi = computeTpi(tp, MTPI_SPEC, W, hyst);
+  const ltpiTpi = computeTpi(tp, LTPI_SPEC, W, hyst);
   // significance needs the whole history (the 1500-day window leaves only ~3 years after warm-up)
-  mtpi.sig = computeTpi(prices, MTPI_SPEC, prices.length).sig;
-  ltpiTpi.sig = computeTpi(prices, LTPI_SPEC, prices.length).sig;
+  mtpi.sig = computeTpi(tp, MTPI_SPEC, tp.length, hyst).sig;
+  ltpiTpi.sig = computeTpi(tp, LTPI_SPEC, tp.length, hyst).sig;
   const ltpiAt = (k: number) => ltpiSource === 'ensemble'
     ? (ltpiTpi.stateSeries[k - off] ?? 0)
-    : (prices[k] > sma(prices.slice(k - 199, k + 1), 200).at(-1)! ? 1 : -1);
+    : (tp[k] > sma(tp.slice(k - 199, k + 1), 200).at(-1)! ? 1 : -1);
   const ltpi = ltpiAt(i);
   const sdcaRisk = compositeRisk[i];
   const mvrvRisk = mvrvSeries[i];

@@ -6,7 +6,10 @@ Status: **W** = wdrożone w aplikacji · **T** = przetestowane i odrzucone (wyni
 | Sekcja notatek / slajdy | Co zawiera | Status | Gdzie |
 |---|---|---|---|
 | Signals intro, SDCA (Adam's signal) | SDCA = akumulacja/dystrybucja wg wyceny | W | SDCA |
-| TPI: definicja, stany > 0 / < 0, rosnący/malejący | 3 wymiary sygnału, wskazówki | W | LTPI · MTPI (stan, ROC, zgodność) |
+| TPI: definicja, stany > 0 / < 0, rosnący/malejący | 3 wymiary sygnału, wskazówki | W | LTPI · MTPI (stan, ROC, zgodność), próg 0 domyślnie |
+| „The TPI is built for $TOTAL” | TPI na całym rynku | W | LTPI/MTPI liczone z $TOTAL (indeks 45 aktywów Coin Metrics, run44) |
+| TPI poniżej zera i spada → rozważ short | short | W | propozycja shortu przy MTPI < 0 i ROC < 0 |
+| RSPS: benchmark $TOTAL | porównanie | W | Backtest: linia $TOTAL kup i trzymaj |
 | TPI × reżim (slajd 005) | dźwignia 2× tylko LTPI+ MTPI+ i trend; spot przy konsolidacji | W | Macierz decyzji (LTPI · MTPI), dźwignia tylko propozycja |
 | RSPS (podstawowy/zaawansowany) | rotacja siły względnej, bramka | W | RSPS |
 | Signal definitions / execution guides | wykonanie, rebalans | W | Portfel |
@@ -48,6 +51,7 @@ Status: **W** = wdrożone w aplikacji · **T** = przetestowane i odrzucone (wyni
 | Speculative breakout (162) | ręczne poziomy + FSVZO/STC/DSMA | R/N | wymaga ręcznie rysowanych poziomów |
 | Sezonowość (163–168) | wiatr w plecy | W/T | karta sezonowości; filtr T (run29) |
 | Kelly | tylko tytuł | W | Statystyka → Kelly (wzory standardowe) |
+| On-chain płatne, cykl kredytowy, płynność, korelacje makro, TOTAL/wolumen w TA | dane niedostępne w aplikacji | R | ręczne uzupełnienie w Piramidzie: link + jak liczyć + plus/minus |
 | Podatki, „jak nie rebalansować” | tylko tytuł | W/K | pasmo ±10 p.p. ogranicza rebalanse |
 | Qualitative alpha #1–#11 | narracje, zespół, tokenomia | R | Piramida · fundamenty (rubryka) |
 | CACRI, Shorter Term Trading, Post-Grad | tylko nagłówki | N | brak treści |
