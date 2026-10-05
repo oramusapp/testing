@@ -50,7 +50,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
           <div className="stat"><div className="k">Szerokość rynku</div><div className="v">{Number.isFinite(breadth) ? pct(breadth * 100, 0) : '—'}<span className="dim" style={{ fontSize: 13 }}> {scan?.gateOpen ? '· otwarta' : '· zamknięta'}</span></div><div className="s">{scanFresh ? `wejście ≥ 70%, wyjście < 60%` : 'skan nieaktualny'}</div></div>
           <div className="stat" onClick={() => setLevOpen(true)} style={{ cursor: 'pointer' }}><div className="k">Propozycje</div><div className="v">{(gate.allowed ? 1 : 0) + (shortProposal ? 1 : 0)}</div><div className="s">dźwignia {gate.checks.filter((c) => c.ok).length}/{gate.checks.length} · short {shortProposal ? 'tak' : 'nie'}</div></div>
         </div>
-        <div className="row compact" style={{ padding: '10px 0 0' }}><span className="dim">LTPI ($TOTAL) · weto RSPS</span><span className={R0.ltpi > 0 ? 'green' : 'red'} style={{ fontWeight: 600 }}>{R0.ltpi > 0 ? 'pozytywne' : 'negatywne → stablecoin'}</span></div>
+        <div className="row compact" style={{ padding: '10px 0 0' }}><span className="dim">LTPI (BTC) · weto RSPS</span><span className={R0.ltpi > 0 ? 'green' : 'red'} style={{ fontWeight: 600 }}>{R0.ltpi > 0 ? 'pozytywne' : 'negatywne → stablecoin'}</span></div>
       </Card>
 
       {(gate.allowed || shortProposal) && <div className="section-title">Propozycje w sygnale</div>}
@@ -72,11 +72,11 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       {regime === 'closed' && (
         <Card>
           <div className="between"><b>Bramka RSPS zamknięta{scan?.gateSince ? ` od ${scan.gateSince}` : ''}</b>{parkingPending && <span className="pill trim">decyzja</span>}</div>
-          <div className="note-text mt8">Gdzie trzymać część RSPS do ponownego otwarcia bramki? Backtest 2020–10.2026, cały portfel z bezpiecznikiem: stablecoin — CAGR 54%, maks. obsunięcie −24%, Sharpe 2024→ 0,94; hybryda (BTC × trend, dopóki ryzyko wyceny SDCA jest poniżej 80%, potem stablecoin) — CAGR 67%, obsunięcie −24%, Sharpe 2024→ 1,07; BTC × trend — CAGR 73%, obsunięcie −27%, Sharpe 2024→ 1,04. Short w żadnym wariancie nie poprawił wyniku, dlatego zostaje tylko warunkową propozycją.</div>
+          <div className="note-text mt8">Gdzie trzymać część RSPS do ponownego otwarcia bramki? Backtest od 2020, portfel 60/40 (SDCA i weto RSPS na LTPI z BTC, research/run48.py): hybryda (BTC × trend, dopóki ryzyko wyceny SDCA jest poniżej 80%) — CAGR 50,8%, maks. obsunięcie −25,3%, Sharpe 2024→ 1,06; BTC × trend (domyślnie) — CAGR 59,6%, obsunięcie −28,0%, Sharpe 2024→ 1,05. Dodatkowe reguły wyjścia z coinów (szybkie wyjście, trailing stop −15/−20/−25%) pogarszały wynik — dzienna rotacja wychodzi z coina, gdy wypada z top-3 lub traci własny trend. Short w żadnym wariancie nie poprawił wyniku, dlatego zostaje tylko warunkową propozycją.</div>
           <div className="flex mt12">
             <button className="btn small grow" style={parking.choice === 'stable' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('stable'); toast('Wybrano: stablecoin'); }}>Stablecoin</button>
-            <button className="btn small grow" style={parking.choice === 'hybrid' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('hybrid'); toast('Wybrano: hybryda'); }}>Hybryda (domyślnie)</button>
-            <button className="btn small grow" style={parking.choice === 'btc' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('btc'); toast('Wybrano: BTC × trend'); }}>BTC × trend</button>
+            <button className="btn small grow" style={parking.choice === 'hybrid' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('hybrid'); toast('Wybrano: hybryda'); }}>Hybryda</button>
+            <button className="btn small grow" style={parking.choice === 'btc' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('btc'); toast('Wybrano: BTC × trend'); }}>BTC × trend (domyślnie)</button>
           </div>
         </Card>
       )}
@@ -92,11 +92,12 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
         <div className="between mb12"><span className="dim">Kapitał całkowity</span><NumInput className="inline-input" value={s.capital} onChange={(v) => upd({ capital: v ?? 0 })} suffix="$" /></div>
         <Row className="compact" label={<b>SDCA ({SPLIT_SDCA}%)</b>} value={<span>{usd(sdcaCap, 0)} <span className="dim">wg podzakładki SDCA</span></span>} />
         <Row className="compact" label={<b>RSPS ({100 - SPLIT_SDCA}%)</b>} value={usd(rspsCap, 0)} />
-        <div className="note-text mb12">Podział z najwyższym Sharpe w backteście 2020–2026 (1,52), rebalans raz w roku.</div>
+        <div className="note-text mb12">Podział bazowy 60/40; przy LTPI z $TOTAL dodatnim cel 40/60 (przechył w Portfelu). Rebalans przy odchyleniu ±10 p.p.</div>
         <div className="mt12" />
         {regime === 'defense' && <div className="note-text">LTPI ujemne: cała część RSPS w stablecoinach.</div>}
         {regime === 'closed' && (parking.choice === 'stable' || (parking.choice === 'hybrid' && !(R0.sdcaRisk < HYBRID_RISK_MAX))) && <div className="note-text">Bramka zamknięta: część RSPS w stablecoinach.</div>}
-        {sleeve.map((x) => (
+        {!R0.signalReady && <div className="warn-box">Sygnał RSPS zablokowany do uzupełnienia dzisiejszych danych ręcznych (resetują się o 00:00 UTC): {R0.manualMissing.join(', ')}. Uzupełnij je w Piramidzie powyżej — wtedy pojawi się alokacja i zlecenia w Portfelu.</div>}
+        {R0.signalReady && sleeve.map((x) => (
           <div key={x.sym} className="mb12">
             <div className="between"><b>{x.sym}</b><span className="num">{pct(x.w * 100, 0)} · {usd(x.w * rspsCap, 0)}{x.note ? <span className="dim"> ({x.note})</span> : null}</span></div>
             <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 3, marginTop: 6 }}><div style={{ width: Math.min(100, x.w * 100) + '%', height: '100%', background: 'var(--accent)', borderRadius: 3 }} /></div>

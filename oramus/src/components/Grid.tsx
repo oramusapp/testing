@@ -1,5 +1,6 @@
 import { Card, Seg } from './ui';
 import { usePersisted } from '../lib/db';
+import { freshToday } from '../lib/market';
 
 // 42 Macro GRID (Darius Dale): the macro regime from the direction of growth and inflation.
 // Growth = 3-month change of the OECD Composite Leading Indicator, inflation = 3-month change of headline CPI YoY.
@@ -16,7 +17,10 @@ const regimeOf = (g: Dir, i: Dir) => (!g || !i ? null : g === 'up' ? (i === 'dow
 
 export function GridCard() {
   const [st, setSt] = usePersisted<GridState>('macro.grid', { growth: '', inflation: '', updated: null });
-  const r = regimeOf(st.growth, st.inflation);
+  // manual macro readings reset at every daily close (00:00 UTC)
+  const fresh = freshToday(st.updated);
+  const g: Dir = fresh ? st.growth : '', inf: Dir = fresh ? st.inflation : '';
+  const r = regimeOf(g, inf);
   const R = r ? REG[r] : null;
   const opts = [{ v: 'up' as Dir, l: 'rośnie ↑' }, { v: 'down' as Dir, l: 'spada ↓' }];
   return (
@@ -24,8 +28,8 @@ export function GridCard() {
       <div className="between"><div className="eyebrow" style={{ margin: 0 }}>Reżim makro · 42 Macro GRID</div>
         {R && <span className="pill" style={{ color: R.color, background: 'var(--surface-3)' }}><span className="dot" />{R.name}</span>}</div>
       <div className="mt12" style={{ display: 'grid', gap: 8 }}>
-        <div className="between"><span>Wzrost (OECD CLI, zmiana 3 mies.)</span><Seg value={st.growth} options={opts} onChange={(v) => setSt({ ...st, growth: v, updated: Date.now() })} /></div>
-        <div className="between"><span>Inflacja (CPI r/r, zmiana 3 mies.)</span><Seg value={st.inflation} options={opts} onChange={(v) => setSt({ ...st, inflation: v, updated: Date.now() })} /></div>
+        <div className="between"><span>Wzrost (OECD CLI, zmiana 3 mies.)</span><Seg value={g} options={opts} onChange={(v) => setSt({ growth: v, inflation: inf, updated: Date.now() })} /></div>
+        <div className="between"><span>Inflacja (CPI r/r, zmiana 3 mies.)</span><Seg value={inf} options={opts} onChange={(v) => setSt({ growth: g, inflation: v, updated: Date.now() })} /></div>
       </div>
       {R && <div className="mt12">
         <div style={{ fontWeight: 600, color: R.color }}>{R.name} <span className="dim" style={{ fontWeight: 400 }}>· {R.desc}</span></div>

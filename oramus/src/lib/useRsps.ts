@@ -4,12 +4,12 @@ import { toast } from '../components/ui';
 import { usePersisted } from './db';
 import { klines, lastClosedDay } from './market';
 import { annVol, capWeights, ratios, linfit } from './quant';
-import { leverageGate } from './pyramid';
+import { leverageGate, PILLARS, isFresh } from './pyramid';
 import { usePyramid } from './pyramidStore';
 import { rsScore } from './backtestAll';
-import { SDCA_DEFAULTS, type LtpiState, type SdcaSettings } from '../tabs/Sdca';
+import { SDCA_DEFAULTS, manualLtpiActive, type LtpiState, type SdcaSettings } from '../tabs/Sdca';
 import { useBtc } from './btcStore';
-import { composite } from './sdcaModel';
+import { composite, freshManual } from './sdcaModel';
 
 // Large-cap, non-meme candidates (Binance <SYMBOL>USDT). The scanner keeps the 10 most liquid.
 export const DEFAULT_TOKENS = ['ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'TRX', 'LINK', 'AVAX', 'DOT', 'LTC', 'BCH', 'XLM', 'ATOM', 'NEAR', 'UNI', 'AAVE', 'ETC', 'ICP',
@@ -23,6 +23,10 @@ export const LOOKBACKS = [30, 60, 90];          // relative-strength ensemble
 export const BREADTH_ENTER = 0.7, BREADTH_EXIT = 0.6;   // gate hysteresis
 // Split with the highest Sharpe (1.52, tie 40/50%) and the better Calmar of the two (research/run8.py).
 export const SPLIT_SDCA = 60;
+// Tilt (research/run47–48.py, on by default since 2.16.0): while LTPI on $TOTAL is positive the target moves to SDCA 40 / RSPS 60.
+// 2020→: CAGR 51.0% → 54.2%, max drawdown −25.0% → −29.7%, Sharpe 2024→ 1.10 → 1.05.
+export const SPLIT_TILT = 40;
+export const splitTarget = (tilt: boolean, totalLtpi: number | undefined) => (tilt && (totalLtpi ?? 0) > 0 ? SPLIT_TILT : SPLIT_SDCA);
 export interface ScanRow { sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; sharpe?: number; sortino?: number; omega?: number; corrBtc?: number; }
 export interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; gateOpen: boolean; gateSince?: string; }
 interface LogEntry { time: number; regime: string; lev?: number; }
@@ -47,9 +51,9 @@ export function useRsps() {
   const sdcaRisk = useMemo(() => {
     if (!btcModel) return NaN;
     const c = { ...SDCA_DEFAULTS, ...sdcaCfg };
-    return composite(btcModel, c.enabled, c.manualRisk).risk.at(-1) ?? NaN;
+    return composite(btcModel, c.enabled, freshManual(c)).risk.at(-1) ?? NaN;
   }, [btcModel, sdcaCfg]);
-  const [parking, setParking] = usePersisted<{ choice: Parking; ack?: string }>('rsps.parking', { choice: 'hybrid' });
+  const [parking, setParking] = usePersisted<{ choice: Parking; ack?: string }>('rsps.parking', { choice: 'btc' });
   const [s0, setS] = usePersisted<RspsSettings>('rsps.settings', RSPS_DEF);
   const s = { ...RSPS_DEF, ...s0 };
   const upd = (p: Partial<RspsSettings>) => setS((o) => ({ ...RSPS_DEF, ...o, ...p }));
@@ -59,7 +63,8 @@ export function useRsps() {
   const [busy, setBusy] = useState(false);
   const a = pyr.auto;
 
-  const ltpi = ltpiManual.mode === 'manual' ? ltpiManual.manual : a?.ltpi ?? 0;
+  // RSPS veto uses LTPI on BTC (research/run45: RSPS OOS Sharpe 0.88 vs 0.61–0.69 with $TOTAL); the LTPI · MTPI tab shows $TOTAL
+  const ltpi = manualLtpiActive(ltpiManual) ? ltpiManual.manual : a?.ltpiBtc ?? 0;
   const scanFresh = !!scan && scan.closeDate >= lastClosedDay();
   const breadth = scan?.breadth ?? NaN;
   // BTC sizing: 4-average trend (backtested default) or, if chosen, the 10-signal MTPI mapped to 0…1
@@ -137,6 +142,9 @@ export function useRsps() {
   }, [scan, s.topN, s.cap]);
 
   // RSPS-sleeve target weights (fractions of the RSPS part); the remainder is stablecoin
+  // the RSPS signal is released only after today's manual inputs are filled in (they reset at every 00:00 UTC close)
+  const manualMissing = PILLARS.filter((p) => !p.auto && !isFresh(pyr.state[p.id])).map((p) => p.name);
+  const signalReady = manualMissing.length === 0;
   const sleeve: { sym: string; w: number; note?: string }[] = [];
   const parkBtc = parking.choice === 'btc' || (parking.choice === 'hybrid' && Number.isFinite(sdcaRisk) && sdcaRisk < HYBRID_RISK_MAX);
   if (regime === 'rsps') {
@@ -157,7 +165,7 @@ export function useRsps() {
   (scan?.rows ?? []).forEach((r) => { if (Number.isFinite(r.vol)) vols[r.sym] = r.vol / 100; });
   if (a) vols.BTC = a.vol30;
 
-  return { pyr, s, upd, scan, scanFresh, busy, runScan, breadth, btcTrend, ltpi, regime, gate, picks, sleeve, shortProposal,
+  return { pyr, s, upd, scan, scanFresh, busy, runScan, breadth, btcTrend, ltpi, regime, gate, picks, sleeve, shortProposal, signalReady, manualMissing,
     parking, parkingPending, confirmParking, log, prices, vols, sdcaRisk };
 }
 

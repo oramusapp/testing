@@ -6,12 +6,14 @@ import { Chart } from '../components/Chart';
 import { stats, monthlyReport, monthOf, type Snapshot, type Flow, type MonthlyReport } from '../lib/performance';
 import { shareFile } from '../components/ui';
 import { useBtc } from '../lib/btcStore';
-import { composite } from '../lib/sdcaModel';
+import { composite, freshManual } from '../lib/sdcaModel';
 import { athSellSeries, backtest, curveRate, safetyStep, slowBuyRate } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
-import { useRsps, SPLIT_SDCA } from '../lib/useRsps';
+import { PaperCard } from '../components/Paper';
+import type { PaperInputs } from '../lib/paper';
+import { useRsps, splitTarget, SPLIT_SDCA, SPLIT_TILT } from '../lib/useRsps';
 import { LEV_MAX } from '../lib/pyramid';
-import { SDCA_DEFAULTS, type SdcaSettings } from './Sdca';
+import { SDCA_DEFAULTS, type SdcaSettings, manualLtpiActive, type LtpiState } from './Sdca';
 import { usd, pct } from '../lib/format';
 
 // Rotation rules (research/run14.py, run15.py):
@@ -27,8 +29,10 @@ interface Portfolio { holdings: Holdings | null; history: { time: number; text: 
 interface Order { id: string; sleeve: 'SDCA' | 'RSPS' | 'Rebalans'; side: 'buy' | 'sell' | 'move'; sym: string; usd: number; units: number; why: string; }
 
 export default function Signals() {
-  const { model, tpiPrices } = useBtc();
+  const { model } = useBtc();
   const R = useRsps();
+  const [tilt, setTilt] = usePersisted<boolean>('portfolio.tilt', true);
+  const splitSdca = splitTarget(tilt, R.pyr.auto?.ltpi);
   const [sd] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
   const [pf, setPf] = usePersisted<Portfolio>('portfolio', { holdings: null, history: [] });
   const [snaps, setSnaps] = usePersisted<Snapshot[]>('portfolio.snapshots', []);
@@ -41,12 +45,14 @@ export default function Signals() {
   const [flowOpen, setFlowOpen] = useState(false);
   const cfg = { ...SDCA_DEFAULTS, ...sd };
   const [tpiSrc] = usePersisted<{ ltpiSource: 'ensemble' | 'sma200'; hyst?: number }>('signals.tpi', { ltpiSource: 'ensemble' });
-  const ltpiSeries = useMemo(() => (model && (cfg.safety || (cfg.slowBuy ?? 1) < 1) ? ltpiStateSeries(tpiPrices ?? model.prices, tpiSrc.ltpiSource ?? 'ensemble', tpiSrc.hyst ?? 0) : undefined), [model, tpiPrices, cfg.safety, cfg.slowBuy, tpiSrc.ltpiSource, tpiSrc.hyst]);
+  const ltpiSeries = useMemo(() => (model && (cfg.safety || (cfg.slowBuy ?? 1) < 1) ? ltpiStateSeries(model.prices, tpiSrc.ltpiSource ?? 'ensemble', tpiSrc.hyst ?? 0) : undefined), [model, cfg.safety, cfg.slowBuy, tpiSrc.ltpiSource, tpiSrc.hyst]);
   const owed = pf.safetyOwed ?? 0;
+  const [ltpiMan] = usePersisted<LtpiState>('signals.ltpi', { mode: 'proxy', manual: 0 });
+  const sdcaLtpi = manualLtpiActive(ltpiMan) ? ltpiMan.manual : (ltpiSeries?.at(-1) ?? 0);   // SDCA: LTPI on BTC
 
   const sdcaState = useMemo(() => {
     if (!model) return null;
-    const comp = composite(model, cfg.enabled, cfg.manualRisk);
+    const comp = composite(model, cfg.enabled, freshManual(cfg));
     const last = model.dates.length - 1;
     const start = Math.max(0, model.dates.findIndex((d) => d >= cfg.startDate));
     const ath = athSellSeries(model.prices, comp.risk);
@@ -56,6 +62,12 @@ export default function Signals() {
     return { price, risk: comp.risk[last], rate: (slow ? slowBuyRate(curveRate(cfg.curve, comp.risk[last]), slow.ltpi[last] ?? 0, slow.mult) : curveRate(cfg.curve, comp.risk[last])) / 100, slowed: !!slow && (slow.ltpi[last] ?? 0) < 0, modelBtcShare: (bt.btc * price) / bt.value, date: model.dates[last], athFrac: ath.frac[last] ?? 0, athK: ath.k[last] ?? 0 };
   }, [model, cfg.enabled, cfg.manualRisk, cfg.curve, cfg.startDate, ltpiSeries, cfg.athSell, cfg.safety, cfg.slowBuy]);
 
+  // live testing input: today's closed-candle signals (RSPS only when the scan is fresh and the signal is released)
+  const paperInputs: PaperInputs | null = sdcaState && (R.scanFresh || !R.busy) ? {
+    date: sdcaState.date, btcPrice: sdcaState.price, prices: R.prices, sdcaRate: sdcaState.rate, risk: sdcaState.risk, ltpi: sdcaLtpi, safety: cfg.safety,
+    rspsTarget: R.scanFresh && R.signalReady ? (R.regime === 'defense' ? [] : R.sleeve.map((x) => ({ sym: x.sym, w: x.w }))) : null,
+    split: splitSdca / 100
+  } : null;
   const prices: Record<string, number> = { ...R.prices, [STABLE]: 1 };
   if (sdcaState) prices.BTC = sdcaState.price;
   const px = (sym: string) => prices[sym] ?? NaN;
@@ -64,7 +76,7 @@ export default function Signals() {
   // ---------- initial plan from the amount ----------
   function plan(total: number): Holdings | null {
     if (!sdcaState) return null;
-    const sdcaUsd = total * SPLIT_SDCA / 100, rspsUsd = total - sdcaUsd;
+    const sdcaUsd = total * splitSdca / 100, rspsUsd = total - sdcaUsd;
     const btcUsd = sdcaUsd * sdcaState.modelBtcShare;
     const rsps: Record<string, number> = {};
     let used = 0;
@@ -96,7 +108,7 @@ export default function Signals() {
       if (units * sdcaState.price >= MIN_TRADE_USD) orders.push({ id: 'sdca', sleeve: 'SDCA', side: 'sell', sym: 'BTC', usd: units * sdcaState.price, units, why: `krzywa ${(r * 100).toFixed(2)}% BTC przy ryzyku ${sdcaState.risk.toFixed(1)}%` });
     }
     if (cfg.safety) {
-      const st = safetyStep(sdcaState.risk, R.ltpi, H.sdca.BTC * sdcaState.price, H.sdca[STABLE], owed);
+      const st = safetyStep(sdcaState.risk, sdcaLtpi, H.sdca.BTC * sdcaState.price, H.sdca[STABLE], owed);
       if (st.kind === 'sell' && st.usd >= MIN_TRADE_USD)
         orders.push({ id: 'sdca-safety', sleeve: 'SDCA', side: 'sell', sym: 'BTC', usd: st.usd, units: st.usd / sdcaState.price, why: `bezpiecznik: LTPI ujemne przy ryzyku ${sdcaState.risk.toFixed(1)}% → 2% BTC do stablecoina` });
       else if (st.kind === 'rebuy' && st.usd >= MIN_TRADE_USD)
@@ -106,7 +118,7 @@ export default function Signals() {
       const units = H.sdca.BTC * sdcaState.athFrac;
       if (units * sdcaState.price >= MIN_TRADE_USD) orders.push({ id: 'sdca-ath', sleeve: 'SDCA', side: 'sell', sym: 'BTC', usd: units * sdcaState.price, units, why: `PROPOZYCJA · nowy szczyt (ATH) przy ryzyku ${sdcaState.risk.toFixed(1)}% → ${(sdcaState.athFrac * 100).toFixed(2)}% BTC (${sdcaState.athK + 1}. w cyklu)` });
     }
-    if (R.scanFresh && rspsVal > 0) {
+    if (R.scanFresh && R.signalReady && rspsVal > 0) {
       const want: Record<string, number> = {};
       target.forEach((t) => (want[t.sym] = t.w * rspsVal));
       const syms = new Set([...Object.keys(want), ...Object.keys(H.rsps).filter((k) => k !== STABLE)]);
@@ -118,10 +130,10 @@ export default function Signals() {
           why: want[sym] ? `cel ${pct((want[sym] / rspsVal) * 100, 0)} części RSPS` : R.regime === 'rsps' ? 'wypadł z wyboru' : 'bramka zamknięta / LTPI' });
       }
     }
-    if (total > 0 && Math.abs(sdcaShare - SPLIT_SDCA / 100) > BAND) {
-      const move = Math.abs(sdcaShare - SPLIT_SDCA / 100) * total;
+    if (total > 0 && Math.abs(sdcaShare - splitSdca / 100) > BAND) {
+      const move = Math.abs(sdcaShare - splitSdca / 100) * total;
       orders.push({ id: 'rebal', sleeve: 'Rebalans', side: 'move', sym: STABLE, usd: move, units: move,
-        why: `SDCA ${pct(sdcaShare * 100, 0)} poza pasmem 50–70%: przenieś ${usd(move, 0)} z ${sdcaShare > SPLIT_SDCA / 100 ? 'SDCA do RSPS' : 'RSPS do SDCA'}` });
+        why: `SDCA ${pct(sdcaShare * 100, 0)} poza pasmem ${splitSdca - 10}–${splitSdca + 10}%: przenieś ${usd(move, 0)} z ${sdcaShare > splitSdca / 100 ? 'SDCA do RSPS' : 'RSPS do SDCA'}` });
     }
   }
 
@@ -139,7 +151,7 @@ export default function Signals() {
       if (h.rsps[o.sym] < 1e-12) delete h.rsps[o.sym];
     } else {
       // move stablecoins from the overweight portfolio to the other one; never sell silently
-      const fromSdca = sdcaShare > SPLIT_SDCA / 100;
+      const fromSdca = sdcaShare > splitSdca / 100;
       const avail = fromSdca ? h.sdca[STABLE] : (h.rsps[STABLE] ?? 0);
       const moved = Math.min(avail, o.usd);
       if (fromSdca) { h.sdca[STABLE] -= moved; h.rsps[STABLE] = (h.rsps[STABLE] ?? 0) + moved; }
@@ -189,7 +201,7 @@ export default function Signals() {
         <Card className="hero">
           <div className="eyebrow">Kwota na kryptowaluty</div>
           <NumInput value={amount} onChange={setAmount} placeholder="np. 10000" suffix="USD" />
-          <div className="note-text mt8">System podzieli kwotę na dwa oddzielne portfele — SDCA {SPLIT_SDCA}% i RSPS {100 - SPLIT_SDCA}% — i rozpisze je według dzisiejszego stanu modeli (zamknięcie {sdcaState?.date ?? '—'}).</div>
+          <div className="note-text mt8">System podzieli kwotę na dwa oddzielne portfele — SDCA {splitSdca}% i RSPS {100 - splitSdca}% — i rozpisze je według dzisiejszego stanu modeli (zamknięcie {sdcaState?.date ?? '—'}).</div>
         </Card>
         {p && <PlanTable h={p} px={px} />}
         {p && <button className="btn primary block" onClick={() => {
@@ -200,6 +212,9 @@ export default function Signals() {
           toast('Portfele utworzone — start śledzenia wyników');
         }}>Kupiłem według planu — utwórz oba portfele</button>}
         {!R.scanFresh && <div className="warn-box mt12">Skan RSPS nieaktualny — otwórz Strategia → RSPS lub poczekaj na skan, aby plan RSPS był aktualny.</div>}
+        <Fold id="pf.paper" title="Live testing" hint="Wirtualny portfel od startu wykonuje sygnały · statystyki, tygodnie, miesiące" defaultOpen>
+          <PaperCard inputs={paperInputs} />
+        </Fold>
       </Screen>
     );
   }
@@ -231,7 +246,7 @@ export default function Signals() {
         <div className="eyebrow">Kapitał na kryptowaluty</div>
         <div className="big-number">{usd(total, 0)}</div>
         <div className="stat-grid mt12">
-          <div className="stat"><div className="k">SDCA / RSPS</div><div className="v">{pct(sdcaShare * 100, 0)} / {pct((1 - sdcaShare) * 100, 0)}</div><div className="s">cel {SPLIT_SDCA}/{100 - SPLIT_SDCA} · pasmo 50–70%</div></div>
+          <div className="stat"><div className="k">SDCA / RSPS</div><div className="v">{pct(sdcaShare * 100, 0)} / {pct((1 - sdcaShare) * 100, 0)}</div><div className="s">cel {splitSdca}/{100 - splitSdca} · pasmo 50–70%</div></div>
           <div className="stat"><div className="k">Ekspozycja na rynek</div><div className="v">{pct(exposure * 100, 0)}</div><div className="s">stablecoin {usd(stableVal, 0)}</div></div>
         </div>
         {missingPrice.length > 0 && <div className="warn-box mt12" style={{ marginBottom: 0 }}>Brak ceny dla: {missingPrice.join(', ')} (poza skanerem). Wartość pominięta.</div>}
@@ -273,7 +288,7 @@ export default function Signals() {
         <Card>
           <div className="between"><b className="accent">Przeniesienie między portfelami</b><span className="pill trim">poza pasmem</span></div>
           <div className="note-text mt8">{transfer.why}. Przenoszone są stablecoiny; jeśli w portfelu źródłowym ich brakuje, najpierw sprzedaj tam część pozycji.</div>
-          <button className="btn primary block mt12" onClick={() => execute(transfer)}>Przenieś {usd(transfer.usd, 0)} {sdcaShare > SPLIT_SDCA / 100 ? 'SDCA → RSPS' : 'RSPS → SDCA'}</button>
+          <button className="btn primary block mt12" onClick={() => execute(transfer)}>Przenieś {usd(transfer.usd, 0)} {sdcaShare > splitSdca / 100 ? 'SDCA → RSPS' : 'RSPS → SDCA'}</button>
         </Card>
       ) : <div className="note-text center mb12">Portfele w paśmie 50–70% — brak przeniesienia między nimi.</div>}
 
@@ -310,6 +325,13 @@ export default function Signals() {
       {R.shortProposal && <Card><b className="red">Short altów: {R.picks.shorts.map((r) => r.sym).join(', ')}</b><div className="note-text mt8">MTPI ($TOTAL) poniżej zera i spada — wg notatek „rozważ short”. 15–30% portfela RSPS jako zabezpieczenie (kontrakty perpetual). Tylko propozycja.</div></Card>}
       {volEst > 0.6 && <Card><b className="amber">Zmienność portfela ≈ {pct(volEst * 100, 0)} rocznie</b><div className="note-text mt8">Szacunek ostrożny (pełna korelacja). Propozycja: ekspozycja ok. {pct(Math.min(1, 0.6 / volEst) * exposure * 100, 0)}, reszta w stablecoinach. W backteście limit zmienności nie poprawiał istotnie wyników.</div></Card>}
 
+      <Card className="tight">
+        <div className="row"><div className="grow"><div>Więcej RSPS, gdy rynek w trendzie</div><div className="faint" style={{ fontSize: 12 }}>LTPI z $TOTAL dodatnie → cel SDCA {SPLIT_TILT}% / RSPS {100 - SPLIT_TILT}% (zamiast {SPLIT_SDCA}/{100 - SPLIT_SDCA}) · teraz cel {splitSdca}/{100 - splitSdca}</div></div><Switch checked={tilt} onChange={setTilt} /></div>
+        <div className="note-text" style={{ padding: '0 14px 12px' }}>Backtest od 2020 przy parkingu BTC × trend (research/run48.py): CAGR 59,6% → 66,7%, maks. obsunięcie −28,0% → −29,3%, Sharpe od 2024 1,05 → 1,00. Wyższy zwrot kosztem nieco większego ryzyka.</div>
+      </Card>
+      <Fold id="pf.paper" title="Live testing" hint="Wirtualny portfel od startu wykonuje sygnały · statystyki, tygodnie, miesiące" defaultOpen>
+        <PaperCard inputs={paperInputs} />
+      </Fold>
       <Fold id="pf.rules" title="Zasady i historia operacji">
       <div className="section-title">Zasady</div>
       <Card>
@@ -334,12 +356,12 @@ export default function Signals() {
         }
         setPf({ ...pf, holdings: h, history: [{ time: Date.now(), text: asFlow ? 'Korekta stanów (wpłata/wypłata)' : 'Korekta stanów (wynik)' }, ...pf.history] });
       }} />
-      <FlowSheet open={flowOpen} onClose={() => setFlowOpen(false)} onSave={(amt, target) => {
+      <FlowSheet split={splitSdca} open={flowOpen} onClose={() => setFlowOpen(false)} onSave={(amt, target) => {
         const h: Holdings = { sdca: { ...H.sdca }, rsps: { ...H.rsps } };
-        const toS = target === 'split' ? amt * SPLIT_SDCA / 100 : target === 'sdca' ? amt : 0;
+        const toS = target === 'split' ? amt * splitSdca / 100 : target === 'sdca' ? amt : 0;
         h.sdca[STABLE] += toS; h.rsps[STABLE] = (h.rsps[STABLE] ?? 0) + (amt - toS);
         if (h.sdca[STABLE] < -1e-9 || (h.rsps[STABLE] ?? 0) < -1e-9) { toast('Za mało stablecoinów w portfelu — najpierw sprzedaj część pozycji'); return; }
-        setPf({ ...pf, holdings: h, history: [{ time: Date.now(), text: `${amt >= 0 ? 'Wpłata' : 'Wypłata'} ${usd(Math.abs(amt), 0)} (${target === 'split' ? `${SPLIT_SDCA}/${100 - SPLIT_SDCA}` : target.toUpperCase()})` }, ...pf.history] });
+        setPf({ ...pf, holdings: h, history: [{ time: Date.now(), text: `${amt >= 0 ? 'Wpłata' : 'Wypłata'} ${usd(Math.abs(amt), 0)} (${target === 'split' ? `${splitSdca}/${100 - splitSdca}` : target.toUpperCase()})` }, ...pf.history] });
         addFlow({ amount: amt, sdca: toS, rsps: amt - toS, note: amt >= 0 ? 'deposit' : 'withdrawal' });
       }} />
       <ReportSheet r={openReport} onClose={() => setOpenReport(null)} />
@@ -432,7 +454,7 @@ function EditSheet({ open, onClose, h, onSave }: { open: boolean; onClose: () =>
   );
 }
 
-function FlowSheet({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: (amt: number, target: 'split' | 'sdca' | 'rsps') => void }) {
+function FlowSheet({ split: splitSdca, open, onClose, onSave }: { split: number; open: boolean; onClose: () => void; onSave: (amt: number, target: 'split' | 'sdca' | 'rsps') => void }) {
   const [amt, setAmt] = useState<number | null>(null);
   const [side, setSide] = useState<'in' | 'out'>('in');
   const [target, setTarget] = useState<'split' | 'sdca' | 'rsps'>('split');
@@ -444,7 +466,7 @@ function FlowSheet({ open, onClose, onSave }: { open: boolean; onClose: () => vo
       </div>
       <div className="field"><label>Kwota (USD)</label><NumInput value={amt} onChange={setAmt} /></div>
       <div className="flex mb12">
-        {([['split', `Oba (${SPLIT_SDCA}/${100 - SPLIT_SDCA})`], ['sdca', 'SDCA'], ['rsps', 'RSPS']] as const).map(([k, l]) => (
+        {([['split', `Oba (${splitSdca}/${100 - splitSdca})`], ['sdca', 'SDCA'], ['rsps', 'RSPS']] as const).map(([k, l]) => (
           <button key={k} className="btn small grow" style={target === k ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => setTarget(k)}>{l}</button>
         ))}
       </div>

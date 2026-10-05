@@ -193,5 +193,9 @@ export async function fearGreed(): Promise<{ value: number; label: string; time:
 }
 
 /** Latest closed daily candle date (UTC) — the candle that closed at the last 00:00 UTC. */
+/** Start of the current UTC day = time of the latest daily candle close. Manual entries are valid only after it. */
+export const lastCloseTime = (now = Date.now()) => Math.floor(now / DAY) * DAY;
+/** True when a manual entry was made after the latest 00:00 UTC close (entries reset at every close). */
+export const freshToday = (t?: number | null, now = Date.now()) => t != null && t >= lastCloseTime(now);
 export const lastClosedDay = (now = Date.now()) => new Date(Math.floor(now / DAY) * DAY - DAY).toISOString().slice(0, 10);
 export const msToNextUtcClose = (now = Date.now()) => (Math.floor(now / DAY) + 1) * DAY - now;

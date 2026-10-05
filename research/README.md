@@ -180,3 +180,40 @@ short jako propozycja przy MTPI < 0 i spadającym (notatki: „below zero and fa
 Silnik RSPS w aplikacji (lib/backtestAll.ts) odtwarza research przy tych samych danych: stablecoin IS 1,37 / OOS 0,33, CAGR 36%, DD −40%
 (research 1,29 / 0,34 / 34% / −40%); BTC×trend 1,88 / 0,88 / 87% / −33% (research 1,82 / 0,88 / 84% / −35%). Ujednolicone definicje:
 siła względna = zmiana log relacji do BTC / zmienność coina (30/60/90), BTC liczony do top-10 płynności, nieprzydzielona część wg parkingu.
+
+## Model bez patrzenia w przyszłość w aplikacji (2.13.0)
+Aplikacja liczy wycenę SDCA tak jak research: szyny kwantylowe przeliczane co rok na danych sprzed 1 stycznia (pierwszy model 2013),
+percentyl MVRV po odtrendowaniu tylko z danych sprzed roku, percentyl Sharpe z przeszłych dni. Kontrola (wbudowane dane, od 2020):
+SDCA z bezpiecznikiem, LTPI z $TOTAL próg 0, zakupy × 0,25 — CAGR 42,2%, Sharpe 2024→ 0,89, DD −32,9% (research run44: 41,4%, 0,89).
+$TOTAL nie jest aktywem w backteście — służy tylko jako wejście TPI (kierunek i trend rynku).
+
+## Źródło LTPI osobno dla SDCA i RSPS (run45.py)
+Portfel 60/40, 2020→, próg 0 / ±0,2: oba z BTC — OOS 1,06 / 1,09, CAGR 51,1 / 53,9%; oba z $TOTAL — 0,88 / 0,92, 48,8 / 49,7%;
+SDCA z BTC + RSPS z $TOTAL (wdrożone w 2.14.0) — 0,94 / 1,01, CAGR 50,4 / 51,6%, DD −26,1 / −23,9%. Sam SDCA: LTPI z BTC OOS 0,98–1,00 vs 0,87–0,89.
+Weto RSPS z LTPI na BTC dawało RSPS OOS 0,88–0,89 vs 0,61–0,69 z $TOTAL — zakładka LTPI·MTPI i RSPS zostają na $TOTAL zgodnie z notatkami.
+
+## Szukanie alfy w RSPS — siatka parametrów (run46.py)
+Konfiguracja jak w aplikacji (weto LTPI $TOTAL, parking hybrydowy, SDCA z LTPI BTC), 2020→. Baza top 3 / cap 50% / uniwersum 10 /
+waga = siła/zmienność: RSPS IS 1,39, OOS 0,63, CAGR 47,5%; portfel IS 1,76, OOS 0,95, CAGR 49,3%, DD −26,6%.
+Żaden wariant nie poprawił jednocześnie IS i CAGR: top 1/2/4/5 (CAGR 36–49%), cap 0,34/0,7/1,0, uniwersum 15/20 (gorzej: 38/32%),
+wagi równe/wg siły, trend tokena ≥ 0,75/1,0, bramka MTPI($TOTAL) (OOS 0,48), bramka 0,6/0,5 i 0,8/0,7 (IS 0,92/1,08).
+Ekspozycja × szerokość: OOS 0,72 przy tym samym IS, ale CAGR 46,1% — nie podnosi zwrotu. Obecne parametry zostają.
+Największe dźwignie zwrotu (kosztem ryzyka): parking BTC×trend (portfel CAGR ok. 73% vs 67%, DD −27% vs −24%, run39)
+i weto RSPS z LTPI na BTC (portfel CAGR 53,9% vs 51,6%, run45) — do decyzji użytkownika.
+
+## RSPS na LTPI z BTC i przechylenie podziału wg $TOTAL (run47.py)
+RSPS z wetem LTPI na BTC (wdrożone 2.15.0): IS 1,36, OOS 0,91, CAGR 53,3%. Portfel (SDCA LTPI BTC, parking hybrydowy), 2020→:
+stały 70/30 — CAGR 49,9%, DD −28,7%, OOS 1,05; 60/40 — 51,0%, −25,0%, 1,10; 50/50 — 51,9%, −25,1%, 1,09; 40/60 — 53,2%, −27,7%, 1,08.
+Przechył wg $TOTAL (LTPI+ → 40/60): 54,2%, −29,7%, 1,05; LTPI+ → 30/70: 55,7%, −31,5%, 1,04; LTPI+ i MTPI+ → 40/60: 54,1%, −29,6%, 1,00.
+W aplikacji: przełącznik w Portfelu (domyślnie wyłączony, 40/60). $TOTAL zostaje wskaźnikiem kierunku rynku w zakładce LTPI·MTPI.
+
+## Parking BTC×trend i reguły wyjścia z coinów (run48.py) — wdrożone 2.16.0
+Weto RSPS i SDCA na LTPI z BTC, 2020→. Portfel 60/40: parking hybrydowy — CAGR 50,8%, DD −25,3%, IS 1,74, OOS 1,06;
+BTC×trend — 59,6%, −28,0%, 1,86, 1,05; BTC×trend + przechył 40/60 przy LTPI($TOTAL)+ — 66,7%, −29,3%, OOS 1,00.
+Wyjścia z coinów ponad dzienną rotację: szybkie (cena < EMA 20 lub momentum relacji 20 d < 0) — RSPS OOS 0,65–0,67, CAGR −10 pp;
+trailing stop −15/−20/−25% z 14-dniową blokadą — CAGR −1…−3 pp; trend tokena ≥ 0,75 — bez poprawy. Zostaje dzienna rotacja.
+
+## Audyt „bez przyszłości” (2.16.0)
+Wszystkie sygnały i backtesty używają tylko danych do zamknięcia świecy: model wyceny przeliczany co rok na danych sprzed 1 stycznia,
+percentyle z przeszłości, TPI z przyczynowych wskaźników, backtest SDCA w aplikacji wykonuje sygnał z poprzedniego zamknięcia
+(jak research), RSPS/TPI: decyzja t, pozycja od t+2. Usunięta szacowana data halvingu 2028 (emisja i zegar tylko z dat, które już były).

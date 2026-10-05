@@ -25,7 +25,7 @@ function runWorker(h: BtcHistory): Promise<SdcaModel> {
 }
 
 async function compute(h: BtcHistory) {
-  const key = h.rows.length + ':' + h.rows[h.rows.length - 1].join('|');
+  const key = 'pit1:' + h.rows.length + ':' + h.rows[h.rows.length - 1].join('|');   // pit1 = point-in-time model (no look-ahead)
   const cached = await get<{ key: string; model: SdcaModel }>('model', cacheStore);
   if (cached?.key === key) { emit({ model: cached.model }); return; }
   emit({ status: 'Liczenie modelu wyceny…', busy: true });

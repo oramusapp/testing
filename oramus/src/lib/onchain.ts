@@ -3,7 +3,8 @@
 // halving schedule (approximation: 144 blocks per day). z uses the TRW sign: + = cheap, − = expensive,
 // against the indicator's own full history (research/run35.py: non-detrended ranks predicted forward
 // returns better than detrended ones).
-const HALVINGS = ['2012-11-28', '2016-07-09', '2020-05-11', '2024-04-20', '2028-04-15'];
+// Only halvings that already happened (no estimated future dates); add the next one when it occurs.
+const HALVINGS = ['2012-11-28', '2016-07-09', '2020-05-11', '2024-04-20'];
 const DAY = 86400000;
 
 /** BTC issued per day on a given date (subsidy × 144 blocks). */

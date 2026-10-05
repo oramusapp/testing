@@ -7,7 +7,7 @@ import { useEffect, useState, useCallback } from 'react';
 const kv = createStore('oramus', 'kv');
 const files = createStore('oramus-files', 'files');
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 const cache = new Map<string, unknown>();
 const listeners = new Map<string, Set<(v: unknown) => void>>();
 
@@ -51,6 +51,12 @@ const MIGRATIONS: Record<number, () => Promise<void>> = {
       await save('pyramid.manual', out);
     }
     await save('pyramid.history', []);
+  },
+  // 2.16.0: user choice after research/run48 — RSPS parks in BTC × trend and the split tilts to 40/60 while LTPI($TOTAL) > 0.
+  5: async () => {
+    const p = cache.get('rsps.parking') as { choice?: string; ack?: string } | undefined;
+    await save('rsps.parking', { ...(p ?? {}), choice: 'btc' });
+    await save('portfolio.tilt', true);
   }
 };
 

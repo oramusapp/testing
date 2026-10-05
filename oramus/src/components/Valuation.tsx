@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card, toast } from './ui';
 import { usePersisted } from '../lib/db';
 import { normCdf } from '../lib/quant';
+import { freshToday } from '../lib/market';
 
 // Aggregate valuation sheet, as taught in the valuation lessons: every indicator gets a z-score
 // (+ = high value / cheap, − = expensive), all equally weighted to cancel estimation error,
@@ -33,11 +34,13 @@ const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length
 /** Returns the long-term valuation z (TRW sign: + = cheap) and its risk-% equivalent. */
 export function useValuation(auto?: Record<string, number>) {
   const [v, setV] = usePersisted<ValState>('sdca.valuation', { z: {}, updated: null });
-  const zOf = (id: string): number | null => auto?.[id] ?? v.z[id] ?? null;
+  // manual readings reset at every daily close (00:00 UTC) so they are re-entered each day
+  const manualFresh = freshToday(v.updated);
+  const zOf = (id: string): number | null => auto?.[id] ?? (manualFresh ? v.z[id] ?? null : null);
   const longZ = avg(VAL_ITEMS.filter((i) => i.horizon === 'long').map((i) => zOf(i.id)).filter((x): x is number => x != null));
   const medZ = avg(VAL_ITEMS.filter((i) => i.horizon === 'medium').map((i) => zOf(i.id)).filter((x): x is number => x != null));
   const filled = VAL_ITEMS.filter((i) => i.horizon === 'long' && zOf(i.id) != null).length;
-  return { v, setV, zOf, longZ, medZ, filled, risk: longZ == null ? null : normCdf(-longZ) * 100 };
+  return { v, setV, zOf, manualFresh, longZ, medZ, filled, risk: longZ == null ? null : normCdf(-longZ) * 100 };
 }
 
 export function ValuationCard({ onUse, auto }: { onUse: (riskPct: number) => void; auto?: Record<string, number> }) {
@@ -46,7 +49,7 @@ export function ValuationCard({ onUse, auto }: { onUse: (riskPct: number) => voi
   const set = (id: string, t: string) => {
     setTxt({ ...txt, [id]: t });
     const z = parse(t);
-    val.setV({ z: { ...val.v.z, [id]: z }, updated: Date.now() });
+    val.setV({ z: { ...(val.manualFresh ? val.v.z : {}), [id]: z }, updated: Date.now() });
   };
   const nLong = VAL_ITEMS.filter((i) => i.horizon === 'long').length;
   return (
@@ -71,7 +74,7 @@ export function ValuationCard({ onUse, auto }: { onUse: (riskPct: number) => voi
             {auto?.[i.id] != null
               ? <div className="num" style={{ width: 84, textAlign: 'center', fontWeight: 600, color: heat(auto[i.id]) }}>{sz(auto[i.id])}<div className="faint" style={{ fontSize: 11, fontWeight: 400 }}>auto</div></div>
               : <input className="input" style={{ width: 84, textAlign: 'center', borderColor: heat(val.v.z[i.id] ?? null) }} inputMode="decimal" placeholder="z"
-                  value={txt[i.id] ?? (val.v.z[i.id] == null ? '' : String(val.v.z[i.id]))} onChange={(e) => set(i.id, e.target.value)} />}
+                  value={txt[i.id] ?? (!val.manualFresh || val.v.z[i.id] == null ? '' : String(val.v.z[i.id]))} onChange={(e) => set(i.id, e.target.value)} />}
           </div>
         ))}
       </div>
