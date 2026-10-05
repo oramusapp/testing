@@ -6,7 +6,7 @@ import { useBtc, refresh } from '../lib/btcStore';
 import { askNotify, notifyPermission } from '../lib/notify';
 import { usePersisted } from '../lib/db';
 import { INDICATORS, composite, RAIL_TAUS } from '../lib/sdcaModel';
-import { ATH_BACKTEST, ATH_SELL, BANDS, DEFAULT_CURVE, SAFETY, SLOW_BUY_OPTIONS, athSellSeries, backtest, slowBuyRate, curveRate, riskZone, safetyStep } from '../lib/quant';
+import { ATH_BACKTEST, ATH_SELL, BANDS, DEFAULT_CURVE, SAFETY, SLOW_BUY_OPTIONS, athSellSeries, slowBuyRate, curveRate, riskZone, safetyStep } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
 import { ValuationCard, AccumulationCalc } from '../components/Valuation';
 import { ConeCard } from '../components/Cone';
@@ -41,7 +41,7 @@ const ZONE_COLORS = { buy: '#2fbf71', acc: '#9ccc5a', trim: '#e5ac4f', sell: '#e
 const riskColor = (v: number) => ZONE_COLORS[riskZone(v).tone];
 
 export default function Sdca({ nav }: { nav?: React.ReactNode }) {
-  const { model, status, busy, history } = useBtc();
+  const { model, status, busy, history, tpiPrices } = useBtc();
   const autoVal = useMemo(() => (history ? autoValuation(history.rows as [string, number, number | null][]).z : undefined), [history]);
   const [s, setS] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
   const [ltpi] = usePersisted<LtpiState>('signals.ltpi', { mode: 'proxy', manual: 0 });
@@ -55,21 +55,15 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
   const cfg = { ...SDCA_DEFAULTS, ...s };
 
   const comp = useMemo(() => (model ? composite(model, cfg.enabled, cfg.manualRisk) : null), [model, cfg.enabled, cfg.manualRisk]);
-  const [tpiCfg0] = usePersisted<{ ltpiSource: 'ensemble' | 'sma200' }>('signals.tpi', { ltpiSource: 'ensemble' });
-  const tpiCfg = { ltpiSource: tpiCfg0.ltpiSource ?? 'ensemble' };
-  const startIdx = useMemo(() => {
-    if (!model) return 0;
-    const i = model.dates.findIndex((d) => d >= cfg.startDate);
-    return i < 0 ? 0 : i;
-  }, [model, cfg.startDate]);
+  const [tpiCfg0] = usePersisted<{ ltpiSource: 'ensemble' | 'sma200'; hyst?: number }>('signals.tpi', { ltpiSource: 'ensemble' });
+  const tpiCfg = { ltpiSource: tpiCfg0.ltpiSource ?? 'ensemble', hyst: tpiCfg0.hyst ?? 0 };
   const ltpiSeries = useMemo(() => {
     if (!model) return null;
-    const s0 = ltpiStateSeries(model.prices, tpiCfg.ltpiSource);
+    const s0 = ltpiStateSeries(tpiPrices ?? model.prices, tpiCfg.ltpiSource, tpiCfg.hyst);
     if (ltpi.mode === 'manual') s0[s0.length - 1] = ltpi.manual;     // manual LTPI applies to today only
     return s0;
-  }, [model, tpiCfg.ltpiSource, ltpi.mode, ltpi.manual]);
+  }, [model, tpiPrices, tpiCfg.ltpiSource, tpiCfg.hyst, ltpi.mode, ltpi.manual]);
   const ath = useMemo(() => (model && comp ? athSellSeries(model.prices, comp.risk) : null), [model, comp]);
-  const bt = useMemo(() => (model && comp ? backtest(model.prices, comp.risk, cfg.curve, startIdx, cfg.capital || 10000, cfg.safety ? ltpiSeries ?? undefined : undefined, cfg.athSell ? ath?.frac : undefined, ltpiSeries && (cfg.slowBuy ?? 1) < 1 ? { ltpi: ltpiSeries, mult: cfg.slowBuy! } : undefined) : null), [model, comp, cfg.curve, startIdx, cfg.capital, cfg.safety, ltpiSeries, cfg.athSell, ath, cfg.slowBuy]);
 
   if (!model || !comp) {
     return <Screen nav={nav} title="SDCA" subtitle="Strategic Dollar Cost Averaging · BTC"><Card><div className="dim">{status}</div></Card></Screen>;
@@ -85,7 +79,7 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
   const zone = riskZone(riskToday);
   const priceRisk = model.risk.price[last];
   const band = BANDS.find((b) => priceRisk / 100 >= b.from && priceRisk / 100 < b.to) ?? (priceRisk < 1 ? BANDS[0] : BANDS[BANDS.length - 1]);
-  const ltpiProxy = tpiCfg.ltpiSource === 'sma200' ? (price > model.prices.slice(-200).reduce((a, b) => a + b, 0) / 200 ? 1 : -1) : (ltpiSeries?.at(-1) ?? 0);
+  const ltpiProxy = ltpiSeries?.at(-1) ?? 0;   // LTPI on $TOTAL (ensemble or SMA 200, per settings)
   const ltpiValue = ltpi.mode === 'manual' ? ltpi.manual : ltpiProxy;
   const rate = slowBuyRate(rateCurve, ltpiValue, cfg.slowBuy ?? 1);
   const slowed = rate !== rateCurve;
@@ -193,7 +187,7 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
         </Card>
       )}
 
-      {view === 'curve' && bt && (
+      {view === 'curve' && (
         <>
           <Card title="Krzywa akumulacji / dystrybucji">
             <div className="note-text mb12">Model oparty wyłącznie na Composite Risk. Każdego dnia wartość krzywej przy bieżącym ryzyku to % gotówki do kupienia (dodatnia) lub % BTC do sprzedania (ujemna). Przeciągnij węzły, aby zmienić kształt.</div>
@@ -203,41 +197,11 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
               <button className="btn small grow" onClick={() => shareFile(new Blob(['risk_pct,rate_pct_per_day\n' + cfg.curve.map((v, i) => `${i * 5},${v}`).join('\n')], { type: 'text/csv' }), 'accum-dist-curve.csv')}>Eksport CSV</button>
             </div>
           </Card>
-          <Card title="Backtest">
-            <div className="flex">
-              <div className="field grow"><label>Data startu</label><input className="input" type="date" value={cfg.startDate} min={model.dates[0]} max={model.dates[last]} onChange={(e) => upd({ startDate: e.target.value })} /></div>
-              <div className="field grow"><label>Kapitał startowy, USD</label><NumInput value={cfg.capital} onChange={(v) => upd({ capital: v ?? 10000 })} /></div>
-            </div>
-            <div className="stat-grid">
-              <Stat k="Dni backtestu" v={bt.days.toLocaleString('pl-PL')} s={`Kup ${bt.buys} / Sprzedaj ${bt.sells} / Brak ${bt.holds}`} />
-              <Stat k="Pozycja BTC" v={bt.btc.toFixed(6)} s={`Śr. zakup ${usd(bt.avgBuy)}`} />
-              <Stat k="Wartość portfela" v={usd(bt.value)} s="BTC + gotówka" />
-              <Stat k="P/L" v={<span className={bt.pnl >= 0 ? 'green' : 'red'}>{(bt.pnl >= 0 ? '+' : '') + usd(bt.pnl)}</span>} s={pct(bt.pnlPct, 2, true)} />
-              <Stat k="Śr. dzienna stopa" v={signed(bt.avgRate) + '%/d'} s={`Śr. ryzyko ${pct(bt.avgRisk)}`} />
-              <Stat k="Lump sum" v={usd(bt.lump)} s={pct(bt.lumpPct, 2, true)} />
-              <Stat k="Portfel vs lump" v={<span className={bt.vsLump >= 0 ? 'green' : 'red'}>{(bt.vsLump >= 0 ? '+' : '') + usd(bt.vsLump)}</span>} s={pct(bt.vsLumpPct, 2, true)} />
-              <Stat k="Rezerwa gotówki" v={usd(bt.cash)} s="Zawiera sprzedaże z krzywej" />
-              <Stat k="Max DD — DCA" v={<span className="red">{pct(bt.maxDD)}</span>} s="Szczyt–dołek portfela" />
-              <Stat k="Max DD — Buy&Hold" v={<span className="red">{pct(bt.maxDDLump)}</span>} s="Szczyt–dołek lump sum" />
-            </div>
-          </Card>
-          <Card>
-            <div className="between mb12"><div className="eyebrow" style={{ margin: 0 }}>DCA vs Buy &amp; Hold</div><div className="flex"><span className="dim" style={{ fontSize: 13 }}>Log</span><Switch checked={cfg.logScale} onChange={(v) => upd({ logScale: v })} /></div></div>
-            <Chart labels={model.dates.slice(startIdx)} log={cfg.logScale} height={240}
-              shade={(i) => { const a = bt.actions[i]; return a > 0 ? 'rgba(47,191,113,.10)' : a < 0 ? 'rgba(239,100,97,.12)' : null; }}
-              lines={[{ values: bt.lumpEquity, color: '#8e8e93', width: 1.1 }, { values: bt.equity, color: '#d4b483', width: 1.6 }]}
-              tip={(i) => `${fmtDate(model.dates[startIdx + i])} · DCA ${usdShort(bt.equity[i])} · B&H ${usdShort(bt.lumpEquity[i])}`} />
-            <div className="legend"><span><i style={{ background: '#d4b483' }} />Strategia DCA</span><span><i style={{ background: '#8e8e93' }} />Buy &amp; hold (lump dzień 1)</span></div>
-          </Card>
+          <div className="note-text">Wynik tej krzywej (z bezpiecznikiem i pozostałymi zasadami) zobaczysz w podzakładce Backtest.</div>
         </>
       )}
 
       <Fold id="sdca.rules" title="Zasady SDCA" hint={`Bezpiecznik ${cfg.safety ? 'wł.' : 'wył.'} · zakupy przy LTPI− × ${String(cfg.slowBuy ?? 1).replace('.', ',')} · propozycja ATH ${athNotify ? 'wł.' : 'wył.'}`}>
-      <div className="section-title">Bezpiecznik LTPI</div>
-      <Card className="tight">
-        <div className="row"><span>LTPI dziś</span><span className={ltpiValue > 0 ? 'green' : ltpiValue < 0 ? 'red' : 'dim'} style={{ fontWeight: 600 }}>{signed(ltpiValue)} · {ltpiValue > 0 ? 'trend długoterminowy pozytywny' : ltpiValue < 0 ? 'negatywny' : 'neutralnie'}</span></div>
-        <div className="note-text" style={{ padding: '0 16px 12px' }}>Składniki, ustawienia i tryb ręczny: podzakładka LTPI · MTPI.</div>
-      </Card>
       <Card className="tight">
         <div className="row"><div className="grow"><div>Bezpiecznik LTPI</div><div className="faint" style={{ fontSize: 12 }}>Ochrona części bezpieczniejszej portfela</div></div><Switch checked={cfg.safety} onChange={(v) => upd({ safety: v })} /></div>
         <div className="note-text" style={{ padding: '0 14px 12px' }}>Gdy LTPI jest ujemne, a ryzyko wyceny ≥ {SAFETY.riskMin}%, SDCA sprzedaje {SAFETY.sellRate * 100}% BTC dziennie do stablecoina. Gdy LTPI wróci na plus, te stablecoiny są odkupywane w BTC (po {SAFETY.rebuyRate * 100}% dziennie; zakładka Portfel pilnuje kwoty). Krzywa akumulacji działa bez zmian. Backtest od 2020: wynik 2020–2023 bez zmian, 2024–2026 obsunięcie portfela −31,5% → −27,3% przy tym samym CAGR.</div>
@@ -341,7 +305,6 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
 
 function getText() { return getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#fff'; }
 
-const Stat = ({ k, v, s }: { k: string; v: React.ReactNode; s?: string }) => <div className="stat"><div className="k">{k}</div><div className="v">{v}</div>{s && <div className="s">{s}</div>}</div>;
 
 function TradeSheet({ open, onClose, price, suggested, onAdd }: { open: boolean; onClose: () => void; price: number; suggested: number; onAdd: (t: Trade) => void }) {
   const [side, setSide] = useState<'buy' | 'sell'>('buy');

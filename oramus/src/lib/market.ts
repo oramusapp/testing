@@ -1,6 +1,7 @@
 // Market data. BTC history (price + MVRV since 2010) ships inside the app and is
 // topped up on the phone from public APIs; token candles for RSPS come from Binance.
 import bundled from '../data-btc.json';
+import bundledTotal from '../data-total.json';
 import { get, set, createStore } from 'idb-keyval';
 
 export type Row = [date: string, price: number, mvrv: number | null];
@@ -94,6 +95,85 @@ export async function refreshBtcHistory(h: BtcHistory, onProgress?: (msg: string
   } catch { /* offline */ }
   const out = { rows, updated: Date.now(), source: sources.join(' + ') || h.source };
   if (sources.length) await set('btc', out, cacheStore);
+  return out;
+}
+
+// ---------- $TOTAL (whole crypto market cap) — the TPI input according to the course notes ----------
+export interface TotalHistory { rows: [string, number][]; updated: number; source: string; approxFrom?: string }
+const TB = bundledTotal as unknown as { assets: string[]; lastCaps: Record<string, number>; rows: [string, number][] };
+const STABLES = ['usdt', 'usdc', 'dai'];
+
+export async function loadTotalHistory(): Promise<TotalHistory> {
+  const cached = await get<TotalHistory>('total', cacheStore);
+  if (cached && cached.rows.length >= TB.rows.length) return cached;
+  return { rows: TB.rows, updated: 0, source: 'wbudowane (Coin Metrics)' };
+}
+
+/** Appends new days as cap-weighted, chain-linked returns of the same assets (Coin Metrics); days Coin Metrics has not
+ *  published yet are estimated from Binance closes weighted by the last known caps (stablecoins = 0% change). */
+export async function refreshTotalHistory(h: TotalHistory): Promise<TotalHistory> {
+  const rows = [...h.rows];
+  const last = () => rows[rows.length - 1];
+  let approxFrom = h.approxFrom;
+  if (approxFrom) { const i = rows.findIndex((r) => r[0] >= approxFrom!); if (i > 0) rows.splice(i); approxFrom = undefined; }   // re-derive estimated days
+  const sources: string[] = [];
+  let weights: Record<string, number> = { ...TB.lastCaps };
+  try {
+    const start = iso(Date.parse(last()[0]) - 3 * DAY);
+    const j = await getJSON(`https://community-api.coinmetrics.io/v4/timeseries/asset-metrics?assets=${TB.assets.join(',')}&metrics=CapMrktCurUSD&frequency=1d&page_size=10000&start_time=${start}`);
+    const byDate = new Map<string, Record<string, number>>();
+    for (const d of j.data ?? []) {
+      const date = String(d.time).slice(0, 10), v = parseFloat(d.CapMrktCurUSD);
+      if (!(v > 0)) continue;
+      if (!byDate.has(date)) byDate.set(date, {});
+      byDate.get(date)![d.asset] = v;
+    }
+    const dates = [...byDate.keys()].sort();
+    for (let k = 1; k < dates.length; k++) {
+      if (dates[k] <= last()[0]) continue;
+      if (dates[k - 1] !== last()[0]) break;            // need the previous day to chain
+      const a = byDate.get(dates[k - 1])!, b = byDate.get(dates[k])!;
+      let w = 0, wr = 0;
+      for (const x of Object.keys(a)) if (b[x] > 0) { const r = b[x] / a[x] - 1; if (Math.abs(r) < 3) { w += a[x]; wr += a[x] * r; } }
+      if (w > 0) { rows.push([dates[k], last()[1] * (1 + wr / w)]); weights = b; }
+    }
+    sources.push('Coin Metrics');
+  } catch { /* fall through */ }
+  try {
+    const from = Date.parse(last()[0]);
+    const syms = Object.keys(weights).filter((a) => !STABLES.includes(a));
+    const series = await Promise.all(syms.map(async (a) => {
+      try { return [a, (await klines(a.toUpperCase() + 'USDT', 0, from)).filter((c) => c.t + DAY <= Date.now())] as const; } catch { return [a, []] as const; }
+    }));
+    const px = new Map<string, Map<string, number>>(series.map(([a, k]) => [a, new Map(k.map((c) => [iso(c.t), c.c]))]));
+    const stableW = STABLES.reduce((s, a) => s + (weights[a] ?? 0), 0);
+    let added = false;
+    for (let t = from + DAY; t + DAY <= Date.now(); t += DAY) {
+      const d = iso(t), p = iso(t - DAY);
+      let w = stableW, wr = 0;
+      for (const a of syms) { const x = px.get(a)?.get(d), y = px.get(a)?.get(p); if (x && y) { w += weights[a]; wr += weights[a] * (x / y - 1); } }
+      if (w <= stableW) break;
+      if (!approxFrom) approxFrom = d;
+      rows.push([d, last()[1] * (1 + wr / w)]); added = true;
+    }
+    if (added) sources.push('Binance (szacunek)');
+  } catch { /* offline */ }
+  const out: TotalHistory = { rows, updated: Date.now(), source: sources.join(' + ') || h.source, approxFrom };
+  if (sources.length) await set('total', out, cacheStore);
+  return out;
+}
+
+/** $TOTAL aligned to the BTC dates (carried forward; after its last day it follows BTC so the TPI is never blank). */
+export function alignTotal(dates: string[], btc: number[], t: TotalHistory | null): number[] {
+  if (!t) return btc;
+  const m = new Map(t.rows);
+  const out: number[] = []; let lastV = NaN, lastB = NaN;
+  dates.forEach((d, i) => {
+    const v = m.get(d);
+    if (v != null) { lastV = v; lastB = btc[i]; out.push(v); }
+    else if (Number.isFinite(lastV)) out.push(lastV * (btc[i] / lastB));
+    else out.push(btc[i] * (t.rows[0][1] / btc[0]));
+  });
   return out;
 }
 

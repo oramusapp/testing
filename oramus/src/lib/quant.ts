@@ -254,7 +254,7 @@ export interface BacktestResult {
   btc: number; cash: number; avgBuy: number; value: number; pnl: number; pnlPct: number;
   avgRate: number; avgRisk: number; lump: number; lumpPct: number; vsLump: number; vsLumpPct: number;
   maxDD: number; maxDDLump: number;
-  equity: number[]; lumpEquity: number[]; actions: number[]; startIndex: number;
+  equity: number[]; lumpEquity: number[]; actions: number[]; startIndex: number; btcShare: number[];
 }
 
 // ---------- SDCA safety (research/run22.py, run23.py) ----------
@@ -317,7 +317,7 @@ export function backtest(prices: Series, riskPct: Series, curve: number[], start
   let cash = capital, btc = 0, spent = 0, bought = 0, buys = 0, sells = 0, holds = 0, owed = 0;
   let peak = 0, maxDD = 0, peakL = 0, maxDDL = 0, rateSum = 0, riskSum = 0, n = 0;
   const p0 = prices[startIndex];
-  const equity: number[] = [], lumpEquity: number[] = [], actions: number[] = [];
+  const equity: number[] = [], lumpEquity: number[] = [], actions: number[] = [], btcShare: number[] = [];
   for (let i = startIndex; i < prices.length; i++) {
     const p = prices[i];
     const r = riskPct[i];
@@ -342,7 +342,7 @@ export function backtest(prices: Series, riskPct: Series, curve: number[], start
     rateSum += rate; if (Number.isFinite(r)) { riskSum += r; n++; }
     const eq = cash + btc * p;
     const lq = (capital / p0) * p;
-    equity.push(eq); lumpEquity.push(lq);
+    equity.push(eq); lumpEquity.push(lq); btcShare.push(eq > 0 ? (btc * p) / eq : 0);
     peak = Math.max(peak, eq); maxDD = Math.min(maxDD, eq / peak - 1);
     peakL = Math.max(peakL, lq); maxDDL = Math.min(maxDDL, lq / peakL - 1);
   }
@@ -355,7 +355,7 @@ export function backtest(prices: Series, riskPct: Series, curve: number[], start
     pnl: value - capital, pnlPct: (value / capital - 1) * 100,
     avgRate: (rateSum / Math.max(days, 1)) * 100, avgRisk: n ? riskSum / n : NaN,
     lump, lumpPct: (lump / capital - 1) * 100, vsLump: value - lump, vsLumpPct: (value / lump - 1) * 100,
-    maxDD: maxDD * 100, maxDDLump: maxDDL * 100, equity, lumpEquity, actions, startIndex
+    maxDD: maxDD * 100, maxDDLump: maxDDL * 100, equity, lumpEquity, actions, startIndex, btcShare
   };
 }
 

@@ -111,7 +111,10 @@ export const LTPI_SPEC: TpiSpec[] = [
   { name: 'HMA 100 rośnie', fn: (p) => hmaRising(p, 100) }
 ];
 
-export const HYSTERESIS = 0.2;
+// Course notes: "I sell if the trend probability swings below zero and buy when it swings above zero" → default threshold 0;
+// ±0.2 hysteresis (fewer whipsaws) is an option in LTPI · MTPI settings.
+export const HYSTERESIS = 0;
+export const HYSTERESIS_OPTIONS = [0, 0.2];
 
 /** State that turns +1 only above +h and −1 only below −h (otherwise keeps the previous state). */
 export function hysteresis(tpi: S, h = HYSTERESIS): S {
@@ -142,11 +145,11 @@ function significance(p: S, state: S, h = 30, skip = 400): TpiSignificance | nul
 }
 
 /** Runs on the last `window` closes (long enough for every warm-up) to stay fast on a phone. */
-export function computeTpi(prices: S, spec: TpiSpec[], window = 1500): TpiResult {
+export function computeTpi(prices: S, spec: TpiSpec[], window = 1500, h = HYSTERESIS): TpiResult {
   const p = prices.slice(-window);
   const votes = spec.map((s) => ({ name: s.name, v: s.fn(p) }));
   const series = p.map((_, i) => votes.reduce((a, x) => a + x.v[i], 0) / votes.length);
-  const stateSeries = hysteresis(series);
+  const stateSeries = hysteresis(series, h);
   const flips = (v: S) => { const a = v.slice(-730); let n = 0; for (let i = 1; i < a.length; i++) if (a[i] !== a[i - 1]) n++; return (n * 365) / Math.max(a.length - 1, 1); };
   const n = series.length;
   return {
@@ -158,7 +161,7 @@ export function computeTpi(prices: S, spec: TpiSpec[], window = 1500): TpiResult
 }
 
 /** LTPI state for every day of `prices` (0 during warm-up): 10-signal ensemble with hysteresis or price vs SMA 200. */
-export function ltpiStateSeries(prices: S, source: 'ensemble' | 'sma200' = 'ensemble'): S {
+export function ltpiStateSeries(prices: S, source: 'ensemble' | 'sma200' = 'ensemble', h = HYSTERESIS): S {
   if (source === 'sma200') { const m = sma(prices, 200); return prices.map((p, i) => (Number.isFinite(m[i]) ? (p > m[i] ? 1 : -1) : 0)); }
-  return computeTpi(prices, LTPI_SPEC, prices.length).stateSeries;
+  return computeTpi(prices, LTPI_SPEC, prices.length, h).stateSeries;
 }

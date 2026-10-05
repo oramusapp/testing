@@ -87,7 +87,11 @@ function PillarSheet({ p, id, onClose }: { p: P; id: PillarId | null; onClose: (
   const [z, setZ] = useState<number>(cur?.z ?? 0);
   const [note, setNote] = useState(cur?.note ?? '');
   const [answers, setAnswers] = useState<(number | null)[]>([]);
+  const [extraAns, setExtraAns] = useState<(number | null)[]>([]);
   useEffect(() => {
+    const ne = PILLARS.find((x) => x.id === id)?.extra?.length ?? 0;
+    const ex = id ? p.extra[id] : undefined;
+    setExtraAns(ex?.answers.length === ne ? ex.answers : new Array(ne).fill(null));
     setZ(cur?.z ?? 0); setNote(cur?.note ?? '');
     const n = PILLARS.find((x) => x.id === id)?.rubric?.length ?? 0;
     setAnswers(cur?.answers?.length === n ? cur.answers : new Array(n).fill(null));
@@ -111,6 +115,29 @@ function PillarSheet({ p, id, onClose }: { p: P; id: PillarId | null; onClose: (
         {def.verify?.map((x) => <div key={x.url} className="row"><span>Sprawdź źródło</span><a href={x.url} target="_blank" rel="noopener noreferrer" className="accent" style={{ textDecoration: 'none' }}>↗ {x.label}</a></div>)}
         {def.auto && <div className="row"><div className="grow"><div>Ręczna korekta</div><div className="faint" style={{ fontSize: 12 }}>Zastępuje wartość automatyczną</div></div><Switch checked={override} onChange={(on) => p.setOverrides({ ...p.overrides, [id]: on })} /></div>}
       </Card>
+      {def.extra && !override && (
+        <>
+          <div className="section-title">Uzupełnienie ręczne (opcjonalne) · {def.extra.length}</div>
+          <div className="note-text mb12">Tych danych aplikacja nie pobiera sama. Każdy wpisany odczyt liczy się jak jeden składnik automatyczny ({def.autoN ?? 1} auto), ważny {MANUAL_MAX_AGE_DAYS} dni. Puste pola nic nie zmieniają.</div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {def.extra.map((q, i) => (
+              <Card key={q.q} className="tight">
+                <div style={{ padding: '12px 14px 8px' }}>
+                  <div style={{ fontWeight: 600, fontSize: 14.5 }}>{q.q}{q.invert ? <span className="faint" style={{ fontWeight: 400 }}> · wyżej = gorzej</span> : null}</div>
+                  <div className="faint" style={{ fontSize: 12.5, margin: '2px 0 4px' }}>Jak liczyć: {q.measure}</div>
+                  <div style={{ fontSize: 12.5, margin: '0 0 4px', lineHeight: 1.45 }}><span className="green">Plus (+):</span> <span className="dim">{q.plus}</span><br /><span className="red">Minus (−):</span> <span className="dim">{q.minus}</span></div>
+                  <a href={q.url} target="_blank" rel="noopener noreferrer" className="accent" style={{ fontSize: 13, textDecoration: 'none' }}>↗ {q.label}</a>
+                </div>
+                <div className="flex" style={{ padding: '0 14px 12px', gap: 8 }}>
+                  <span className="dim" style={{ fontSize: 13 }}>Odczyt</span>
+                  <SigmaInput value={extraAns[i]} onChange={(v) => { const n = [...extraAns]; n[i] = v; setExtraAns(n); }} />
+                </div>
+              </Card>
+            ))}
+          </div>
+          <button className="btn primary block mt12" onClick={() => { p.setExtraAnswers(id, extraAns); toast('Zapisano uzupełnienie'); }}>Zapisz uzupełnienie</button>
+        </>
+      )}
       {editable && (
         <>
           {def.rubric && (

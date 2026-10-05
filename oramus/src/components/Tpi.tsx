@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Card } from './ui';
 import type { TpiResult } from '../lib/tpi';
-import { HYSTERESIS } from '../lib/tpi';
 
 const tone = (v: number) => (v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--amber)');
 const f = (v: number) => (v > 0 ? '+' : '') + v.toFixed(2);
@@ -52,7 +51,7 @@ export function TpiCard({ title, res, note, stateLabel }: { title: string; res: 
         </div>
       )}
       {open && <div className="note-text mt8">Spójność czasowa: składniki jednego TPI powinny działać w podobnym horyzoncie. Liczba zmian sygnału na rok (ostatnie 2 lata) pokazuje, które są wyraźnie szybsze lub wolniejsze od reszty.</div>}
-      <div className="note-text mt8">{note}{stateLabel ? ` Stan zmienia się dopiero po przekroczeniu ±${HYSTERESIS.toString().replace('.', ',')} (histereza ogranicza fałszywe sygnały).` : ''}</div>
+      <div className="note-text mt8">{note} Liczone z $TOTAL (cały rynek).</div>
     </Card>
   );
 }

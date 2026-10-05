@@ -2,6 +2,7 @@ import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App';
+import PasswordGate from './components/PasswordGate';
 import { hydrate } from './lib/db';
 import './styles.css';
 
@@ -41,7 +42,7 @@ export const checkForUpdate = async () => {
 function Root() {
   const [ready, setR] = useState(pendingReady);
   useEffect(() => { setReady = setR; }, []);
-  return <App updateReady={ready} applyUpdate={() => updateSW?.(true)} />;
+  return <PasswordGate><App updateReady={ready} applyUpdate={() => updateSW?.(true)} /></PasswordGate>;
 }
 
 hydrate().finally(() => {

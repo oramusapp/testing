@@ -3,9 +3,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from '../components/ui';
 import { usePersisted } from './db';
 import { klines, lastClosedDay } from './market';
-import { vams, annVol, capWeights, ratios, linfit } from './quant';
+import { annVol, capWeights, ratios, linfit } from './quant';
 import { leverageGate } from './pyramid';
 import { usePyramid } from './pyramidStore';
+import { rsScore } from './backtestAll';
 import { SDCA_DEFAULTS, type LtpiState, type SdcaSettings } from '../tabs/Sdca';
 import { useBtc } from './btcStore';
 import { composite } from './sdcaModel';
@@ -100,7 +101,7 @@ export function useRsps() {
           rows.push({
             sym, price: c.at(-1)!, ret: (c.at(-1)! / c[c.length - 31] - 1) * 100, vol: vol * 100,
             liq: k.slice(-30).reduce((p, x) => p + (x.q ?? 0), 0) / 30, ratioUp: ratio.at(-1)! > r50, trend: trendOf(c),
-            score: LOOKBACKS.map((L) => vams(ratio, L, 30)).reduce((p, v) => p + v, 0) / LOOKBACKS.length,
+            score: rsScore(ratio, vol),   // research definition: ratio log change / coin volatility, 30/60/90
             ...ratios(c, 365),
             corrBtc: (() => {
               const kk = k.filter((x) => btcMap.has(x.t)).slice(-91);
@@ -112,7 +113,7 @@ export function useRsps() {
       }));
       // point-in-time universe: the N most liquid (30-day average quote volume)
       const ok = rows.filter((r) => !r.error).sort((x, y) => y.liq - x.liq);
-      ok.slice(0, s.universeSize).forEach((r) => (r.inUniverse = true));
+      ok.slice(0, s.universeSize - 1).forEach((r) => (r.inUniverse = true));   // BTC is one of the top-N (as in the research)
       const uni = ok.filter((r) => r.inUniverse);
       const br = uni.length ? uni.filter((r) => r.ratioUp).length / uni.length : NaN;
       rows.sort((x, y) => (y.inUniverse ? 1 : 0) - (x.inUniverse ? 1 : 0) || (y.score || -99) - (x.score || -99));
@@ -137,17 +138,19 @@ export function useRsps() {
 
   // RSPS-sleeve target weights (fractions of the RSPS part); the remainder is stablecoin
   const sleeve: { sym: string; w: number; note?: string }[] = [];
+  const parkBtc = parking.choice === 'btc' || (parking.choice === 'hybrid' && Number.isFinite(sdcaRisk) && sdcaRisk < HYBRID_RISK_MAX);
   if (regime === 'rsps') {
     picks.sel.forEach((p) => sleeve.push(p));
     const rest = 1 - picks.sel.reduce((x, p) => x + p.w, 0);
-    if (rest > 0.001 && btcTrend > 0) sleeve.push({ sym: 'BTC', w: rest * btcTrend, note: 'reszta × trend BTC' });
+    if (rest > 0.001 && btcTrend > 0 && parkBtc) sleeve.push({ sym: 'BTC', w: rest * btcTrend, note: 'reszta × trend BTC' });
   } else if (regime === 'closed' && btcTrend > 0 && (parking.choice === 'btc' || (parking.choice === 'hybrid' && Number.isFinite(sdcaRisk) && sdcaRisk < HYBRID_RISK_MAX)))
     sleeve.push({ sym: 'BTC', w: btcTrend, note: `trend ${btcTrend.toFixed(2)}${parking.choice === 'hybrid' ? ` · ryzyko ${sdcaRisk.toFixed(0)}% < ${HYBRID_RISK_MAX}%` : ''}` });
   // a decision is pending whenever the gate closed since the user last confirmed where to park
   const parkingPending = regime === 'closed' && scanFresh && parking.ack !== (scan?.gateSince ?? '');
   const confirmParking = (choice: Parking) => setParking({ choice, ack: scan?.gateSince ?? lastClosedDay() });
   // short proposal: the backtested condition (BTC trend ensemble ≤ 0.25), weakest alts in their own downtrend
-  const shortProposal = btcTrend <= 0.25 && picks.shorts.length > 0 && scanFresh;
+  // course notes: TPI "below zero and falling → consider shorting crypto" (MTPI on $TOTAL); proposal only, never automatic
+  const shortProposal = !!a && a.mtpi.state < 0 && a.mtpi.roc5 < 0 && picks.shorts.length > 0 && scanFresh;
   const prices: Record<string, number> = {};
   (scan?.rows ?? []).forEach((r) => { if (Number.isFinite(r.price)) prices[r.sym] = r.price; });
   const vols: Record<string, number> = {};
