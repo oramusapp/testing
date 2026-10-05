@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, toast } from './ui';
+import { Card, toast, SignBtn, flipSign } from './ui';
 import { usePersisted } from '../lib/db';
 import { normCdf } from '../lib/quant';
 import { freshToday } from '../lib/market';
@@ -65,7 +65,7 @@ export function ValuationCard({ onUse, auto }: { onUse: (riskPct: number) => voi
       </div>
       <div className="mt12" style={{ display: 'grid', gap: 10 }}>
         {VAL_ITEMS.map((i) => (
-          <div key={i.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 8, alignItems: 'center' }}>
+          <div key={i.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto auto', gap: 8, alignItems: 'center' }}>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 600 }}>{i.name} <span className="faint" style={{ fontWeight: 400, fontSize: 12 }}>· {i.kind}{i.horizon === 'medium' ? ' · średni horyzont' : ''}</span></div>
               <div className="faint" style={{ fontSize: 12.5 }}>{i.hint}</div>
@@ -75,6 +75,7 @@ export function ValuationCard({ onUse, auto }: { onUse: (riskPct: number) => voi
               ? <div className="num" style={{ width: 84, textAlign: 'center', fontWeight: 600, color: heat(auto[i.id]) }}>{sz(auto[i.id])}<div className="faint" style={{ fontSize: 11, fontWeight: 400 }}>auto</div></div>
               : <input className="input" style={{ width: 84, textAlign: 'center', borderColor: heat(val.v.z[i.id] ?? null) }} inputMode="decimal" placeholder="z"
                   value={txt[i.id] ?? (!val.manualFresh || val.v.z[i.id] == null ? '' : String(val.v.z[i.id]))} onChange={(e) => set(i.id, e.target.value)} />}
+            {auto?.[i.id] == null && <SignBtn onClick={() => set(i.id, flipSign(txt[i.id] ?? (!val.manualFresh || val.v.z[i.id] == null ? '' : String(val.v.z[i.id]))))} />}
           </div>
         ))}
       </div>

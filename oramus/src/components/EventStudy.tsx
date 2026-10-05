@@ -63,7 +63,7 @@ export function EventStudyCard({ fg }: { fg: FG | null }) {
         {EVENTS.map((e) => <option key={e.v} value={e.v}>{e.l}</option>)}
       </select>
       <div className="flex mt8" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-        {def.unit != null && <label className="dim" style={{ fontSize: 13 }}>próg <input className="input" style={{ width: 70 }} inputMode="decimal" value={thr} onChange={(e) => setThr(e.target.value)} /> {def.unit}</label>}
+        {def.unit != null && <label className="dim" style={{ fontSize: 13 }}>próg <input className="input" style={{ width: 70 }} inputMode="text" value={thr} onChange={(e) => setThr(e.target.value)} /> {def.unit}</label>}
         <span className="dim" style={{ fontSize: 13 }}>odstęp sygnałów</span><Seg value={gap} onChange={setGap} options={[{ v: '30', l: '30 d' }, { v: '90', l: '90 d' }]} />
       </div>
       {res?.needFg && <div className="note-text mt8">Czekam na historię Fear &amp; Greed (pobiera się raz dziennie).</div>}

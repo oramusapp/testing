@@ -1,4 +1,5 @@
 export const CHANGELOG = [
+  { v: '2.18.1', date: '2026-10-05', items: ['Przycisk ± przy odczytach w σ (Piramida, uzupełnienia, arkusz wyceny) — klawiatura iPhone nie ma minusa; w kalkulatorach pola mogące być ujemne mają pełną klawiaturę'] },
   { v: '2.18.0', date: '2026-10-05', items: ['RSPS: Hyperliquid (HYPE) wśród kandydatów; historia sprzed notowania na Binance (24.09.2026) pobierana z Hyperliquid'] },
   { v: '2.17.2', date: '2026-10-05', items: ['RSPS: BTC widoczny w skanerze i tabeli jakości aktywów jako wzorzec (siła 0) z wagą, jaką RSPS trzyma w BTC (nieprzydzielona część i parking BTC × trend)'] },
   { v: '2.17.1', date: '2026-10-05', items: ['SDCA: zakup tylko powyżej 1% rezerwy dziennie; przy 1% i mniej aplikacja pokazuje HOLD (x% gotówki) — także w Portfelu, live testingu i backteście (od 2020: CAGR 44,3 → 43,5%, obsunięcie bez zmian)'] },
