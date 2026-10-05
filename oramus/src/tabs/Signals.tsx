@@ -6,12 +6,12 @@ import { Chart } from '../components/Chart';
 import { stats, monthlyReport, monthOf, type Snapshot, type Flow, type MonthlyReport } from '../lib/performance';
 import { shareFile } from '../components/ui';
 import { useBtc } from '../lib/btcStore';
-import { composite } from '../lib/sdcaModel';
+import { composite, freshManual } from '../lib/sdcaModel';
 import { athSellSeries, backtest, curveRate, safetyStep, slowBuyRate } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
 import { useRsps, SPLIT_SDCA } from '../lib/useRsps';
 import { LEV_MAX } from '../lib/pyramid';
-import { SDCA_DEFAULTS, type SdcaSettings } from './Sdca';
+import { SDCA_DEFAULTS, type SdcaSettings, manualLtpiActive, type LtpiState } from './Sdca';
 import { usd, pct } from '../lib/format';
 
 // Rotation rules (research/run14.py, run15.py):
@@ -27,7 +27,7 @@ interface Portfolio { holdings: Holdings | null; history: { time: number; text: 
 interface Order { id: string; sleeve: 'SDCA' | 'RSPS' | 'Rebalans'; side: 'buy' | 'sell' | 'move'; sym: string; usd: number; units: number; why: string; }
 
 export default function Signals() {
-  const { model, tpiPrices } = useBtc();
+  const { model } = useBtc();
   const R = useRsps();
   const [sd] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
   const [pf, setPf] = usePersisted<Portfolio>('portfolio', { holdings: null, history: [] });
@@ -41,12 +41,14 @@ export default function Signals() {
   const [flowOpen, setFlowOpen] = useState(false);
   const cfg = { ...SDCA_DEFAULTS, ...sd };
   const [tpiSrc] = usePersisted<{ ltpiSource: 'ensemble' | 'sma200'; hyst?: number }>('signals.tpi', { ltpiSource: 'ensemble' });
-  const ltpiSeries = useMemo(() => (model && (cfg.safety || (cfg.slowBuy ?? 1) < 1) ? ltpiStateSeries(tpiPrices ?? model.prices, tpiSrc.ltpiSource ?? 'ensemble', tpiSrc.hyst ?? 0) : undefined), [model, tpiPrices, cfg.safety, cfg.slowBuy, tpiSrc.ltpiSource, tpiSrc.hyst]);
+  const ltpiSeries = useMemo(() => (model && (cfg.safety || (cfg.slowBuy ?? 1) < 1) ? ltpiStateSeries(model.prices, tpiSrc.ltpiSource ?? 'ensemble', tpiSrc.hyst ?? 0) : undefined), [model, cfg.safety, cfg.slowBuy, tpiSrc.ltpiSource, tpiSrc.hyst]);
   const owed = pf.safetyOwed ?? 0;
+  const [ltpiMan] = usePersisted<LtpiState>('signals.ltpi', { mode: 'proxy', manual: 0 });
+  const sdcaLtpi = manualLtpiActive(ltpiMan) ? ltpiMan.manual : (ltpiSeries?.at(-1) ?? 0);   // SDCA: LTPI on BTC
 
   const sdcaState = useMemo(() => {
     if (!model) return null;
-    const comp = composite(model, cfg.enabled, cfg.manualRisk);
+    const comp = composite(model, cfg.enabled, freshManual(cfg));
     const last = model.dates.length - 1;
     const start = Math.max(0, model.dates.findIndex((d) => d >= cfg.startDate));
     const ath = athSellSeries(model.prices, comp.risk);
@@ -96,7 +98,7 @@ export default function Signals() {
       if (units * sdcaState.price >= MIN_TRADE_USD) orders.push({ id: 'sdca', sleeve: 'SDCA', side: 'sell', sym: 'BTC', usd: units * sdcaState.price, units, why: `krzywa ${(r * 100).toFixed(2)}% BTC przy ryzyku ${sdcaState.risk.toFixed(1)}%` });
     }
     if (cfg.safety) {
-      const st = safetyStep(sdcaState.risk, R.ltpi, H.sdca.BTC * sdcaState.price, H.sdca[STABLE], owed);
+      const st = safetyStep(sdcaState.risk, sdcaLtpi, H.sdca.BTC * sdcaState.price, H.sdca[STABLE], owed);
       if (st.kind === 'sell' && st.usd >= MIN_TRADE_USD)
         orders.push({ id: 'sdca-safety', sleeve: 'SDCA', side: 'sell', sym: 'BTC', usd: st.usd, units: st.usd / sdcaState.price, why: `bezpiecznik: LTPI ujemne przy ryzyku ${sdcaState.risk.toFixed(1)}% → 2% BTC do stablecoina` });
       else if (st.kind === 'rebuy' && st.usd >= MIN_TRADE_USD)

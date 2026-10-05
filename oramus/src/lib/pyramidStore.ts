@@ -2,10 +2,10 @@
 import { useEffect, useMemo } from 'react';
 import { useBtc } from './btcStore';
 import { usePersisted, load, save } from './db';
-import { composite as sdcaComposite } from './sdcaModel';
+import { composite as sdcaComposite, freshManual } from './sdcaModel';
 import { computeAuto, sentimentZ } from './autoSignals';
-import { fearGreed, lastClosedDay } from './market';
-import { composite, PILLARS, MANUAL_MAX_AGE_DAYS, type PillarId, type PillarState, type PillarValue, type WeightMethod } from './pyramid';
+import { fearGreed, lastClosedDay, freshToday } from './market';
+import { composite, PILLARS, type PillarId, type PillarState, type PillarValue, type WeightMethod } from './pyramid';
 import { SDCA_DEFAULTS, type SdcaSettings } from '../tabs/Sdca';
 
 /** z: pillar z-score in σ; answers: the per-question σ readings (direction-adjusted). */
@@ -36,7 +36,7 @@ export function usePyramid() {
   const auto = useMemo(() => {
     if (!model) return null;
     const cfg = { ...SDCA_DEFAULTS, ...sdca };
-    const comp = sdcaComposite(model, cfg.enabled, cfg.manualRisk);
+    const comp = sdcaComposite(model, cfg.enabled, freshManual(cfg));
     return computeAuto(model.dates, model.prices, comp.risk, model.risk.mvrv, comp.z, model.z.mvrv, tpiCfg.ltpiSource, tpiPrices ?? undefined, tpiCfg.hyst ?? 0);
   }, [model, sdca, tpiCfg.ltpiSource, tpiCfg.hyst, tpiPrices]);
 
@@ -50,7 +50,7 @@ export function usePyramid() {
       const base = { z: z != null && Number.isFinite(z) ? z : null, updated: at && now - at < 4 * 86400000 ? now : at, detail };
       // manual supplements (data the app cannot fetch) blend in like extra components while fresh
       const def = PILLARS.find((d) => d.id === id), ex = extra[id];
-      if (base.z == null || !def?.extra || !ex || now - ex.updated > MANUAL_MAX_AGE_DAYS * 86400000) return base;
+      if (base.z == null || !def?.extra || !ex || !freshToday(ex.updated, now)) return base;
       const vals = ex.answers.map((v, k) => (v == null ? null : def.extra![k]?.invert ? -v : v)).filter((x): x is number => x != null);
       if (!vals.length) return base;
       const n = def.autoN ?? 1;

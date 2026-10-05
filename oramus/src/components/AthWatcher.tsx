@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useBtc } from '../lib/btcStore';
 import { usePersisted } from '../lib/db';
-import { composite } from '../lib/sdcaModel';
+import { composite, freshManual } from '../lib/sdcaModel';
 import { ATH_BACKTEST, athSellSeries } from '../lib/quant';
 import { notifyOnce } from '../lib/notify';
 import { SDCA_DEFAULTS, type SdcaSettings } from '../tabs/Sdca';
@@ -15,7 +15,7 @@ export default function AthWatcher() {
   useEffect(() => {
     if (!model || !on) return;
     const cfg = { ...SDCA_DEFAULTS, ...sd };
-    const comp = composite(model, cfg.enabled, cfg.manualRisk);
+    const comp = composite(model, cfg.enabled, freshManual(cfg));
     const { frac, k } = athSellSeries(model.prices, comp.risk);
     const i = model.dates.length - 1;
     if (frac[i] > 0) {

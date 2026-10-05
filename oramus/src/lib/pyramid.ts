@@ -91,8 +91,9 @@ export const MANUAL_MAX_AGE_DAYS = 7;
 export const Z_CLIP = 3;
 export const clipZ = (z: number) => Math.max(-Z_CLIP, Math.min(Z_CLIP, z));
 
+/** A pillar value counts only if it is from after the latest daily close (00:00 UTC): manual entries reset at every close. */
 export const isFresh = (v: PillarValue | undefined, now = Date.now()) =>
-  !!v && v.z != null && Number.isFinite(v.z) && v.updated != null && now - v.updated <= MANUAL_MAX_AGE_DAYS * 86400000;
+  !!v && v.z != null && Number.isFinite(v.z) && v.updated != null && v.updated >= Math.floor(now / 86400000) * 86400000;
 
 export interface Composite { z: number; p: number; coverage: number; dispersion: number; missing: PillarId[]; contributions: Record<string, number>; }
 
@@ -137,7 +138,7 @@ export function leverageGate(x: LeverageInputs) {
     { ok: x.sdcaRisk < 50, label: 'Wycena SDCA poniżej 50% (rynek nieprzegrzany)' },
     { ok: x.volBelowMedian, label: 'Zmienność BTC 30d poniżej mediany z roku' },
     { ok: x.persistDays >= LEV_PERSIST, label: `Wszystkie warunki automatyczne spełnione ≥ ${LEV_PERSIST} dni z rzędu (teraz ${x.persistDays})` },
-    { ok: x.pyramid.missing.length === 0, label: `Wszystkie filary piramidy aktualne (ręczne ≤ ${MANUAL_MAX_AGE_DAYS} dni)` },
+    { ok: x.pyramid.missing.length === 0, label: 'Wszystkie filary piramidy aktualne (ręczne wpisane po ostatnim zamknięciu 00:00 UTC)' },
     { ok: x.pyramid.z >= LEV_Z_MIN, label: `Piramida Z ≥ +0,67σ, P ≥ 75% (teraz ${x.pyramid.z >= 0 ? '+' : ''}${x.pyramid.z.toFixed(2)}σ, P ${Math.round(x.pyramid.p * 100)}%)` },
     { ok: PILLARS.every((p) => (x.state[p.id]?.z ?? -9) > LEV_PILLAR_Z_FLOOR), label: 'Żaden filar poniżej −0,32σ (P > 37,5%)' },
     { ok: !x.rspsActive, label: 'RSPS nieaktywny (dźwignia tylko na BTC, nigdy na alty)' }

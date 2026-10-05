@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Seg, Sheet, Switch, toast } from './ui';
-import { PILLARS, weights, isFresh, zLabel, MANUAL_MAX_AGE_DAYS, type PillarId } from '../lib/pyramid';
+import { PILLARS, weights, isFresh, zLabel, type PillarId } from '../lib/pyramid';
+import { freshToday } from '../lib/market';
 import { normCdf } from '../lib/quant';
 import { msToNextUtcClose } from '../lib/market';
 import type { usePyramid } from '../lib/pyramidStore';
@@ -51,7 +52,7 @@ export function PyramidCard({ p }: { p: P }) {
             );
           })}
         </div>
-        {stale.length > 0 && <div className="warn-box mt12" style={{ marginBottom: 0 }}>Do uzupełnienia: {stale.map((s) => s.name).join(', ')}. Dotknij filar, aby zaktualizować. Ręczne wpisy ważą {MANUAL_MAX_AGE_DAYS} dni.</div>}
+        {stale.length > 0 && <div className="warn-box mt12" style={{ marginBottom: 0 }}>Do uzupełnienia: {stale.map((s) => s.name).join(', ')}. Dotknij filar, aby zaktualizować. Ręczne wpisy resetują się przy każdym zamknięciu świecy (00:00 UTC).</div>}
         <div className="hr" />
         <div className="dim" style={{ fontSize: 12.5 }}>Model rozkładu normalnego: każdy filar to z-score (σ), P = Φ(z). Auto: dane do {p.auto?.date ?? '—'} · kolejne zamknięcie 00:00 UTC za {countdown}</div>
         <div className="mt12"><Seg value={p.method} onChange={p.setMethod} options={[{ v: 'roc', l: 'Wagi ROC' }, { v: 'linear', l: 'Liniowe' }, { v: 'equal', l: 'Równe' }]} /></div>
@@ -91,10 +92,11 @@ function PillarSheet({ p, id, onClose }: { p: P; id: PillarId | null; onClose: (
   useEffect(() => {
     const ne = PILLARS.find((x) => x.id === id)?.extra?.length ?? 0;
     const ex = id ? p.extra[id] : undefined;
-    setExtraAns(ex?.answers.length === ne ? ex.answers : new Array(ne).fill(null));
-    setZ(cur?.z ?? 0); setNote(cur?.note ?? '');
+    setExtraAns(ex && freshToday(ex.updated) && ex.answers.length === ne ? ex.answers : new Array(ne).fill(null));
+    const fresh = !!cur && freshToday(cur.updated);
+    setZ(fresh ? cur!.z : 0); setNote(fresh ? cur!.note ?? '' : '');
     const n = PILLARS.find((x) => x.id === id)?.rubric?.length ?? 0;
-    setAnswers(cur?.answers?.length === n ? cur.answers : new Array(n).fill(null));
+    setAnswers(fresh && cur?.answers?.length === n ? cur.answers : new Array(n).fill(null));
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!def || !id) return null;
   const answer = (i: number, raw: number | null) => {
@@ -118,7 +120,7 @@ function PillarSheet({ p, id, onClose }: { p: P; id: PillarId | null; onClose: (
       {def.extra && !override && (
         <>
           <div className="section-title">Uzupełnienie ręczne (opcjonalne) · {def.extra.length}</div>
-          <div className="note-text mb12">Tych danych aplikacja nie pobiera sama. Każdy wpisany odczyt liczy się jak jeden składnik automatyczny ({def.autoN ?? 1} auto), ważny {MANUAL_MAX_AGE_DAYS} dni. Puste pola nic nie zmieniają.</div>
+          <div className="note-text mb12">Tych danych aplikacja nie pobiera sama. Każdy wpisany odczyt liczy się jak jeden składnik automatyczny ({def.autoN ?? 1} auto), ważny do najbliższego zamknięcia świecy (00:00 UTC). Puste pola nic nie zmieniają.</div>
           <div style={{ display: 'grid', gap: 10 }}>
             {def.extra.map((q, i) => (
               <Card key={q.q} className="tight">

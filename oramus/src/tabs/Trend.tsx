@@ -2,7 +2,7 @@ import { Screen, Card, Seg, Fold } from '../components/ui';
 import { TpiCard } from '../components/Tpi';
 import { usePersisted } from '../lib/db';
 import { usePyramid, TPI_DEFAULTS, type TpiSettings } from '../lib/pyramidStore';
-import type { LtpiState } from './Sdca';
+import { manualLtpiActive, type LtpiState } from './Sdca';
 import { signed } from '../lib/format';
 import { useBtc } from '../lib/btcStore';
 import { varianceRatio } from '../lib/quant';
@@ -16,7 +16,8 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
   const [tpi0, setTpi] = usePersisted<TpiSettings>('signals.tpi', TPI_DEFAULTS);
   const tpi = { ...TPI_DEFAULTS, ...tpi0 };
   const a = pyr.auto;
-  const ltpiValue = ltpi.mode === 'manual' ? ltpi.manual : a?.ltpi ?? 0;
+  const manualOn = manualLtpiActive(ltpi);
+  const ltpiValue = manualOn ? ltpi.manual : a?.ltpi ?? 0;
   const { model } = useBtc();
   // decision matrix from the masterclass: LTPI + MTPI + market regime
   const vr = model ? varianceRatio(model.prices) : NaN;
@@ -31,12 +32,12 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
     <Screen nav={nav} title="LTPI · MTPI" subtitle="Trend całego rynku ($TOTAL) · zamknięcie 00:00 UTC">
       <Card className="hero">
         <div className="between"><div className="eyebrow" style={{ margin: 0 }}>LTPI — długoterminowy trend</div>
-          <Seg value={ltpi.mode} onChange={(m) => setLtpi({ ...ltpi, mode: m })} options={[{ v: 'proxy', l: 'Auto' }, { v: 'manual', l: 'Ręcznie' }]} /></div>
-        <div className={'mid-number mt12 ' + (ltpiValue > 0 ? 'green' : ltpiValue < 0 ? 'red' : 'dim')}>{ltpi.mode === 'manual' ? signed(ltpiValue) : ltpiValue > 0 ? 'Stan: pozytywny' : ltpiValue < 0 ? 'Stan: negatywny' : 'Stan: brak'}</div>
+          <Seg value={ltpi.mode} onChange={(m) => setLtpi({ ...ltpi, mode: m, updated: Date.now() })} options={[{ v: 'proxy', l: 'Auto' }, { v: 'manual', l: 'Ręcznie' }]} /></div>
+        <div className={'mid-number mt12 ' + (ltpiValue > 0 ? 'green' : ltpiValue < 0 ? 'red' : 'dim')}>{manualOn ? signed(ltpiValue) : ltpiValue > 0 ? 'Stan: pozytywny' : ltpiValue < 0 ? 'Stan: negatywny' : 'Stan: brak'}</div>
         <div className="dim" style={{ fontSize: 13 }}>{ltpiValue > 0 ? 'Trend długoterminowy pozytywny' : ltpiValue < 0 ? 'Sygnał „emergency exit”: LTPI negatywne' : 'Neutralnie'}{ltpi.mode !== 'manual' && a && tpi.ltpiSource === 'ensemble' ? ` · wartość ${signed(a.ltpiTpi.value)}` : ''}</div>
         {ltpi.mode === 'manual' ? (
-          <div className="mt12"><input type="range" min={-1} max={1} step={0.05} value={ltpi.manual} onChange={(e) => setLtpi({ ...ltpi, manual: +e.target.value })} />
-            <div className="note-text">Wpisz LTPI z własnego systemu (−1 … +1). Używają go: bezpiecznik SDCA, reżim RSPS i Portfel.</div></div>
+          <div className="mt12"><input type="range" min={-1} max={1} step={0.05} value={ltpi.manual} onChange={(e) => setLtpi({ ...ltpi, manual: +e.target.value, updated: Date.now() })} />
+            <div className="note-text">{manualOn ? 'Wpisz LTPI z własnego systemu (−1 … +1). Wpis jest ważny do najbliższego zamknięcia świecy (00:00 UTC), potem wraca automatyczne LTPI. Używają go: bezpiecznik SDCA, reżim RSPS i Portfel.' : 'Ręczny wpis wygasł przy zamknięciu świecy (00:00 UTC) — działa automatyczne LTPI. Przesuń suwak, aby wpisać nową wartość na dziś.'}</div></div>
         ) : <div className="note-text mt12">{`Liczone z $TOTAL (kapitalizacja całego rynku), jak w notatkach. ${tpi.ltpiSource === 'sma200' ? 'Źródło: $TOTAL vs SMA 200.' : '10 wskaźników trendu'}; stan ${(tpi.hyst ?? 0) > 0 ? 'z histerezą ±0,2' : 'zmienia się przy przejściu przez 0 (notatki)'}.`} Steruje: bezpiecznikiem SDCA (LTPI &lt; 0 i ryzyko ≥ 70%) oraz RSPS (LTPI &lt; 0 → stablecoiny).</div>}
       </Card>
 

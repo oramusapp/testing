@@ -3,9 +3,10 @@ import { Screen, Card, Row, Seg, Switch, NumInput, Sheet, Fold, shareFile, toast
 import { Chart, CurveEditor } from '../components/Chart';
 import { IcRefresh, IcInfo, IcPlus, IcTrash } from '../components/icons';
 import { useBtc, refresh } from '../lib/btcStore';
+import { freshToday } from '../lib/market';
 import { askNotify, notifyPermission } from '../lib/notify';
 import { usePersisted } from '../lib/db';
-import { INDICATORS, composite, RAIL_TAUS } from '../lib/sdcaModel';
+import { INDICATORS, composite, freshManual, RAIL_TAUS } from '../lib/sdcaModel';
 import { ATH_BACKTEST, ATH_SELL, BANDS, DEFAULT_CURVE, SAFETY, SLOW_BUY_OPTIONS, athSellSeries, slowBuyRate, curveRate, riskZone, safetyStep } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
 import { ValuationCard, AccumulationCalc } from '../components/Valuation';
@@ -19,6 +20,7 @@ const usd = (v: number, d = 2) => usdFull(v, Math.abs(v) >= 1e5 ? 0 : d);
 export interface SdcaSettings {
   enabled: Record<string, boolean>;
   manualRisk: number | null;
+  manualUpdated?: number;
   curve: number[];
   startDate: string;
   capital: number;
@@ -34,14 +36,16 @@ export const SDCA_DEFAULTS: SdcaSettings = {
   enabled: { price: true, sharpe: false, mvrv: true, manual: false },
   manualRisk: null, curve: DEFAULT_CURVE, startDate: '2015-01-01', capital: 10000, cash: 0, btcHeld: 0, logScale: false, range: 'all', safety: true, athSell: false, slowBuy: 0.25
 };
-export interface LtpiState { mode: 'proxy' | 'manual'; manual: number; }
+export interface LtpiState { mode: 'proxy' | 'manual'; manual: number; updated?: number; }
+/** Manual LTPI counts only until the next daily close (00:00 UTC); afterwards the automatic LTPI applies again. */
+export const manualLtpiActive = (s: LtpiState) => s.mode === 'manual' && freshToday(s.updated);
 interface Trade { id: string; date: string; side: 'buy' | 'sell'; usd: number; price: number; }
 
 const ZONE_COLORS = { buy: '#2fbf71', acc: '#9ccc5a', trim: '#e5ac4f', sell: '#ef6461', dim: '#888' };
 const riskColor = (v: number) => ZONE_COLORS[riskZone(v).tone];
 
 export default function Sdca({ nav }: { nav?: React.ReactNode }) {
-  const { model, status, busy, history, tpiPrices } = useBtc();
+  const { model, status, busy, history } = useBtc();
   const autoVal = useMemo(() => (history ? autoValuation(history.rows as [string, number, number | null][]).z : undefined), [history]);
   const [s, setS] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
   const [ltpi] = usePersisted<LtpiState>('signals.ltpi', { mode: 'proxy', manual: 0 });
@@ -54,15 +58,16 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
   const upd = (p: Partial<SdcaSettings>) => setS((o) => ({ ...SDCA_DEFAULTS, ...o, ...p }));
   const cfg = { ...SDCA_DEFAULTS, ...s };
 
-  const comp = useMemo(() => (model ? composite(model, cfg.enabled, cfg.manualRisk) : null), [model, cfg.enabled, cfg.manualRisk]);
+  const comp = useMemo(() => (model ? composite(model, cfg.enabled, freshManual(cfg)) : null), [model, cfg.enabled, cfg.manualRisk]);
   const [tpiCfg0] = usePersisted<{ ltpiSource: 'ensemble' | 'sma200'; hyst?: number }>('signals.tpi', { ltpiSource: 'ensemble' });
   const tpiCfg = { ltpiSource: tpiCfg0.ltpiSource ?? 'ensemble', hyst: tpiCfg0.hyst ?? 0 };
   const ltpiSeries = useMemo(() => {
     if (!model) return null;
-    const s0 = ltpiStateSeries(tpiPrices ?? model.prices, tpiCfg.ltpiSource, tpiCfg.hyst);
-    if (ltpi.mode === 'manual') s0[s0.length - 1] = ltpi.manual;     // manual LTPI applies to today only
+    // SDCA uses LTPI computed on BTC (the asset it trades; research/run44–45); the LTPI · MTPI tab and RSPS use $TOTAL
+    const s0 = ltpiStateSeries(model.prices, tpiCfg.ltpiSource, tpiCfg.hyst);
+    if (manualLtpiActive(ltpi)) s0[s0.length - 1] = ltpi.manual;     // manual LTPI applies to today only
     return s0;
-  }, [model, tpiPrices, tpiCfg.ltpiSource, tpiCfg.hyst, ltpi.mode, ltpi.manual]);
+  }, [model, tpiCfg.ltpiSource, tpiCfg.hyst, ltpi.mode, ltpi.manual]);
   const ath = useMemo(() => (model && comp ? athSellSeries(model.prices, comp.risk) : null), [model, comp]);
 
   if (!model || !comp) {
@@ -79,8 +84,8 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
   const zone = riskZone(riskToday);
   const priceRisk = model.risk.price[last];
   const band = BANDS.find((b) => priceRisk / 100 >= b.from && priceRisk / 100 < b.to) ?? (priceRisk < 1 ? BANDS[0] : BANDS[BANDS.length - 1]);
-  const ltpiProxy = ltpiSeries?.at(-1) ?? 0;   // LTPI on $TOTAL (ensemble or SMA 200, per settings)
-  const ltpiValue = ltpi.mode === 'manual' ? ltpi.manual : ltpiProxy;
+  const ltpiProxy = ltpiSeries?.at(-1) ?? 0;   // LTPI on BTC (ensemble or SMA 200, per settings)
+  const ltpiValue = manualLtpiActive(ltpi) ? ltpi.manual : ltpiProxy;
   const rate = slowBuyRate(rateCurve, ltpiValue, cfg.slowBuy ?? 1);
   const slowed = rate !== rateCurve;
 
@@ -137,7 +142,7 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
         <Row className="compact" label="Composite Risk dziś" value={pct(riskToday)} />
         <Row className="compact" label="Wycena z (TRW)" value={<span style={{ color: zToday >= 1.5 ? 'var(--green)' : zToday <= -1.5 ? 'var(--red)' : undefined }}>{signed(zToday)}σ <span className="dim">· + = tanio</span></span>} />
         <Row className="compact" label="Krzywa dziś" value={signed(rate) + '%/dzień' + (slowed ? ` (pełna ${signed(rateCurve)}%, LTPI −)` : '')} />
-        <Row className="compact" label="Bezpiecznik LTPI" value={<span className={safetyOn ? 'red' : 'dim'}>{!cfg.safety ? 'wyłączony' : safetyOn ? 'aktywny — sprzedaż' : ltpiValue > 0 ? 'nieaktywny · LTPI +' : `czuwa (ryzyko ≥ ${SAFETY.riskMin}% i LTPI < 0)`}</span>} />
+        <Row className="compact" label="Bezpiecznik LTPI (BTC)" value={<span className={safetyOn ? 'red' : 'dim'}>{!cfg.safety ? 'wyłączony' : safetyOn ? 'aktywny — sprzedaż' : ltpiValue > 0 ? 'nieaktywny · LTPI +' : `czuwa (ryzyko ≥ ${SAFETY.riskMin}% i LTPI < 0)`}</span>} />
         {athOn && <div className="note-text mt8" style={{ borderLeft: '3px solid var(--amber)', paddingLeft: 10 }}><b>Propozycja · nowy szczyt (ATH):</b> sprzedaj {cfg.btcHeld > 0 ? `${(cfg.btcHeld * athFrac).toFixed(6)} BTC` : `${(athFrac * 100).toFixed(2)}% BTC`} ({athK + 1}. sprzedaż w cyklu, ryzyko {riskToday.toFixed(1)}%). {ATH_BACKTEST}</div>}
         <Row className="compact" label="Cena BTC" value={usd(price)} />
         {pyrHist.length > 0 && Number.isFinite(pyrHist.at(-1)!.z) && <Row className="compact" label="Piramida analizy" value={<span style={{ color: pyrHist.at(-1)!.z >= 0.25 ? 'var(--green)' : pyrHist.at(-1)!.z <= -0.25 ? 'var(--red)' : 'var(--amber)' }}>{signed(pyrHist.at(-1)!.z)}σ <span className="dim">· P {Math.round(pyrHist.at(-1)!.p * 100)}% · pokrycie {Math.round(pyrHist.at(-1)!.coverage * 100)}%</span></span>} />}
@@ -223,7 +228,7 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
 
       </Fold>
       <Fold id="sdca.valuation" title="Wycena on-chain i narzędzia" hint="Arkusz z-score (część liczona automatycznie), tempo akumulacji, stożek wyników">
-      <ValuationCard auto={autoVal} onUse={(r) => upd({ manualRisk: r, enabled: { ...cfg.enabled, manual: true } })} />
+      <ValuationCard auto={autoVal} onUse={(r) => upd({ manualRisk: r, manualUpdated: Date.now(), enabled: { ...cfg.enabled, manual: true } })} />
       <AccumulationCalc cash={cfg.cash} />
 
       <div className="section-title">Poziomy pasm (na żywo)</div>
@@ -262,7 +267,7 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
               <div>{ind.name}</div>
               <div className="faint" style={{ fontSize: 12, marginTop: 2 }}>{ind.note}</div>
               {ind.id !== 'manual' && <div className="dim num" style={{ fontSize: 12.5, marginTop: 4 }}>Ryzyko {pct(model.risk[ind.id][last])} · z {signed(model.z[ind.id][last])}{ind.id === 'mvrv' && model.mvrvStaleFrom ? ` · MVRV z ${model.mvrvStaleFrom} (przeniesione)` : ''}</div>}
-              {ind.id === 'manual' && cfg.enabled.manual && <div className="flex mt8"><span className="dim" style={{ fontSize: 13 }}>Ryzyko</span><NumInput className="input" value={cfg.manualRisk} placeholder="np. 43.6" onChange={(v) => upd({ manualRisk: v == null ? null : Math.min(100, Math.max(0, v)) })} suffix="%" /></div>}
+              {ind.id === 'manual' && cfg.enabled.manual && <div className="flex mt8"><span className="dim" style={{ fontSize: 13 }}>Ryzyko</span><NumInput className="input" value={cfg.manualRisk} placeholder="np. 43.6" onChange={(v) => upd({ manualUpdated: Date.now(), manualRisk: v == null ? null : Math.min(100, Math.max(0, v)) })} suffix="%" /></div>}
             </div>
             <Switch checked={!!cfg.enabled[ind.id]} onChange={(v) => upd({ enabled: { ...cfg.enabled, [ind.id]: v } })} />
           </div>

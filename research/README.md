@@ -186,3 +186,8 @@ Aplikacja liczy wycenę SDCA tak jak research: szyny kwantylowe przeliczane co r
 percentyl MVRV po odtrendowaniu tylko z danych sprzed roku, percentyl Sharpe z przeszłych dni. Kontrola (wbudowane dane, od 2020):
 SDCA z bezpiecznikiem, LTPI z $TOTAL próg 0, zakupy × 0,25 — CAGR 42,2%, Sharpe 2024→ 0,89, DD −32,9% (research run44: 41,4%, 0,89).
 $TOTAL nie jest aktywem w backteście — służy tylko jako wejście TPI (kierunek i trend rynku).
+
+## Źródło LTPI osobno dla SDCA i RSPS (run45.py)
+Portfel 60/40, 2020→, próg 0 / ±0,2: oba z BTC — OOS 1,06 / 1,09, CAGR 51,1 / 53,9%; oba z $TOTAL — 0,88 / 0,92, 48,8 / 49,7%;
+SDCA z BTC + RSPS z $TOTAL (wdrożone w 2.14.0) — 0,94 / 1,01, CAGR 50,4 / 51,6%, DD −26,1 / −23,9%. Sam SDCA: LTPI z BTC OOS 0,98–1,00 vs 0,87–0,89.
+Weto RSPS z LTPI na BTC dawało RSPS OOS 0,88–0,89 vs 0,61–0,69 z $TOTAL — zakładka LTPI·MTPI i RSPS zostają na $TOTAL zgodnie z notatkami.

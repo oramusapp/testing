@@ -7,9 +7,9 @@ import { annVol, capWeights, ratios, linfit } from './quant';
 import { leverageGate } from './pyramid';
 import { usePyramid } from './pyramidStore';
 import { rsScore } from './backtestAll';
-import { SDCA_DEFAULTS, type LtpiState, type SdcaSettings } from '../tabs/Sdca';
+import { SDCA_DEFAULTS, manualLtpiActive, type LtpiState, type SdcaSettings } from '../tabs/Sdca';
 import { useBtc } from './btcStore';
-import { composite } from './sdcaModel';
+import { composite, freshManual } from './sdcaModel';
 
 // Large-cap, non-meme candidates (Binance <SYMBOL>USDT). The scanner keeps the 10 most liquid.
 export const DEFAULT_TOKENS = ['ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'TRX', 'LINK', 'AVAX', 'DOT', 'LTC', 'BCH', 'XLM', 'ATOM', 'NEAR', 'UNI', 'AAVE', 'ETC', 'ICP',
@@ -47,7 +47,7 @@ export function useRsps() {
   const sdcaRisk = useMemo(() => {
     if (!btcModel) return NaN;
     const c = { ...SDCA_DEFAULTS, ...sdcaCfg };
-    return composite(btcModel, c.enabled, c.manualRisk).risk.at(-1) ?? NaN;
+    return composite(btcModel, c.enabled, freshManual(c)).risk.at(-1) ?? NaN;
   }, [btcModel, sdcaCfg]);
   const [parking, setParking] = usePersisted<{ choice: Parking; ack?: string }>('rsps.parking', { choice: 'hybrid' });
   const [s0, setS] = usePersisted<RspsSettings>('rsps.settings', RSPS_DEF);
@@ -59,7 +59,7 @@ export function useRsps() {
   const [busy, setBusy] = useState(false);
   const a = pyr.auto;
 
-  const ltpi = ltpiManual.mode === 'manual' ? ltpiManual.manual : a?.ltpi ?? 0;
+  const ltpi = manualLtpiActive(ltpiManual) ? ltpiManual.manual : a?.ltpi ?? 0;
   const scanFresh = !!scan && scan.closeDate >= lastClosedDay();
   const breadth = scan?.breadth ?? NaN;
   // BTC sizing: 4-average trend (backtested default) or, if chosen, the 10-signal MTPI mapped to 0…1

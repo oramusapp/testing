@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Screen, Card, Seg, toast } from '../components/ui';
 import { Chart } from '../components/Chart';
 import { useBtc } from '../lib/btcStore';
 import { usePersisted } from '../lib/db';
-import { composite } from '../lib/sdcaModel';
+import { composite, freshManual } from '../lib/sdcaModel';
 import { athSellSeries, backtest } from '../lib/quant';
 import { computeTpi, ltpiStateSeries, MTPI_SPEC } from '../lib/tpi';
 import { PERIODS, buyHold, combine, equity, loadCoins, perf, rspsRun, sdcaRun, tpiRun, type Run } from '../lib/backtestAll';
@@ -34,20 +34,21 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
 
   const base = useMemo(() => {
     if (!model) return null;
-    const comp = composite(model, cfg.enabled, cfg.manualRisk);
+    const comp = composite(model, cfg.enabled, freshManual(cfg));
     const tp = tpiPrices ?? model.prices;
-    const ltpi = ltpiStateSeries(tp, tpiCfg.ltpiSource, tpiCfg.hyst ?? 0);
+    const ltpi = ltpiStateSeries(tp, tpiCfg.ltpiSource, tpiCfg.hyst ?? 0);          // $TOTAL: tab + RSPS veto
+    const ltpiBtc = ltpiStateSeries(model.prices, tpiCfg.ltpiSource, tpiCfg.hyst ?? 0);   // BTC: SDCA
     const mtpi = computeTpi(tp, MTPI_SPEC, tp.length, tpiCfg.hyst ?? 0).stateSeries;
-    return { comp, ltpi, mtpi, tp };
+    return { comp, ltpi, ltpiBtc, mtpi, tp };
   }, [model, tpiPrices, cfg.enabled, cfg.manualRisk, tpiCfg.ltpiSource, tpiCfg.hyst]);
 
   const s0 = model ? Math.max(0, model.dates.findIndex((d) => d >= effStart)) : 0;
   const runs = useMemo(() => {
     if (!model || !base) return null;
-    const { comp, ltpi, mtpi } = base;
+    const { comp, ltpi, ltpiBtc, mtpi } = base;
     const ath = cfg.athSell ? athSellSeries(model.prices, comp.risk).frac : undefined;
-    const slow = (cfg.slowBuy ?? 1) < 1 ? { ltpi, mult: cfg.slowBuy! } : undefined;
-    const bt = backtest(model.prices, comp.risk, cfg.curve, s0, 10000, cfg.safety ? ltpi : undefined, ath, slow);
+    const slow = (cfg.slowBuy ?? 1) < 1 ? { ltpi: ltpiBtc, mult: cfg.slowBuy! } : undefined;
+    const bt = backtest(model.prices, comp.risk, cfg.curve, s0, 10000, cfg.safety ? ltpiBtc : undefined, ath, slow);
     return {
       sdca: sdcaRun(model.dates, s0, bt.equity, bt.btcShare),
       ltpi: tpiRun(model.dates, model.prices, ltpi, s0),
@@ -87,6 +88,8 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
   }, [runs, rspsRunRes, mode]);
 
   const needRsps = (mode === 'all' || mode === 'rsps') && !rspsRunRes;
+  // recompute automatically after every daily close (new candle → new key) or settings change
+  useEffect(() => { if (needRsps && model && base && !busy) void runRsps(); }, [rspsKey, mode, !!base]); // eslint-disable-line react-hooks/exhaustive-deps
   const labels = view ? view.main[0].run.dates : [];
   const btcPrices = model ? new Map(model.dates.map((d, i) => [d, model.prices[i]])) : new Map<string, number>();
   const bh: Run | null = labels.length ? buyHold(labels, labels.map((d) => btcPrices.get(d)!)) : null;
@@ -100,7 +103,7 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
       {!model && <Card><div className="dim">Ładowanie danych BTC…</div></Card>}
       {model && needRsps && (
         <Card className="mt12">
-          <div className="note-text">Backtest RSPS pobiera dzienne świece listy kandydatów z Binance od 2019 r. (kilkadziesiąt zapytań). Wynik zostaje zapisany do następnej świecy lub zmiany ustawień.</div>
+          <div className="note-text">Backtest RSPS pobiera dzienne świece listy kandydatów z Binance od 2019 r. (kilkadziesiąt zapytań) i przelicza się sam po każdym zamknięciu świecy (00:00 UTC) lub zmianie ustawień.</div>
           <button className="btn primary block mt12" disabled={!!busy} onClick={() => void runRsps()}>{busy ?? 'Pobierz dane i policz RSPS'}</button>
         </Card>
       )}
@@ -125,7 +128,7 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
         </>
       )}
       <div className="note-text mt12">
-        Bez patrzenia w przyszłość: każdy dzień używa tylko danych do zamknięcia swojej świecy (00:00 UTC) — model wyceny przeliczany co rok na danych sprzed 1 stycznia, percentyle tylko z przeszłości, TPI z wcześniejszych zamknięć; decyzja na zamknięciu, transakcja następnego dnia. Zasady jak w sygnałach: decyzja na zamknięciu dnia, transakcja następnego dnia, koszt 0,15% za stronę. SDCA: krzywa, bezpiecznik LTPI, tempo zakupów przy LTPI− i (jeśli włączona) sprzedaż przy ATH — od 100% stablecoinów w dniu startu.
+        Bez patrzenia w przyszłość: każdy dzień używa tylko danych do zamknięcia swojej świecy (00:00 UTC) — model wyceny przeliczany co rok na danych sprzed 1 stycznia, percentyle tylko z przeszłości, TPI z wcześniejszych zamknięć; decyzja na zamknięciu, transakcja następnego dnia. Zasady jak w sygnałach: decyzja na zamknięciu dnia, transakcja następnego dnia, koszt 0,15% za stronę. SDCA: krzywa, bezpiecznik LTPI (liczone z BTC), tempo zakupów przy LTPI− i (jeśli włączona) sprzedaż przy ATH — od 100% stablecoinów w dniu startu.
         LTPI · MTPI: BTC, gdy stan TPI jest dodatni, w przeciwnym razie stablecoin. Kupowany jest BTC; $TOTAL (cały rynek) służy wyłącznie do odczytu kierunku i trendu (TPI), jak w notatkach — nie jest aktywem do kupienia. Próg stanu wg ustawień (domyślnie 0).
         RSPS: codzienna rotacja siły względnej wśród {rs.universeSize - 1} najpłynniejszych altów (plus BTC), bramka szerokości 70%/60%, LTPI− → stablecoin, parking: {parking.choice === 'stable' ? 'stablecoin' : parking.choice === 'btc' ? 'BTC × trend' : `hybryda (ryzyko < ${HYBRID_RISK_MAX}%)`}.
         Używa dzisiejszej listy kandydatów, więc tokeny, które zniknęły z rynku, są pominięte — wynik RSPS jest optymistyczny (błąd przeżywalności).

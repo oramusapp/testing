@@ -3,7 +3,7 @@
 // No look-ahead: every day's value uses only data available at that day's close. The quantile rails are refitted
 // each year on data before 1 January (research/sdca.py price_risk_expanding); percentiles use only past values.
 import { fitCurvature, priceRisk, rails, detrendedRiskExpanding, rollingSharpe, ema, percentileRankExpanding, normInv, TAUS, type CurvatureModel } from './quant';
-import type { Row } from './market';
+import { freshToday, type Row } from './market';
 
 export const INDICATORS = [
   { id: 'price', name: 'Asymmetric Tail Curvature (cena)', note: 'Regresja kwantylowa log-ceny względem log-czasu, osobna krzywizna dla każdego kwantyla.' },
@@ -57,6 +57,9 @@ export function buildModel(rows: Row[]): SdcaModel {
     z: { price: pr.map((x) => x.z), mvrv: mvr.z, sharpe: shRisk.map((r) => (Number.isFinite(r) ? -normInv(Math.min(Math.max(r, 0.001), 0.999)) : NaN)) }
   };
 }
+
+/** Manual risk indicator, only if entered after the latest daily close (it resets at every 00:00 UTC close). */
+export const freshManual = (c: { manualRisk: number | null; manualUpdated?: number }) => (freshToday(c.manualUpdated) ? c.manualRisk : null);
 
 /** Equal-weight composite of enabled indicators (manual indicator applies to the latest day only). */
 export function composite(model: SdcaModel, enabled: Record<string, boolean>, manualRisk: number | null) {
