@@ -1,5 +1,13 @@
 export const CHANGELOG = [
   {
+    v: '2.4.0', date: '2026-10-05',
+    items: [
+      'Piramida · Makro: rentowność US10Y względem kanału regresji',
+      'Piramida · Sentyment (ręczna korekta): F&G, Google Trends, Lunacy (DIX, GEX + CNN F&G) z opisem plus/minus',
+      'Statystyka: pasma ±1σ/±2σ wokół regresji i wykres z-score w czasie z liniami ±1/±2/±3σ'
+    ]
+  },
+  {
     v: '2.3.0', date: '2026-10-05',
     items: [
       'Statystyka: korelacja rangowa Spearmana, wykrywanie punktów odstających i r bez nich',

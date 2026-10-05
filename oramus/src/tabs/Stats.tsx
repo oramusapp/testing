@@ -72,6 +72,7 @@ export default function Stats({ nav }: { nav?: React.ReactNode }) {
         <div className="row compact"><span>Szansa na wartość w przedziale</span><span className="num" style={{ fontWeight: 600 }}>{num(pAB * 100, 2)}%</span></div>
         <div className="note-text mt8">Reguła 68–95–99,7: w rozkładzie normalnym 68% danych mieści się w ±1σ od średniej, 95% w ±2σ, 99,7% w ±3σ. z między −1 a +1 to wartość typowa. Model normalny pasuje tylko do danych jednomodalnych i symetrycznych; ceny trendujące (niestacjonarne) najpierw trzeba przekształcić.</div>
       </Card>
+      {byData && n >= 5 && <ZTime xs={xs} mu={mu} sigma={sigma} />}
       {byData && n >= 5 && <QQ xs={xs} mu={mu} sigma={sigma} />}
       {n > 0 && n <= 40 && (
         <Card className="tight">
@@ -101,8 +102,10 @@ function Corr({ x, y, set }: { x: string; y: string; set: (x: string, y: string)
   const out = res.map((v) => Math.abs(v) > 2.5 * rsd);
   const keep = xs.slice(0, n).map((v, i) => [v, ys[i]] as const).filter((_, i) => !out[i]);
   const f2 = out.some(Boolean) ? linfit(keep.map((k) => k[0]), keep.map((k) => k[1])) : null;
-  const W = 320, H = 200, L = 40, R = 10, T = 10, B = 24;
-  const [x0, x1] = [Math.min(...xs.slice(0, n)), Math.max(...xs.slice(0, n))], [y0, y1] = [Math.min(...ys.slice(0, n)), Math.max(...ys.slice(0, n))];
+  const W = 330, H = 200, L = 56, R = 10, T = 10, B = 24;
+  const [x0, x1] = [Math.min(...xs.slice(0, n)), Math.max(...xs.slice(0, n))];
+  const band = Number.isFinite(rsd) ? 2 * rsd : 0;
+  const [y0, y1] = [Math.min(...ys.slice(0, n), f.a + f.b * x0 - band, f.a + f.b * x1 - band), Math.max(...ys.slice(0, n), f.a + f.b * x0 + band, f.a + f.b * x1 + band)];
   const sx = (v: number) => L + ((v - x0) / (x1 - x0 || 1)) * (W - L - R), sy = (v: number) => H - B - ((v - y0) / (y1 - y0 || 1)) * (H - T - B);
   return (
     <>
@@ -118,16 +121,18 @@ function Corr({ x, y, set }: { x: string; y: string; set: (x: string, y: string)
           <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label="Wykres punktowy">
             <line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="var(--faint)" /><line x1={L} x2={L} y1={T} y2={H - B} stroke="var(--faint)" />
             {xs.slice(0, n).map((v, i) => <circle key={i} cx={sx(v)} cy={sy(ys[i])} r={out[i] ? 5 : 3.5} fill={out[i] ? 'none' : 'var(--text)'} stroke={out[i] ? 'var(--red)' : 'none'} strokeWidth={2} opacity={0.85} />)}
+            {Number.isFinite(f.b) && [-2, -1, 1, 2].map((k) => <line key={k} x1={sx(x0)} y1={sy(f.a + f.b * x0 + k * rsd)} x2={sx(x1)} y2={sy(f.a + f.b * x1 + k * rsd)} stroke="var(--accent)" strokeWidth={1} strokeDasharray={Math.abs(k) === 2 ? '2 3' : '5 3'} opacity={0.7} />)}
             {Number.isFinite(f.b) && <line x1={sx(x0)} y1={sy(f.a + f.b * x0)} x2={sx(x1)} y2={sy(f.a + f.b * x1)} stroke="var(--accent)" strokeWidth={2} />}
             <text x={L} y={H - 6} fontSize={9} fill="var(--faint)">{num(x0)}</text><text x={W - R} y={H - 6} fontSize={9} fill="var(--faint)" textAnchor="end">{num(x1)}</text>
-            <text x={L - 4} y={H - B} fontSize={9} fill="var(--faint)" textAnchor="end">{num(y0)}</text><text x={L - 4} y={T + 8} fontSize={9} fill="var(--faint)" textAnchor="end">{num(y1)}</text>
+            <text x={L - 4} y={H - B} fontSize={8.5} fill="var(--faint)" textAnchor="end">{num(y0)}</text><text x={L - 4} y={T + 8} fontSize={8.5} fill="var(--faint)" textAnchor="end">{num(y1)}</text>
           </svg>
           <div className="row compact"><span>Korelacja r</span><span className="num" style={{ fontWeight: 600 }}>{num(f.r, 3)} · {strength(f.r)}</span></div>
           <div className="row compact"><span>Korelacja rangowa Spearmana ρ</span><span className="num">{num(rho, 3)}</span></div>
           {f2 && <div className="row compact"><span>r bez odstających ({out.filter(Boolean).length})</span><span className="num">{num(f2.r, 3)}</span></div>}
           <div className="row compact"><span>R² (siła wyjaśniania, 0–1)</span><span className="num">{num(f.r2, 3)}</span></div>
+          <div className="row compact"><span>Odchylenie reszt σ (szerokość pasm)</span><span className="num">{num(rsd)}</span></div>
           <div className="row compact"><span>Prosta regresji</span><span className="num">y = {num(f.a)} {f.b >= 0 ? '+' : '−'} {num(Math.abs(f.b), 4)}·x</span></div>
-          <div className="note-text mt8">Regresja wybiera prostą o najmniejszej sumie kwadratów odległości punktów od niej. r mierzy siłę i kierunek zależności liniowej (od −1 do +1), R² = r² mówi, jaką część zmienności y wyjaśnia x. Punkty odstające (czerwone kółka, reszta &gt; 2,5σ) mocno zmieniają r; sprawdź, czy to błąd danych, czy szczególna sytuacja, zanim je pominiesz. r mierzy tylko zależność liniową: krzywa lub fala może mieć r = 0 mimo silnego związku, a duże r nie gwarantuje, że prosta pasuje. Spearman ρ porównuje rangi, więc wychwytuje zależności rosnące lub malejące także nieliniowe i jest mniej czuły na odstające. Korelacja nie oznacza przyczynowości.</div>
+          <div className="note-text mt8">Regresja wybiera prostą o najmniejszej sumie kwadratów odległości punktów od niej. Przerywane linie to ±1σ i ±2σ reszt: przy normalnych resztach ok. 68% i 95% punktów leży w tych pasmach (warunkowy rozkład y przy danym x), co daje probabilistyczne strefy wykupienia i wyprzedania. Lepiej używać tego do oceny bieżącej (koincydentnej) niż do prognozy poza zakresem danych. r mierzy siłę i kierunek zależności liniowej (od −1 do +1), R² = r² mówi, jaką część zmienności y wyjaśnia x. Punkty odstające (czerwone kółka, reszta &gt; 2,5σ) mocno zmieniają r; sprawdź, czy to błąd danych, czy szczególna sytuacja, zanim je pominiesz. r mierzy tylko zależność liniową: krzywa lub fala może mieć r = 0 mimo silnego związku, a duże r nie gwarantuje, że prosta pasuje. Spearman ρ porównuje rangi, więc wychwytuje zależności rosnące lub malejące także nieliniowe i jest mniej czuły na odstające. Korelacja nie oznacza przyczynowości.</div>
         </Card>
       )}
     </>
@@ -180,6 +185,25 @@ function QQ({ xs, mu, sigma }: { xs: number[]; mu: number; sigma: number }) {
         <text x={10} y={H / 2} fontSize={9} textAnchor="middle" fill="var(--faint)" transform={`rotate(-90 10 ${H / 2})`}>dane</text>
       </svg>
       <div className="note-text">Punkty blisko linii: dane mniej więcej normalne, więc z-score i procenty z tablicy są wiarygodne. Końce uciekające od linii oznaczają grube ogony (częstsze skrajne wartości niż w rozkładzie normalnym, typowe dla zwrotów krypto) albo skośność.</div>
+    </Card>
+  );
+}
+
+/** Series in the order entered (time), standardised to z with ±1/±2/±3σ lines, as on the lesson's z-score oscillator. */
+function ZTime({ xs, mu, sigma }: { xs: number[]; mu: number; sigma: number }) {
+  const z = xs.map((v) => (v - mu) / sigma), n = z.length;
+  const lim = Math.max(3.2, ...z.map(Math.abs));
+  const W = 320, H = 180, L = 26, R = 8, T = 8, B = 8;
+  const sx = (i: number) => L + (i / Math.max(n - 1, 1)) * (W - L - R), sy = (v: number) => T + ((lim - v) / (2 * lim)) * (H - T - B);
+  const lines: [number, string][] = [[0, 'var(--faint)'], [1, 'var(--red)'], [-1, 'var(--red)'], [2, 'var(--green)'], [-2, 'var(--green)'], [3, 'var(--amber)'], [-3, 'var(--amber)']];
+  return (
+    <Card>
+      <div className="eyebrow" style={{ margin: 0 }}>Z-score w czasie (kolejność wpisania)</div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block', marginTop: 8 }} role="img" aria-label="Z-score w czasie">
+        {lines.map(([v, c]) => <g key={v}><line x1={L} x2={W - R} y1={sy(v)} y2={sy(v)} stroke={c} strokeWidth={v === 0 ? 1.2 : 1} opacity={0.7} /><text x={L - 4} y={sy(v) + 3} fontSize={9} textAnchor="end" fill="var(--faint)">{v > 0 ? '+' + v : v}</text></g>)}
+        <path d={z.map((v, i) => `${i ? 'L' : 'M'}${sx(i).toFixed(1)} ${sy(v).toFixed(1)}`).join('')} fill="none" stroke="var(--text)" strokeWidth={1.4} />
+      </svg>
+      <div className="note-text">Odczyty poza ±2σ zdarzają się w rozkładzie normalnym w ok. 4,6% przypadków, poza ±3σ w 0,3%. Jeśli widzisz je dużo częściej, rozkład ma grube ogony albo zmienność się zmieniła (wtedy liczy się z-score w oknie kroczącym).</div>
     </Card>
   );
 }
