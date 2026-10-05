@@ -1,4 +1,5 @@
 export const CHANGELOG = [
+  { v: '2.7.2', date: '2026-10-05', items: ['Piramida · sentyment: Smart Money / Dumb Money (SentimenTrader) lub sentix', 'Badanie: Stochastic i CCI — jako trend lepsze niż jako powrót do średniej, ale nie poprawiają MTPI'] },
   { v: '2.7.1', date: '2026-10-05', items: ['Piramida · analiza techniczna: wynik testu formacji świecowych i struktury rynku na BTC (bez przewagi)'] },
   { v: '2.7.0', date: '2026-10-05', items: ['SDCA: probabilistyczny zakres wyników na 30/90 dni (stożek) według dzisiejszej strefy wyceny i stanu LTPI, z porównaniem do wszystkich dni'] },
   { v: '2.6.0', date: '2026-10-05', items: ['Statystyka: histogram ze średnią, medianą, dominantą i skośnością; dekompozycja szeregu (trend, sezonowość, losowe)', 'LTPI · MTPI: sezonowość BTC według miesięcy (informacyjnie; backtest nie potwierdził stabilnej sezonowości)'] },

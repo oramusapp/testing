@@ -106,3 +106,8 @@ W aplikacji: stożek prawdopodobieństwa w SDCA.
 BTCUSDT 1D OHLC 2018→: żadna formacja świecowa (objęcie hossy/bessy, młot, spadająca gwiazda, doji, trzech żołnierzy,
 trzy wrony) nie daje istotnie innego zwrotu 5/20-dniowego niż wszystkie dni (|t| < 1,4; formacje „niedźwiedzie” 50–57% dni na plusie).
 Struktura HH/HL (pivot ±3/5/10/20) jako filtr long: Sharpe OOS 0,09–0,62 vs 0,89 (4 średnie) i 0,78 (B&H). Zgodne z lekcją: nie wdrażamy.
+
+## Oscylatory: Stochastic i CCI, trend vs powrót do średniej (run33.py)
+BTCUSDT 1D: jako trend (powyżej środka = long) Sharpe IS/OOS 0,86–1,48 / 0,68–0,96; jako powrót do średniej (kup przy
+wyprzedaniu, sprzedaj przy wykupieniu) 0,20–0,30 / 0,32–0,70 — zgodne z lekcją (TPI = trend, nie mean reversion).
+Dodanie Stochastic 14 i CCI 20 do MTPI (12 głosów): IS 1,26 → 1,10, OOS 1,02 → 0,90 → nie dodane.
