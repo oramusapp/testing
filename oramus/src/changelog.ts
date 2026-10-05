@@ -1,4 +1,5 @@
 export const CHANGELOG = [
+  { v: '2.9.0', date: '2026-10-05', items: ['SDCA: opcjonalna sprzedaż w dni nowego szczytu (ATH) przy ryzyku ≥ 70%, harmonogram ×1,1 z lekcji o tempie dystrybucji; zlecenie także w Portfelu', 'Badania: składniki on-chain (NUPL, MVRV Z, Puell, 2Y MA, Pi Cycle, hash ribbon) nie poprawiają wyceny; rotacja bety w RSPS pogarsza wynik'] },
   { v: '2.8.1', date: '2026-10-05', items: ['Źródła wskaźników rozłożone na więcej stron: najwyżej 2–3 wskaźniki na jedną stronę (Glassnode, Blockchain.com, Yahoo Finance, CoinMarketCap, CoinGecko obok dotychczasowych)'] },
   { v: '2.8.0', date: '2026-10-05', items: ['RSPS: badanie zdarzeń (F&G poniżej/powyżej progu, duży spadek dzienny, skok zmienności, nowy szczyt, przebicie SMA 200) — zwroty po 1 tyg.–3 mies., % dodatnich i z-score, bez nakładających się sygnałów'] },
   { v: '2.7.2', date: '2026-10-05', items: ['Piramida · sentyment: Smart Money / Dumb Money (SentimenTrader) lub sentix', 'Badanie: Stochastic i CCI — jako trend lepsze niż jako powrót do średniej, ale nie poprawiają MTPI'] },

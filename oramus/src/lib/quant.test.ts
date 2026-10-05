@@ -113,3 +113,21 @@ describe('polyfit', () => {
     expect(f.r2).toBeCloseTo(1, 6); expect(f.f(4)).toBeCloseTo(1 + 8 + 8, 6);
   });
 });
+
+import { athSellSeries } from './quant';
+
+describe('athSellSeries', () => {
+  it('sells growing fractions on ATH days with high risk and resets after a 50% drawdown', () => {
+    const prices = [100, 110, 105, 120, 130, 60, 140, 150];
+    const risk = [80, 80, 80, 80, 40, 80, 80, 80];
+    const { frac, k } = athSellSeries(prices, risk);
+    expect(frac[0]).toBe(0);                          // first day: no prior high
+    expect(frac[1]).toBeCloseTo(0.01);                // 1st sale
+    expect(frac[2]).toBe(0);                          // not an ATH
+    expect(frac[3]).toBeCloseTo(0.011);               // 2nd sale ×1.1
+    expect(frac[4]).toBe(0);                          // ATH but risk < 70
+    expect(k[5]).toBe(0);                             // 60 < 130 × 0.5 → reset
+    expect(frac[6]).toBeCloseTo(0.01);
+    expect(frac[7]).toBeCloseTo(0.011);
+  });
+});

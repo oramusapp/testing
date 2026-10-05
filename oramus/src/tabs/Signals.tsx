@@ -7,7 +7,7 @@ import { stats, monthlyReport, monthOf, type Snapshot, type Flow, type MonthlyRe
 import { shareFile } from '../components/ui';
 import { useBtc } from '../lib/btcStore';
 import { composite } from '../lib/sdcaModel';
-import { backtest, curveRate, safetyStep } from '../lib/quant';
+import { athSellSeries, backtest, curveRate, safetyStep } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
 import { useRsps, SPLIT_SDCA } from '../lib/useRsps';
 import { LEV_MAX } from '../lib/pyramid';
@@ -49,10 +49,11 @@ export default function Signals() {
     const comp = composite(model, cfg.enabled, cfg.manualRisk);
     const last = model.dates.length - 1;
     const start = Math.max(0, model.dates.findIndex((d) => d >= cfg.startDate));
-    const bt = backtest(model.prices, comp.risk, cfg.curve, start, 10000, ltpiSeries);
+    const ath = cfg.athSell ? athSellSeries(model.prices, comp.risk) : null;
+    const bt = backtest(model.prices, comp.risk, cfg.curve, start, 10000, ltpiSeries, ath?.frac);
     const price = model.prices[last];
-    return { price, risk: comp.risk[last], rate: curveRate(cfg.curve, comp.risk[last]) / 100, modelBtcShare: (bt.btc * price) / bt.value, date: model.dates[last] };
-  }, [model, cfg.enabled, cfg.manualRisk, cfg.curve, cfg.startDate, ltpiSeries]);
+    return { price, risk: comp.risk[last], rate: curveRate(cfg.curve, comp.risk[last]) / 100, modelBtcShare: (bt.btc * price) / bt.value, date: model.dates[last], athFrac: ath?.frac[last] ?? 0, athK: ath?.k[last] ?? 0 };
+  }, [model, cfg.enabled, cfg.manualRisk, cfg.curve, cfg.startDate, ltpiSeries, cfg.athSell]);
 
   const prices: Record<string, number> = { ...R.prices, [STABLE]: 1 };
   if (sdcaState) prices.BTC = sdcaState.price;
@@ -100,6 +101,10 @@ export default function Signals() {
       else if (st.kind === 'rebuy' && st.usd >= MIN_TRADE_USD)
         orders.push({ id: 'sdca-rebuy', sleeve: 'SDCA', side: 'buy', sym: 'BTC', usd: st.usd, units: st.usd / sdcaState.price, why: `odkup po bezpieczniku: LTPI dodatnie, zostało ${usd(owed, 0)} do odkupienia` });
     }
+    if (sdcaState.athFrac > 0 && H.sdca.BTC > 0) {
+      const units = H.sdca.BTC * sdcaState.athFrac;
+      if (units * sdcaState.price >= MIN_TRADE_USD) orders.push({ id: 'sdca-ath', sleeve: 'SDCA', side: 'sell', sym: 'BTC', usd: units * sdcaState.price, units, why: `nowy szczyt (ATH) przy ryzyku ${sdcaState.risk.toFixed(1)}% → ${(sdcaState.athFrac * 100).toFixed(2)}% BTC (${sdcaState.athK + 1}. w cyklu)` });
+    }
     if (R.scanFresh && rspsVal > 0) {
       const want: Record<string, number> = {};
       target.forEach((t) => (want[t.sym] = t.w * rspsVal));
@@ -145,7 +150,7 @@ export default function Signals() {
     let nOwed = owed;
     if (o.id === 'sdca-safety') nOwed += o.usd;
     else if (o.id === 'sdca-rebuy' || (o.sleeve === 'SDCA' && o.side === 'buy')) nOwed = Math.max(0, nOwed - o.usd);
-    else if (o.id === 'sdca' && o.side === 'sell') nOwed *= H.sdca.BTC > 0 ? Math.max(0, 1 - o.units / H.sdca.BTC) : 0;
+    else if ((o.id === 'sdca' || o.id === 'sdca-ath') && o.side === 'sell') nOwed *= H.sdca.BTC > 0 ? Math.max(0, 1 - o.units / H.sdca.BTC) : 0;
     if (nOwed < MIN_TRADE_USD) nOwed = 0;
     setPf({ holdings: h, safetyOwed: nOwed, history: [{ time: Date.now(), text: `${o.sleeve}: ${o.side === 'buy' ? 'kupno' : o.side === 'sell' ? 'sprzedaż' : 'przeniesienie'} ${o.sym} ${usd(o.usd, 0)}` }, ...pf.history].slice(0, 200) });
     if (!short) toast('Zapisano wykonanie');

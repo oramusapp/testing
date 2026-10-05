@@ -276,8 +276,33 @@ export function safetyStep(riskPct: number, ltpi: number, btcUsd: number, cashUs
   return { kind: null, usd: 0 };
 }
 
-/** ltpiState: optional LTPI state per day (aligned with prices) — enables the SDCA safety. */
-export function backtest(prices: Series, riskPct: Series, curve: number[], startIndex: number, capital: number, ltpiState?: Series): BacktestResult {
+// ---------- SDCA sales on all-time-high days (research/run36.py, run37.py) ----------
+// Masterclass, rate of distribution: "perhaps combining ATH days/weeks with valuation would be an optimal
+// strategy". On every new all-time-high close while valuation risk ≥ 70%, the SDCA sleeve sells
+// unit × growth^k of its BTC, where k = ATH sales already made this cycle (slide schedule "×1.1").
+// The counter resets once price is 50% below its ATH. Proceeds stay in stablecoin for the curve to reinvest.
+export const ATH_SELL = { unit: 0.01, growth: 1.1, riskMin: 70, reset: 0.5 };
+
+/** Fraction of BTC to sell on each day (0 on non-ATH days) and the per-cycle sale counter. */
+export function athSellSeries(prices: Series, riskPct: Series): { frac: number[]; k: number[] } {
+  const frac: number[] = [], ks: number[] = [];
+  let ath = 0, k = 0;
+  for (let i = 0; i < prices.length; i++) {
+    const p = prices[i];
+    if (ath > 0 && p < ath * (1 - ATH_SELL.reset)) k = 0;
+    const isAth = ath > 0 && p > ath;
+    ath = Math.max(ath, p);
+    ks.push(k);
+    if (isAth && Number.isFinite(riskPct[i]) && riskPct[i] >= ATH_SELL.riskMin) {
+      frac.push(Math.min(1, ATH_SELL.unit * ATH_SELL.growth ** k)); k++;
+    } else frac.push(0);
+  }
+  return { frac, k: ks };
+}
+
+/** ltpiState: optional LTPI state per day (aligned with prices) — enables the SDCA safety.
+ *  athSell: optional per-day fraction of BTC to sell (athSellSeries().frac). */
+export function backtest(prices: Series, riskPct: Series, curve: number[], startIndex: number, capital: number, ltpiState?: Series, athSell?: number[]): BacktestResult {
   let cash = capital, btc = 0, spent = 0, bought = 0, buys = 0, sells = 0, holds = 0, owed = 0;
   let peak = 0, maxDD = 0, peakL = 0, maxDDL = 0, rateSum = 0, riskSum = 0, n = 0;
   const p0 = prices[startIndex];
@@ -300,6 +325,7 @@ export function backtest(prices: Series, riskPct: Series, curve: number[], start
       if (st.kind === 'sell' && st.usd > 0) { btc -= st.usd / p; cash += st.usd; owed += st.usd; act = Math.min(act, -SAFETY.sellRate); }
       else if (st.kind === 'rebuy' && st.usd > 0) { cash -= st.usd; btc += st.usd / p; owed -= st.usd; spent += st.usd; bought += st.usd / p; act = Math.max(act, 1e-4); }
     }
+    if (athSell && athSell[i] > 0 && btc > 0) { const q = btc * athSell[i]; btc -= q; cash += q * p; act = Math.min(act, -athSell[i]); }
     actions.push(act);
     rateSum += rate; if (Number.isFinite(r)) { riskSum += r; n++; }
     const eq = cash + btc * p;

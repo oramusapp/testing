@@ -116,3 +116,25 @@ Dodanie Stochastic 14 i CCI 20 do MTPI (12 głosów): IS 1,26 → 1,10, OOS 1,02
 BTC 2014→, sygnały co najmniej 30–90 dni od siebie, z vs wszystkie dni: skok zmienności 30 d > 2× mediana (n=6) z ≈ 0,4–0,7;
 spadek dzienny ≤ −10% (n=36) z ≈ 1,1–1,6; przebicia SMA 200 (n=21–25) |z| < 0,7; nowy ATH (n=14): 1 tydz. z = 3,6, dalej < 2.
 Zdarzenia F&G (< 12 / > 90) liczy aplikacja na historii F&G z telefonu (w sandboxie brak dostępu do alternative.me).
+
+## Składniki on-chain w wycenie SDCA (run35.py, lekcje o wycenie i alpha decay)
+Coin Metrics: NUPL, MVRV Z, Puell, hash ribbon; z ceny: mnożnik 2Y MA, Pi Cycle. Każdy jako percentyl względem historii
+sprzed roku (z detrendem log-czasu i bez). Spearman z przyszłym zwrotem 365 d, 2015–25: cena −0,32, MVRV (obecny, detrend) −0,12,
+NUPL surowy −0,27, MVRV Z surowy −0,25, Puell −0,24, 2Y MA surowy −0,29, Pi Cycle −0,15, hash ribbon −0,26.
+Korelacja z obecnym composite: NUPL/MVRV Z/2Y MA 0,93–0,94 (redundantne), Puell 0,71, Pi Cycle 0,78, hash ribbon 0,33.
+SDCA z bezpiecznikiem, OOS 2024→ Sharpe: obecny 0,98; + MVRV Z 1,01; + NUPL 0,95; + 2Y MA 0,94; + Puell 0,82 (DD −49%);
++ Pi Cycle 0,68; + hash ribbon 0,90; wszystkie 8: 0,77. Cena + NUPL surowy: FULL CAGR 57,6 → 62,3%, ale OOS DD −34,8 → −37,4%;
+cena + MVRV Z surowy: OOS 1,03, DD −28,7%, IS 1,65 → 1,66. Różnice małe względem szumu → bez zmian w modelu.
+Detrend w oknie rozszerzanym osłabia predykcję (2015–19 odwrotny znak) — zgodne z uwagą z lekcji, że NUPL powinien być odporny na alpha decay.
+
+## Sprzedaż w dni nowego ATH (run36.py, run37.py, lekcja „Rate of Distribution”)
+Na każdym nowym ATH przy ryzyku ≥ 70% sprzedaj u × g^k BTC (k = sprzedaże w cyklu, reset po −50% od ATH). Harmonogramy ze slajdu
+(nasza interpretacja, slajd podaje tylko nazwy): Linear+2, Expon, Incr1, Incr2, ×1,1. SDCA z bezpiecznikiem 2020→:
+obecna IS 1,65 / OOS 0,98, DD OOS −34,8%; wszystkie harmonogramy OOS 1,14–1,22, DD −28,7%, IS 1,50–1,63.
+Siatka u 0,5–1,5% × g 1,0–1,2: OOS 1,02–1,22, FULL Sharpe 1,39–1,48 (obecna 1,37). Wybrane ×1,1, u = 1% (środek plateau).
+Lata: 2021 +16,0% → +12,6%, 2025 +0,8% → +4,5%, 2026 +13,4% → +23,7%. Portfel 60/40 (parking BTC×trend): OOS Sharpe 1,04 → 1,18,
+DD −27,3% → −24,4%, FULL CAGR 72,8 → 73,7%. Tylko dwie hossy w próbie → w aplikacji jako opcja, domyślnie wyłączona.
+
+## Rotacja bety w RSPS (run38.py, notatki TPI: „increase beta” / „reduce beta”)
+Alty RSPS → BTC lub stablecoin, gdy ryzyko wyceny ≥ 60/70/80%: IS Sharpe 1,82 → 1,16–1,23, FULL CAGR 84 → 39–45%.
+Sezon altów 2021 wypadł przy wysokiej wycenie BTC, więc cięcie bety po wycenie usuwa główne źródło alfy. Nie wdrożone.
