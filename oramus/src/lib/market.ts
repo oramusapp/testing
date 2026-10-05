@@ -189,6 +189,45 @@ export async function refreshTotalHistory(h: TotalHistory): Promise<TotalHistory
   return out;
 }
 
+// ---------- $TOTAL from TradingView (CRYPTOCAP:TOTAL) ----------
+// TradingView has no public data API, so the official series comes from the user's own CSV export of the 1D chart
+// ("Export chart data", paid plans). After the last exported day the series is extended with the daily changes of the
+// built-in index until the next import (marked in the UI).
+export interface TvTotal { rows: [string, number][]; imported: number; file: string }
+export async function loadTvTotal(): Promise<TvTotal | null> { return (await get<TvTotal>('total.tv', cacheStore)) ?? null; }
+export async function saveTvTotal(t: TvTotal | null) { await set('total.tv', t, cacheStore); }
+/** Parses a TradingView CSV export: needs a time column (unix seconds or a date) and a close column; daily bars. */
+export function parseTvCsv(text: string): [string, number][] {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) throw new Error('pusty plik');
+  const head = lines[0].split(',').map((x) => x.trim().replace(/"/g, '').toLowerCase());
+  const ti = head.indexOf('time'), ci = head.indexOf('close');
+  if (ti < 0 || ci < 0) throw new Error('brak kolumn „time” i „close” — to nie jest eksport z TradingView');
+  const out = new Map<string, number>();
+  for (const l of lines.slice(1)) {
+    const c = l.split(','); const t = c[ti]?.replace(/"/g, '').trim(); const v = parseFloat(c[ci]);
+    if (!t || !(v > 0)) continue;
+    const d = /^\d+$/.test(t) ? new Date(+t * 1000) : new Date(t);
+    if (Number.isNaN(d.getTime())) continue;
+    out.set(d.toISOString().slice(0, 10), v);
+  }
+  const rows = [...out.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  if (rows.length < 300) throw new Error(`za mało świec dziennych (${rows.length}) — wyeksportuj wykres 1D z dłuższą historią`);
+  const gaps = rows.slice(1).filter((r, i) => Date.parse(r[0]) - Date.parse(rows[i][0]) > 3 * 86400000).length;
+  if (gaps > 5) throw new Error('to nie wygląda na interwał 1D (duże przerwy między świecami)');
+  return rows;
+}
+/** TradingView rows where they exist; before them and after them the built-in index, chain-linked to the TV level. */
+export function mergeTvTotal(own: TotalHistory | null, tv: TvTotal | null): TotalHistory | null {
+  if (!tv || !tv.rows.length) return own;
+  const om = new Map(own?.rows ?? []);
+  const first = tv.rows[0], last = tv.rows[tv.rows.length - 1];
+  const before = (own?.rows ?? []).filter(([d]) => d < first[0]);
+  const k0 = om.get(first[0]); const pre: [string, number][] = k0 ? before.map(([d, v]) => [d, v * (first[1] / k0)]) : [];
+  const k1 = om.get(last[0]); const post: [string, number][] = k1 ? (own?.rows ?? []).filter(([d]) => d > last[0]).map(([d, v]) => [d, v * (last[1] / k1)]) : [];
+  return { rows: [...pre, ...tv.rows, ...post], updated: own?.updated ?? 0, source: `TradingView CRYPTOCAP:TOTAL (import do ${last[0]})` + (post.length ? ` + własny indeks od ${post[0][0]}` : ''), approxFrom: post.length ? post[0][0] : undefined };
+}
+
 /** $TOTAL aligned to the BTC dates (carried forward; after its last day it follows BTC so the TPI is never blank). */
 export function alignTotal(dates: string[], btc: number[], t: TotalHistory | null): number[] {
   if (!t) return btc;

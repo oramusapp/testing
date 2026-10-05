@@ -8,6 +8,7 @@ import { useBtc } from '../lib/btcStore';
 import { varianceRatio } from '../lib/quant';
 import { SeasonalityCard } from '../components/Seasonality';
 import { Macro42Card } from '../components/Macro42';
+import { TvTotalCard } from '../components/TvTotal';
 
 /** LTPI / MTPI: trend-following signals (not valuation). */
 export default function Trend({ nav }: { nav?: React.ReactNode }) {
@@ -60,6 +61,7 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
       {a && <TpiCard title="MTPI · średnioterminowy (10 wskaźników)" res={a.mtpi}
         note={tpi.mtpiSizing === 'ensemble' ? 'Steruje skalowaniem BTC w części RSPS (MTPI przeliczony na 0…1).' : 'Informacyjnie: skalowanie BTC używa 4 średnich (wariant z backtestu).'} />}
       {!a && <Card><div className="dim">Ładowanie danych BTC…</div></Card>}
+      <TvTotalCard />
 
       <Fold id="trend.macro" title="Makro (42 Macro) i sezonowość" hint="Cotygodniowe odczyty 42 Macro → filar Makro; sezonowość BTC">
         <Macro42Card />
@@ -75,7 +77,7 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
           <Seg value={tpi.mtpiSizing} onChange={(v) => setTpi({ ...tpi, mtpiSizing: v })} options={[{ v: 'ma4', l: '4 średnie ★' }, { v: 'ensemble', l: 'MTPI' }]} /></div>
         <div className="row"><div className="grow"><div>Próg zmiany stanu</div><div className="faint" style={{ fontSize: 12 }}>Notatki: sprzedaż poniżej 0, kupno powyżej 0. Histereza ±0,2 ogranicza fałszywe zmiany</div></div>
           <Seg value={String(tpi.hyst ?? 0)} onChange={(v) => setTpi({ ...tpi, hyst: +v })} options={[{ v: '0', l: '0 · notatki' }, { v: '0.2', l: '±0,2' }]} /></div>
-        <div className="note-text" style={{ padding: '4px 16px 14px' }}>LTPI i MTPI liczone są z $TOTAL — indeksu kapitalizacji całego rynku (45 aktywów z Coin Metrics, w tym stablecoiny; ok. 90% prawdziwego $TOTAL), bo według notatek „TPI is built for $TOTAL”. Backtest od 2020 (research/run44.py): MTPI z $TOTAL lepszy niż z BTC (Sharpe 2024→ 0,91 vs 0,63 przy ±0,2); LTPI z $TOTAL w portfelu nieco słabszy (Sharpe 2024→ 0,88–0,92 vs 1,09, CAGR 49–50% vs 54%). ★ = wariant wybrany w backteście na BTC (research/run17–18.py).</div>
+        <div className="note-text" style={{ padding: '4px 16px 14px' }}>LTPI i MTPI liczone są z $TOTAL — z importu CRYPTOCAP:TOTAL z TradingView, jeśli go dodasz, inaczej z własnego indeksu kapitalizacji (45 aktywów z Coin Metrics, w tym stablecoiny; ok. 90% prawdziwego $TOTAL), bo według notatek „TPI is built for $TOTAL”. Backtest od 2020 (research/run44.py): MTPI z $TOTAL lepszy niż z BTC (Sharpe 2024→ 0,91 vs 0,63 przy ±0,2); LTPI z $TOTAL w portfelu nieco słabszy (Sharpe 2024→ 0,88–0,92 vs 1,09, CAGR 49–50% vs 54%). ★ = wariant wybrany w backteście na BTC (research/run17–18.py).</div>
       </Card>
 
       <div className="section-title">Jak czytać TPI</div>

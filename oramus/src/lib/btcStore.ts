@@ -1,17 +1,17 @@
 // Shared BTC history + SDCA model, loaded once and used by both SDCA and RSPS tabs.
 import { useEffect, useState } from 'react';
 import { get, set, createStore } from 'idb-keyval';
-import { loadBtcHistory, refreshBtcHistory, loadTotalHistory, refreshTotalHistory, alignTotal, lastClosedDay, msToNextUtcClose, type BtcHistory, type TotalHistory } from './market';
+import { loadBtcHistory, refreshBtcHistory, loadTotalHistory, refreshTotalHistory, alignTotal, loadTvTotal, saveTvTotal, mergeTvTotal, type TvTotal, lastClosedDay, msToNextUtcClose, type BtcHistory, type TotalHistory } from './market';
 import type { SdcaModel } from './sdcaModel';
 
 const cacheStore = createStore('oramus-model', 'model');
 /** tpiPrices: $TOTAL aligned to model.dates — the input of LTPI / MTPI (course notes: "The TPI is built for $TOTAL"). */
-interface State { history: BtcHistory | null; model: SdcaModel | null; total: TotalHistory | null; tpiPrices: number[] | null; status: string; busy: boolean; }
+interface State { tv?: TvTotal | null; history: BtcHistory | null; model: SdcaModel | null; total: TotalHistory | null; tpiPrices: number[] | null; status: string; busy: boolean; }
 let state: State = { history: null, model: null, total: null, tpiPrices: null, status: 'Ładowanie danych…', busy: true };
 const subs = new Set<(s: State) => void>();
 const emit = (patch: Partial<State>) => {
   state = { ...state, ...patch };
-  if ((patch.model || patch.total) && state.model) state = { ...state, tpiPrices: alignTotal(state.model.dates, state.model.prices, state.total) };
+  if ((patch.model || patch.total || 'tv' in patch) && state.model) state = { ...state, tpiPrices: alignTotal(state.model.dates, state.model.prices, mergeTvTotal(state.total, state.tv ?? null)) };
   subs.forEach((f) => f(state));
 };
 
@@ -39,8 +39,8 @@ let lastRefresh = 0;
 export async function startBtc() {
   if (started) return; started = true;
   try {
-    const [h, t] = await Promise.all([loadBtcHistory(), loadTotalHistory()]);
-    emit({ history: h, total: t });
+    const [h, t, tv] = await Promise.all([loadBtcHistory(), loadTotalHistory(), loadTvTotal()]);
+    emit({ history: h, total: t, tv });
     await compute(h);
     await refresh();
   } catch (e) { emit({ status: 'Błąd: ' + (e as Error).message, busy: false }); }
@@ -78,3 +78,8 @@ export function useBtc() {
   useEffect(() => { subs.add(setS); void startBtc(); return () => { subs.delete(setS); }; }, []);
   return s;
 }
+
+/** Imports (or clears, with null) the user's TradingView CRYPTOCAP:TOTAL export; the TPIs recompute at once. */
+export async function setTvTotal(tv: TvTotal | null) { await saveTvTotal(tv); emit({ tv }); }
+/** The $TOTAL series actually used by the TPIs (TradingView import merged with the built-in index). */
+export const effectiveTotal = (st: { total: TotalHistory | null; tv?: TvTotal | null }) => mergeTvTotal(st.total, st.tv ?? null);

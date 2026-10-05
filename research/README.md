@@ -299,3 +299,11 @@ Okna siły, wybór po IS (portfel IS / OOS / CAGR / DD): 30/60/90 — 1,86 / 1,3
 1,42 / 87,0 (lepsze w 2024→, ale tego nie można było wiedzieć). Silnik aplikacji (fixture, stare LTPI, bez PAXG): IS 1,91 vs 1,92 dla
 7/21/42 — różnica w granicach szumu. Wynik uczciwy 2.26 (portfel 2020→): CAGR 85,7%, DD −25,6%, IS 1,97, 2024→ Sharpe 1,32, CAGR 55,0%.
 Wyniki 2.23–2.25 w tym README są zawyżone (wybory z wglądem w 2024→ lub z wiedzą z przyszłości o liście coinów).
+
+## $TOTAL z TradingView (2.27.0)
+Użytkownik wymaga oficjalnego CRYPTOCAP:TOTAL z TradingView (suma kapitalizacji top 125 coinów). TradingView nie ma publicznego API
+danych, a historyczny wykres globalnej kapitalizacji w CoinGecko jest tylko w płatnym planie — dlatego aplikacja przyjmuje eksport
+CSV z wykresu 1D (TradingView: „Export chart data”, plany płatne od Essential). Seria TradingView zastępuje własny indeks tam, gdzie
+jest; przed nią i po ostatnim imporcie własny indeks jest przypięty do poziomu TradingView. Backtesty w tym README nadal używają
+własnego indeksu (45 aktywów Coin Metrics) — po otrzymaniu pliku CSV trzeba je powtórzyć. $TOTAL wpływa na: przechył podziału
+SDCA/RSPS (LTPI $TOTAL), MTPI i propozycję shortu, zakładkę LTPI·MTPI oraz benchmark w backteście; SDCA i RSPS używają LTPI z BTC.
