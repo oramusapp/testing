@@ -95,3 +95,9 @@ stopień 2 (obecny): błąd 0,259, portfel OOS Sharpe 1,04, DD −27,3% — najl
 Średnie dzienne log-zwroty wg miesiąca: korelacja 2013–19 vs 2020–26 = 0,19; Kruskal-Wallis p = 0,14 i 0,44 (brak różnic).
 Dni tygodnia: korelacja 0,31, p = 0,79 i 0,17. Filtr „miesiące dodatnie w 2013–19” od 2020: Sharpe 0,84 vs 0,92 (B&H).
 Tylko październik dodatni w obu okresach (t 2,4 i 3,0) — możliwy przypadek przy 12 testach. Nie wdrożone do sygnałów.
+
+## Probabilistyczny zakres wyników: wartość × trend (run30.py, run31.py)
+Zwrot BTC po 90 dniach (2014→, wycena bez look-ahead × LTPI z histerezą): tanio + LTPI+: P10 −9%, mediana +9%, 68% dodatnich;
+środek + LTPI+: mediana +25%, 78%; środek + LTPI−: mediana −14%, 31% (najgorzej); wszystkie dni: mediana +7%, 57%.
+Próg bezpiecznika SDCA (LTPI < 0 i ryzyko ≥ R, z odkupem): R = 30…60 obniżają DD, ale też CAGR i Sharpe; R = 70 najlepszy → bez zmian.
+W aplikacji: stożek prawdopodobieństwa w SDCA.

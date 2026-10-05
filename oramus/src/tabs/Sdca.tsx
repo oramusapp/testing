@@ -8,6 +8,7 @@ import { INDICATORS, composite, RAIL_TAUS } from '../lib/sdcaModel';
 import { BANDS, DEFAULT_CURVE, SAFETY, backtest, curveRate, riskZone, safetyStep } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
 import { ValuationCard, AccumulationCalc } from '../components/Valuation';
+import { ConeCard } from '../components/Cone';
 import { usd as usdFull, usdShort, pct, signed, fmtDate, uid } from '../lib/format';
 
 // whole dollars once amounts get large so stat tiles stay readable
@@ -135,6 +136,8 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
         <Row className="compact" label="Rezerwa gotówki" value={<NumInput className="inline-input" value={cfg.cash} onChange={(v) => upd({ cash: v ?? 0 })} suffix="$" />} />
         <Row className="compact" label="Posiadane BTC" value={<NumInput className="inline-input" value={cfg.btcHeld} onChange={(v) => upd({ btcHeld: v ?? 0 })} />} />
       </Card>
+
+      {ltpiSeries && <ConeCard dates={model.dates} prices={model.prices} risk={comp.risk} ltpi={ltpiSeries} />}
 
       {/* ---- charts ---- */}
       <Seg value={view} onChange={setView} options={[{ v: 'rainbow', l: 'EQM Rainbow' }, { v: 'risk', l: 'Composite Risk' }, { v: 'curve', l: 'Accum/Dist' }]} />
