@@ -6,6 +6,7 @@ import Settings from './Settings';
 import Strategy from './tabs/Strategy';
 import Signals from './tabs/Signals';
 import Other from './tabs/Other';
+import AthWatcher from './components/AthWatcher';
 import { save } from './lib/db';
 
 type Tab = 'strategy' | 'portfolio' | 'other';
@@ -49,6 +50,7 @@ export default function App({ updateReady, applyUpdate }: { updateReady: boolean
       {pane('strategy', <Strategy />)}
       {pane('portfolio', <Signals />)}
       {pane('other', <Other />)}
+      <AthWatcher />
       <button className="icon-btn" aria-label="Ustawienia" onClick={() => setSettings(true)}
         style={{ position: 'fixed', zIndex: 21, left: 16, top: 'calc(var(--safe-top) + 10px)' }}><IcGear width={19} /></button>
       <nav className="tabbar">

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { usePersisted } from '../lib/db';
 
 export function Screen({ title, subtitle, actions, children, flush, nav }: { title: string; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode; flush?: boolean; nav?: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -34,15 +35,33 @@ const CREDITS = [
 ];
 export function Footer() {
   const [big, setBig] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   return (
     <footer className="copyright">
-      <div className="credits">
+      <button className="credits-note" onClick={() => setOpen(!open)} aria-expanded={open}
+        style={{ background: 'none', border: 0, color: 'inherit', font: 'inherit', padding: 0, cursor: 'pointer' }}>
+        <u>Credits</u>: Prof. Adam · Crypto Investing Masterclass · The Real World
+      </button>
+      {open && <div className="credits">
         {CREDITS.map((c) => <button key={c.src} onClick={() => setBig(c.src)} aria-label={c.alt}><img src={c.src} alt={c.alt} loading="lazy" /></button>)}
-      </div>
-      <div className="credits-note">Credits: Prof. Adam · Crypto Investing Masterclass · The Real World</div>
+      </div>}
       <div>© {new Date().getFullYear()} @thenotoriousg · Wszelkie prawa zastrzeżone</div>
       {big && <div className="credits-view" onClick={() => setBig(null)}><img src={big} alt="" /></div>}
     </footer>
+  );
+}
+
+/** Collapsible section: keeps secondary analyses out of the way until needed (open state remembered). */
+export function Fold({ id, title, hint, children, defaultOpen = false }: { id: string; title: ReactNode; hint?: ReactNode; children: ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = usePersisted<boolean>('ui.fold.' + id, defaultOpen);
+  return (
+    <div className="fold">
+      <button className="fold-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span className="grow"><span className="fold-title">{title}</span>{hint && <span className="fold-hint">{hint}</span>}</span>
+        <span className="fold-icon">{open ? '−' : '+'}</span>
+      </button>
+      {open && <div className="fold-body">{children}</div>}
+    </div>
   );
 }
 

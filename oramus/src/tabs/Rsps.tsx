@@ -1,5 +1,6 @@
+import { HYBRID_RISK_MAX } from '../lib/useRsps';
 import { useState } from 'react';
-import { Screen, Card, Row, NumInput, Sheet, toast } from '../components/ui';
+import { Screen, Card, Row, NumInput, Sheet, toast, Fold } from '../components/ui';
 import { IcInfo, IcRefresh, IcShield, IcLayers, IcX, IcPlus } from '../components/icons';
 import { PyramidCard } from '../components/Pyramid';
 import { SentimentCard } from '../components/Sentiment';
@@ -23,7 +24,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
   const [info, setInfo] = useState(false);
   const [tokOpen, setTokOpen] = useState(false);
   const [levOpen, setLevOpen] = useState(false);
-  const R = { ...REGIMES[regime], desc: regime === 'closed' ? (parking.choice === 'stable' ? 'Część RSPS w stablecoinach (Twój wybór).' : `Część RSPS w BTC skalowanym trendem (${btcTrend.toFixed(2)}).`) : REGIMES[regime].desc };
+  const R = { ...REGIMES[regime], desc: regime === 'closed' ? (parking.choice === 'stable' ? 'Część RSPS w stablecoinach (Twój wybór).' : parking.choice === 'hybrid' ? (R0.sdcaRisk < HYBRID_RISK_MAX ? `Hybryda: BTC × trend (${btcTrend.toFixed(2)}), bo ryzyko wyceny ${R0.sdcaRisk.toFixed(0)}% < ${HYBRID_RISK_MAX}%.` : `Hybryda: stablecoin, bo ryzyko wyceny ${R0.sdcaRisk.toFixed(0)}% ≥ ${HYBRID_RISK_MAX}%.`) : `Część RSPS w BTC skalowanym trendem (${btcTrend.toFixed(2)}).`) : REGIMES[regime].desc };
   const rspsCap = s.capital * (1 - SPLIT_SDCA / 100), sdcaCap = s.capital * SPLIT_SDCA / 100;
 
   return (
@@ -70,17 +71,20 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       {regime === 'closed' && (
         <Card>
           <div className="between"><b>Bramka RSPS zamknięta{scan?.gateSince ? ` od ${scan.gateSince}` : ''}</b>{parkingPending && <span className="pill trim">decyzja</span>}</div>
-          <div className="note-text mt8">Gdzie trzymać część RSPS do ponownego otwarcia bramki? Backtest 2020–10.2026 (cały portfel): stablecoin — CAGR 54%, Sharpe 1,57, maks. obsunięcie −26%, ekspozycja śr. 48%; BTC × trend — CAGR 73%, Sharpe 1,64, obsunięcie −32%, ekspozycja śr. 62%.</div>
+          <div className="note-text mt8">Gdzie trzymać część RSPS do ponownego otwarcia bramki? Backtest 2020–10.2026, cały portfel z bezpiecznikiem: stablecoin — CAGR 54%, maks. obsunięcie −24%, Sharpe 2024→ 0,94; hybryda (BTC × trend, dopóki ryzyko wyceny SDCA jest poniżej 80%, potem stablecoin) — CAGR 67%, obsunięcie −24%, Sharpe 2024→ 1,07; BTC × trend — CAGR 73%, obsunięcie −27%, Sharpe 2024→ 1,04. Short w żadnym wariancie nie poprawił wyniku, dlatego zostaje tylko warunkową propozycją.</div>
           <div className="flex mt12">
-            <button className="btn small grow" style={parking.choice === 'stable' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('stable'); toast('Wybrano: stablecoin'); }}>Stablecoin (domyślnie)</button>
+            <button className="btn small grow" style={parking.choice === 'stable' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('stable'); toast('Wybrano: stablecoin'); }}>Stablecoin</button>
+            <button className="btn small grow" style={parking.choice === 'hybrid' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('hybrid'); toast('Wybrano: hybryda'); }}>Hybryda (domyślnie)</button>
             <button className="btn small grow" style={parking.choice === 'btc' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('btc'); toast('Wybrano: BTC × trend'); }}>BTC × trend</button>
           </div>
         </Card>
       )}
 
       <PyramidCard p={pyr} />
-      <SentimentCard fg={pyr.fg} />
-      <EventStudyCard fg={pyr.fg} />
+      <Fold id="rsps.studies" title="Badania: sentyment i zdarzenia" hint="F&G a zwroty, badanie zdarzeń">
+        <SentimentCard fg={pyr.fg} />
+        <EventStudyCard fg={pyr.fg} />
+      </Fold>
 
       <div className="section-title">Trend</div>
       <Card className="tight">
@@ -97,7 +101,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
         <div className="note-text mb12">Podział z najwyższym Sharpe w backteście 2020–2026 (1,52), rebalans raz w roku.</div>
         <div className="mt12" />
         {regime === 'defense' && <div className="note-text">LTPI ujemne: cała część RSPS w stablecoinach.</div>}
-        {regime === 'closed' && parking.choice === 'stable' && <div className="note-text">Bramka zamknięta: część RSPS w stablecoinach.</div>}
+        {regime === 'closed' && (parking.choice === 'stable' || (parking.choice === 'hybrid' && !(R0.sdcaRisk < HYBRID_RISK_MAX))) && <div className="note-text">Bramka zamknięta: część RSPS w stablecoinach.</div>}
         {sleeve.map((x) => (
           <div key={x.sym} className="mb12">
             <div className="between"><b>{x.sym}</b><span className="num">{pct(x.w * 100, 0)} · {usd(x.w * rspsCap, 0)}{x.note ? <span className="dim"> ({x.note})</span> : null}</span></div>
@@ -150,6 +154,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
         )}
       </Card>
 
+      <Fold id="rsps.params" title="Parametry i historia reżimów">
       <div className="section-title">Parametry</div>
       <Card className="tight">
         <Row label="Przegląd" value="codziennie, 00:00 UTC" />
@@ -164,6 +169,8 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
         {log.length === 0 && <div className="empty">Brak zmian</div>}
         {log.slice(0, 20).map((l, i) => <Row key={i} label={(REGIMES as Record<string, { title: string }>)[l.regime]?.title ?? l.regime} value={<span className="dim">{new Date(l.time).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })}</span>} />)}
       </Card>
+
+      </Fold>
 
       <Sheet open={levOpen} onClose={() => setLevOpen(false)} title="Propozycja dźwigni">
         <div className="note-text mb12">Dźwignia nie jest częścią strategii. Propozycja {LEV_MAX}× na BTC pojawia się w sygnale tylko gdy spełnione są wszystkie warunki naraz (w backteście 2020–2026: 24 dni, ok. 1%). W każdej innej sytuacji brak propozycji.</div>
