@@ -3,6 +3,7 @@ import { Screen, Card, Row, NumInput, Sheet, toast } from '../components/ui';
 import { IcInfo, IcRefresh, IcShield, IcLayers, IcX, IcPlus } from '../components/icons';
 import { PyramidCard } from '../components/Pyramid';
 import { SentimentCard } from '../components/Sentiment';
+import { EventStudyCard } from '../components/EventStudy';
 import { usePersisted } from '../lib/db';
 import { LEV_MAX } from '../lib/pyramid';
 import { useRsps, DEFAULT_TOKENS, MEME, RSPS_DEF, SPLIT_SDCA } from '../lib/useRsps';
@@ -79,6 +80,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
 
       <PyramidCard p={pyr} />
       <SentimentCard fg={pyr.fg} />
+      <EventStudyCard fg={pyr.fg} />
 
       <div className="section-title">Trend</div>
       <Card className="tight">

@@ -111,3 +111,8 @@ Struktura HH/HL (pivot ±3/5/10/20) jako filtr long: Sharpe OOS 0,09–0,62 vs 0
 BTCUSDT 1D: jako trend (powyżej środka = long) Sharpe IS/OOS 0,86–1,48 / 0,68–0,96; jako powrót do średniej (kup przy
 wyprzedaniu, sprzedaj przy wykupieniu) 0,20–0,30 / 0,32–0,70 — zgodne z lekcją (TPI = trend, nie mean reversion).
 Dodanie Stochastic 14 i CCI 20 do MTPI (12 głosów): IS 1,26 → 1,10, OOS 1,02 → 0,90 → nie dodane.
+
+## Badanie zdarzeń (run34.py, slajdy SentimenTrader / OddStats)
+BTC 2014→, sygnały co najmniej 30–90 dni od siebie, z vs wszystkie dni: skok zmienności 30 d > 2× mediana (n=6) z ≈ 0,4–0,7;
+spadek dzienny ≤ −10% (n=36) z ≈ 1,1–1,6; przebicia SMA 200 (n=21–25) |z| < 0,7; nowy ATH (n=14): 1 tydz. z = 3,6, dalej < 2.
+Zdarzenia F&G (< 12 / > 90) liczy aplikacja na historii F&G z telefonu (w sandboxie brak dostępu do alternative.me).
