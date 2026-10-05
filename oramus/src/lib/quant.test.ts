@@ -184,3 +184,16 @@ describe('minimum SDCA buy', () => {
     expect(minBuyRate(-2)).toBe(-2);
   });
 });
+
+import { score42, kissBtc, MACRO42_EMPTY } from './macro42';
+describe('42 Macro weekly readings', () => {
+  it('maps readings to a σ score and applies the KISS Bitcoin rule', () => {
+    const m = { ...MACRO42_EMPTY, regime: 'R' as const, riskOnProb: 75, btcVams: 'bull' as const, crashRisk: 'high' as const };
+    const s = score42(m);
+    expect(s.parts.length).toBe(4);
+    expect(s.z).toBeCloseTo((1 + 1 + 1 - 1) / 4, 2);
+    expect(kissBtc(m)).toBe(10);
+    expect(kissBtc({ ...m, regime: 'I', btcVams: 'neutral' })).toBe(2.5);
+    expect(score42(MACRO42_EMPTY).z).toBeNull();
+  });
+});

@@ -231,3 +231,10 @@ obecnie (BTC→stable) — CAGR 65,5%, DD −29,3%, OOS 1,00, RSPS IS 1,59; BTC�
 złoto w trendzie → BTC → stable — 51,2%, −26,0%, 1,22, IS 1,07 (złoto wypycha BTC); złoto silne = trend i PAXG/BTC > średnia 50 d —
 72,8%, −29,0%, 1,37, IS 1,49; złoto silne = trend i momentum PAXG/BTC 30/60/90 d > 0 (wybrane) — 71,4%, −26,7%, 1,25, IS 1,55.
 Średni udział w RSPS (wybrany wariant): złoto 28%, BTC 30%. Silnik aplikacji (fixture): CAGR RSPS 87,2 → 99,3%, IS 1,88 → 1,84, OOS 0,88 → 1,27.
+
+## 42 Macro — cotygodniowe odczyty (2.21.0)
+Raport 42 Macro jest płatny i objęty zakazem redystrybucji — w repozytorium nie ma jego treści. Aplikacja ma kartę, w której
+użytkownik co tydzień wpisuje odczyty modeli: Global Macro Risk Matrix (reżim, P(risk-on)), VAMS BTC/ETH/złota, Macro Weather Model
+(BTC, utrzymanie risk-on), Global Liquidity (trend, wskaźniki wyprzedzające), GRID (modalny wynik), Positioning (ryzyko korekty
+i krachu), KISS i Dr. Mo dla BTC. Punktacja (własne przypisanie, równe wagi, bez backtestu — historie modeli nie są publiczne)
+zasila filar Makro w Piramidzie przez 7 dni; reguła KISS dla BTC (10%/5% wg risk-on/off × 100/50/0% wg VAMS) liczona dla podglądu.

@@ -1,4 +1,5 @@
 export const CHANGELOG = [
+  { v: '2.21.0', date: '2026-10-05', items: ['LTPI·MTPI → Makro: karta cotygodniowych odczytów 42 Macro (Risk Matrix, VAMS, Weather Model, płynność, GRID, Positioning, KISS, Dr. Mo); punktacja zasila filar Makro przez 7 dni, przypomnienie co tydzień'] },
   { v: '2.20.1', date: '2026-10-05', items: ['Jeden podział SDCA/RSPS w całej aplikacji: zakładka RSPS pokazuje ten sam cel co Portfel (60/40 albo 40/60 przy przechyle)'] },
   { v: '2.20.0', date: '2026-10-05', items: ['RSPS: rezerwa w hierarchii złoto → BTC → stablecoin (domyślnie) — złoto, gdy jest w trendzie i silniejsze od BTC (momentum PAXG/BTC); inaczej BTC × trend; inaczej stablecoin (backtest z przechyłem: CAGR 65,5 → 71,4%, obsunięcie −29,3 → −26,7%)'] },
   { v: '2.19.0', date: '2026-10-05', items: ['RSPS: rezerwa w tokenizowanym złocie (PAXG) zamiast stablecoina — zawsze albo tylko gdy złoto jest w trendzie; także w zleceniach, live testingu i backteście'] },

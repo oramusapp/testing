@@ -7,7 +7,7 @@ import { signed } from '../lib/format';
 import { useBtc } from '../lib/btcStore';
 import { varianceRatio } from '../lib/quant';
 import { SeasonalityCard } from '../components/Seasonality';
-import { GridCard } from '../components/Grid';
+import { Macro42Card } from '../components/Macro42';
 
 /** LTPI / MTPI: trend-following signals (not valuation). */
 export default function Trend({ nav }: { nav?: React.ReactNode }) {
@@ -61,8 +61,8 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
         note={tpi.mtpiSizing === 'ensemble' ? 'Steruje skalowaniem BTC w części RSPS (MTPI przeliczony na 0…1).' : 'Informacyjnie: skalowanie BTC używa 4 średnich (wariant z backtestu).'} />}
       {!a && <Card><div className="dim">Ładowanie danych BTC…</div></Card>}
 
-      <Fold id="trend.macro" title="Makro i sezonowość" hint="42 Macro GRID (ręcznie), sezonowość BTC">
-        <GridCard />
+      <Fold id="trend.macro" title="Makro (42 Macro) i sezonowość" hint="Cotygodniowe odczyty 42 Macro → filar Makro; sezonowość BTC">
+        <Macro42Card />
         <SeasonalityCard />
       </Fold>
 

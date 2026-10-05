@@ -5,6 +5,7 @@ import { usePersisted, load, save } from './db';
 import { composite as sdcaComposite, freshManual } from './sdcaModel';
 import { computeAuto, sentimentZ } from './autoSignals';
 import { fearGreed, lastClosedDay, freshToday } from './market';
+import { MACRO42_EMPTY, fresh42, score42, type Macro42 } from './macro42';
 import { composite, PILLARS, type PillarId, type PillarState, type PillarValue, type WeightMethod } from './pyramid';
 import { SDCA_DEFAULTS, type SdcaSettings } from '../tabs/Sdca';
 
@@ -22,6 +23,7 @@ export function usePyramid() {
   const [manual, setManual] = usePersisted<ManualMap>('pyramid.manual', {});
   const [overrides, setOverrides] = usePersisted<Overrides>('pyramid.overrides', {});
   const [extra, setExtra] = usePersisted<ExtraMap>('pyramid.extra', {});
+  const [m42] = usePersisted<Macro42>('macro.42', MACRO42_EMPTY);
   const [method, setMethod] = usePersisted<WeightMethod>('pyramid.method', 'roc');
   const [fg, setFg] = usePersisted<FG | null>('pyramid.fg', null);
   const [sdca] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
@@ -60,14 +62,22 @@ export function usePyramid() {
     return {
       system: autoVal('system', auto?.system, auto ? `z momentum ${auto.zMom.toFixed(2)} · z wyceny ${Number.isFinite(auto.zVal) ? auto.zVal.toFixed(2) : '—'}` : ''),
       fundamental: man('fundamental'),
-      macro: man('macro'),
+      // Macro pillar: weekly 42 Macro readings (valid 7 days) averaged with the manual rubric when that is filled today
+      macro: (() => {
+        const mm = man('macro');
+        if (!fresh42(m42)) return mm;
+        const z42 = score42(m42).z;
+        if (z42 == null) return mm;
+        const manualToday = mm.z != null && mm.updated != null && freshToday(mm.updated, now);
+        return { z: manualToday ? (mm.z! + z42) / 2 : z42, updated: now, manual: true, detail: manualToday ? `42 Macro ${z42.toFixed(2)}σ + rubryka ${mm.z!.toFixed(2)}σ` : `42 Macro (${m42.reportDate || 'tydzień'}) ${z42.toFixed(2)}σ` };
+      })(),
       onchain: autoVal('onchain', auto?.onchain, auto ? `ryzyko MVRV ${auto.mvrvRisk.toFixed(0)}% (percentyl)` : ''),
       stats: autoVal('stats', auto?.stats, auto ? `t(90d) ${auto.tStat90.toFixed(2)} · ADF ${auto.adfStat.toFixed(2)}` : ''),
       sentiment: (overrides.sentiment && manual.sentiment) ? { z: manual.sentiment.z, updated: manual.sentiment.updated, manual: true, detail: 'ręczna korekta' }
         : fg && fg.mu != null && fg.sd ? { z: sentimentZ(fg.value, fg.mu, fg.sd), updated: fg.time + 86400000 > now - 3 * 86400000 ? now : fg.time, detail: `F&G ${fg.value} · ${fg.label} · μ ${fg.mu.toFixed(0)}, σ ${fg.sd.toFixed(0)} (n=${fg.n})` } : { z: null, updated: null, detail: 'brak danych F&G' },
       ta: autoVal('ta', auto?.ta, auto ? `BB 1W ${auto.taParts.bbWeekly.toFixed(2)}σ · BB 1D(50) ${auto.taParts.bbDaily.toFixed(2)}σ · struktura ${auto.taParts.structure > 0 ? 'HH/HL' : auto.taParts.structure < 0 ? 'LH/LL' : 'mieszana'}` : '')
     };
-  }, [auto, manual, overrides, fg, extra]);
+  }, [auto, manual, overrides, fg, extra, m42]);
 
   const comp = useMemo(() => composite(state, method), [state, method]);
 
