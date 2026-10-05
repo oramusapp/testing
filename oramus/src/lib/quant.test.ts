@@ -80,3 +80,11 @@ describe('variance ratio', () => {
     expect(varianceRatio(trend)).toBeGreaterThan(1); expect(varianceRatio(alt)).toBeLessThan(1);
   });
 });
+
+import { normCdf as Phi } from './quant';
+describe('normal table (lesson values)', () => {
+  it('matches the z-table', () => {
+    expect(Phi(-2.6)).toBeCloseTo(0.0047, 4); expect(Phi(0.54)).toBeCloseTo(0.7054, 4); expect(Phi(-1)).toBeCloseTo(0.1587, 4);
+    expect(Phi(1) - Phi(-1)).toBeCloseTo(0.6827, 3); expect(Phi(2) - Phi(-2)).toBeCloseTo(0.9545, 3);
+  });
+});
