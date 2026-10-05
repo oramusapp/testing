@@ -36,3 +36,11 @@ Top 10 wybierany wg 30-dniowego średniego wolumenu (Binance). Kapitalizacja z C
 nieprzydatna do rankingu (XRP, XLM, ICP liczone od całkowitej podaży; brak BNB).
 Wybrana konfiguracja (wg okresu 2020–2023): przegląd codzienny, siła = średnia VAMS ratio z 30/60/90 dni,
 bramka wejście ≥ 70% / wyjście < 60%, maks. 3 pozycje, limit 50%, podział SDCA 60 / RSPS 40.
+
+## MTPI / LTPI z 10 wskaźników (run17.py, run18.py)
+
+`tpi.py`: wskaźniki trendu liczone z samych cen zamknięcia (EMA/SMA, MACD, RSI, ROC, Donchian, Aroon, Supertrend
+na zmianach zamknięć, nachylenie regresji, HMA), każdy głosuje ±1; TPI = średnia.
+Wynik: LTPI z 10 wskaźników i histerezą ±0,2 ≈ reguła SMA 200 (Sharpe OOS 1,03 vs 1,03, mniejsze obsunięcie
+−30,0% vs −31,5%) → używany w aplikacji. MTPI z 10 wskaźników obniżał wynik OOS (0,82–0,95 vs 1,03), więc
+skalowanie BTC zostaje na 4 średnich; MTPI jest wyświetlany informacyjnie (opcjonalnie można go włączyć).

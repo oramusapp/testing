@@ -49,7 +49,8 @@ export function useRsps() {
   const ltpi = ltpiManual.mode === 'manual' ? ltpiManual.manual : a?.ltpi ?? 0;
   const scanFresh = !!scan && scan.closeDate >= lastClosedDay();
   const breadth = scan?.breadth ?? NaN;
-  const btcTrend = a?.trendEnsemble ?? scan?.btcTrend ?? 0;
+  // BTC sizing: 4-average trend (backtested default) or, if chosen, the 10-signal MTPI mapped to 0…1
+  const btcTrend = a ? (pyr.tpiCfg.mtpiSizing === 'ensemble' ? (a.mtpi.value + 1) / 2 : a.trendEnsemble) : (scan?.btcTrend ?? 0);
   const rspsActive = scanFresh && !!scan?.gateOpen && btcTrend >= 0.5 && ltpi >= 0;
 
   const gate = leverageGate({

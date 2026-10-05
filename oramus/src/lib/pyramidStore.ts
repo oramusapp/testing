@@ -9,6 +9,9 @@ import { composite, type PillarId, type PillarState, type PillarValue, type Weig
 import { SDCA_DEFAULTS, type SdcaSettings } from '../tabs/Sdca';
 
 /** z: pillar z-score in σ; answers: the per-question σ readings (direction-adjusted). */
+export interface TpiSettings { ltpiSource: 'ensemble' | 'sma200'; mtpiSizing: 'ma4' | 'ensemble'; }
+export const TPI_DEFAULTS: TpiSettings = { ltpiSource: 'ensemble', mtpiSizing: 'ma4' };
+
 export type ManualMap = Partial<Record<PillarId, { z: number; updated: number; note?: string; answers?: number[] }>>;
 export interface Overrides { onchain?: boolean; sentiment?: boolean; stats?: boolean; system?: boolean; }
 interface FG { value: number; label: string; time: number; fetched: number; mu?: number; sd?: number; n?: number; }
@@ -20,6 +23,7 @@ export function usePyramid() {
   const [method, setMethod] = usePersisted<WeightMethod>('pyramid.method', 'roc');
   const [fg, setFg] = usePersisted<FG | null>('pyramid.fg', null);
   const [sdca] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
+  const [tpiCfg] = usePersisted<TpiSettings>('signals.tpi', TPI_DEFAULTS);
 
   // Fear & Greed publishes once a day; refetch when the last fetch predates the latest UTC close
   useEffect(() => {
@@ -31,8 +35,8 @@ export function usePyramid() {
     if (!model) return null;
     const cfg = { ...SDCA_DEFAULTS, ...sdca };
     const comp = sdcaComposite(model, cfg.enabled, cfg.manualRisk);
-    return computeAuto(model.dates, model.prices, comp.risk, model.risk.mvrv, comp.z, model.z.mvrv);
-  }, [model, sdca]);
+    return computeAuto(model.dates, model.prices, comp.risk, model.risk.mvrv, comp.z, model.z.mvrv, tpiCfg.ltpiSource);
+  }, [model, sdca, tpiCfg.ltpiSource]);
 
   const state: PillarState = useMemo(() => {
     const at = auto ? Date.parse(auto.date + 'T23:59:59Z') : null;
@@ -67,5 +71,5 @@ export function usePyramid() {
   }, [auto?.date]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setPillar = (id: PillarId, z: number, note?: string, answers?: number[]) => setManual({ ...manual, [id]: { z, updated: Date.now(), note, answers } });
-  return { auto, state, comp, method, setMethod, manual, setPillar, overrides, setOverrides, fg };
+  return { auto, state, comp, method, setMethod, manual, setPillar, overrides, setOverrides, fg, tpiCfg: { ...TPI_DEFAULTS, ...tpiCfg } };
 }
