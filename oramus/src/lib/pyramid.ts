@@ -12,7 +12,8 @@ export type PillarId = 'system' | 'fundamental' | 'macro' | 'onchain' | 'stats' 
 export type WeightMethod = 'roc' | 'linear' | 'equal';
 
 /** One standardised question: the user reads the measure in σ (e.g. Bollinger Bands) and picks −2…+2. */
-export interface RubricItem { q: string; measure: string; label: string; url: string; invert?: boolean; qualitative?: boolean; }
+/** plus/minus: what a positive / negative reading of the MEASURED quantity means (before any inversion). */
+export interface RubricItem { q: string; measure: string; plus: string; minus: string; label: string; url: string; invert?: boolean; qualitative?: boolean; }
 export interface PillarDef { id: PillarId; rank: number; name: string; short: string; auto: boolean; source: string; rubric?: RubricItem[]; verify?: { label: string; url: string }[]; }
 
 const TV = (sym: string) => `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(sym)}`;
@@ -23,17 +24,17 @@ export const PILLARS: PillarDef[] = [
     verify: [{ label: 'Strona sygnałów SDCA', url: 'https://sdca-signals-automation-production-bdd2.up.railway.app/' }] },
   { id: 'fundamental', rank: 2, name: 'Ekonomia fundamentalna', short: 'Fundamenty', auto: false, source: 'Ręcznie · skala σ',
     rubric: [
-      { q: 'Napływy netto do spot ETF na BTC', measure: 'Suma z 10 sesji względem średniej i odchylenia z ostatniego roku', label: 'Farside Investors', url: 'https://farside.co.uk/btc/' },
-      { q: 'Odblokowania tokenów (portfel RSPS, 30 dni)', measure: '% podaży względem typowego miesiąca; więcej = gorzej', label: 'Tokenomist', url: 'https://tokenomist.ai/', invert: true },
-      { q: 'Opłaty i TVL sieci', measure: 'Zmiana 30-dniowa względem rozkładu zmian z ostatniego roku', label: 'DefiLlama', url: 'https://defillama.com/' },
-      { q: 'Regulacje i zdarzenia strukturalne', measure: 'Ocena jakościowa: siła wpływu w skali σ', label: 'CoinDesk Policy', url: 'https://www.coindesk.com/policy', qualitative: true }
+      { q: 'Napływy netto do spot ETF na BTC', measure: 'Suma z 10 sesji względem średniej i odchylenia z ostatniego roku', plus: 'napływy większe niż średnio w roku (np. +1σ = o jedno odchylenie wyżej)', minus: 'napływy mniejsze niż średnio lub odpływy', label: 'Farside Investors', url: 'https://farside.co.uk/btc/' },
+      { q: 'Odblokowania tokenów (portfel RSPS, 30 dni)', measure: '% podaży względem typowego miesiąca; więcej = gorzej', plus: 'więcej odblokowań niż zwykle (aplikacja liczy to na minus)', minus: 'mniej odblokowań niż zwykle (aplikacja liczy to na plus)', label: 'Tokenomist', url: 'https://tokenomist.ai/', invert: true },
+      { q: 'Opłaty i TVL sieci', measure: 'Zmiana 30-dniowa względem rozkładu zmian z ostatniego roku', plus: 'opłaty/TVL rosną szybciej niż typowo', minus: 'spadają lub rosną wolniej niż typowo', label: 'DefiLlama', url: 'https://defillama.com/' },
+      { q: 'Regulacje i zdarzenia strukturalne', measure: 'Ocena jakościowa: siła wpływu w skali σ', plus: 'korzystne: np. zatwierdzenia ETF, jasne przepisy, wejście instytucji', minus: 'niekorzystne: np. zakazy, pozwy, upadki giełd, hakowania', label: 'CoinDesk Policy', url: 'https://www.coindesk.com/policy', qualitative: true }
     ] },
   { id: 'macro', rank: 3, name: 'Makroekonomia', short: 'Makro', auto: false, source: 'Ręcznie · skala σ',
     rubric: [
-      { q: 'Płynność: bilans Fed (WALCL)', measure: 'Zmiana 13-tygodniowa względem rozkładu z 5 lat (FRED: Edit graph → Units: % change)', label: 'FRED · WALCL', url: 'https://fred.stlouisfed.org/series/WALCL' },
-      { q: 'Stopy procentowe: oczekiwania rynku', measure: 'Oczekiwana zmiana stóp na 3 posiedzenia względem zmian z 5 lat; obniżki = plus', label: 'CME FedWatch', url: 'https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html' },
-      { q: 'Dolar (DXY)', measure: 'Pozycja w Bollinger Bands (50, 2σ); górna wstęga ≈ +2σ = negatywne dla krypto', label: 'TradingView · DXY', url: TV('TVC:DXY'), invert: true },
-      { q: 'Akcje (S&P 500)', measure: 'Pozycja w Bollinger Bands (50, 2σ)', label: 'TradingView · SPX', url: TV('SP:SPX') }
+      { q: 'Płynność: bilans Fed (WALCL)', measure: 'Zmiana 13-tygodniowa względem rozkładu z 5 lat (FRED: Edit graph → Units: % change)', plus: 'bilans rośnie szybciej niż zwykle (dodruk, QE)', minus: 'bilans się kurczy (QT)', label: 'FRED · WALCL', url: 'https://fred.stlouisfed.org/series/WALCL' },
+      { q: 'Stopy procentowe: oczekiwania rynku', measure: 'Oczekiwana zmiana stóp na 3 posiedzenia względem zmian z 5 lat; obniżki = plus', plus: 'rynek oczekuje obniżek stóp (większych niż typowo)', minus: 'rynek oczekuje podwyżek lub mniejszych obniżek', label: 'CME FedWatch', url: 'https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html' },
+      { q: 'Dolar (DXY)', measure: 'Pozycja w Bollinger Bands (50, 2σ); górna wstęga ≈ +2σ = negatywne dla krypto', plus: 'DXY przy górnej wstędze, silny dolar (aplikacja liczy to na minus)', minus: 'DXY przy dolnej wstędze, słaby dolar (aplikacja liczy to na plus)', label: 'TradingView · DXY', url: TV('TVC:DXY'), invert: true },
+      { q: 'Akcje (S&P 500)', measure: 'Pozycja w Bollinger Bands (50, 2σ)', plus: 'S&P 500 powyżej środkowej linii / przy górnej wstędze (apetyt na ryzyko)', minus: 'poniżej środkowej linii / przy dolnej wstędze', label: 'TradingView · SPX', url: TV('SP:SPX') }
     ] },
   { id: 'onchain', rank: 4, name: 'Dane on-chain', short: 'On-chain', auto: true, source: 'Auto: z-score MVRV (Coin Metrics) po odtrendowaniu; tanio = plus',
     verify: [{ label: 'Coin Metrics · MVRV', url: 'https://charts.coinmetrics.io/crypto-data/' }] },
@@ -42,10 +43,10 @@ export const PILLARS: PillarDef[] = [
     verify: [{ label: 'Crypto Fear & Greed', url: 'https://alternative.me/crypto/fear-and-greed-index/' }] },
   { id: 'ta', rank: 7, name: 'Uznaniowa analiza techniczna', short: 'Analiza techniczna', auto: false, source: 'Ręcznie · skala σ',
     rubric: [
-      { q: 'BTC na interwale tygodniowym', measure: 'Pozycja w Bollinger Bands (20, 2σ) na świecach 1W', label: 'TradingView · BTCUSDT 1W', url: TV('BINANCE:BTCUSDT') },
-      { q: 'Kapitalizacja całego rynku (TOTAL)', measure: 'Pozycja w Bollinger Bands (50, 2σ) na świecach 1D', label: 'TradingView · TOTAL', url: TV('CRYPTOCAP:TOTAL') },
-      { q: 'Wolumen BTC', measure: 'Wolumen względem średniej 20 dni w σ, ze znakiem kierunku ceny', label: 'TradingView · BTCUSDT', url: TV('BINANCE:BTCUSDT') },
-      { q: 'Struktura rynku (szczyty i dołki)', measure: 'Ocena jakościowa: siła struktury w skali σ', label: 'TradingView · BTCUSDT', url: TV('BINANCE:BTCUSDT'), qualitative: true }
+      { q: 'BTC na interwale tygodniowym', measure: 'Pozycja w Bollinger Bands (20, 2σ) na świecach 1W', plus: 'BTC powyżej środkowej linii, przy górnej wstędze (trend wzrostowy)', minus: 'poniżej środkowej linii, przy dolnej wstędze', label: 'TradingView · BTCUSDT 1W', url: TV('BINANCE:BTCUSDT') },
+      { q: 'Kapitalizacja całego rynku (TOTAL)', measure: 'Pozycja w Bollinger Bands (50, 2σ) na świecach 1D', plus: 'TOTAL powyżej środkowej linii, przy górnej wstędze', minus: 'poniżej środkowej linii, przy dolnej wstędze', label: 'TradingView · TOTAL', url: TV('CRYPTOCAP:TOTAL') },
+      { q: 'Wolumen BTC', measure: 'Wolumen względem średniej 20 dni w σ, ze znakiem kierunku ceny', plus: 'wolumen powyżej średniej przy rosnącej cenie', minus: 'wolumen powyżej średniej przy spadającej cenie', label: 'TradingView · BTCUSDT', url: TV('BINANCE:BTCUSDT') },
+      { q: 'Struktura rynku (szczyty i dołki)', measure: 'Ocena jakościowa: siła struktury w skali σ', plus: 'wyższe szczyty i wyższe dołki', minus: 'niższe szczyty i niższe dołki', label: 'TradingView · BTCUSDT', url: TV('BINANCE:BTCUSDT'), qualitative: true }
     ] }
 ];
 

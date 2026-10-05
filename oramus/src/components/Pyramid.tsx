@@ -122,6 +122,7 @@ function PillarSheet({ p, id, onClose }: { p: P; id: PillarId | null; onClose: (
                     <div style={{ padding: '12px 14px 8px' }}>
                       <div style={{ fontWeight: 600, fontSize: 14.5 }}>{q.q}{q.invert ? <span className="faint" style={{ fontWeight: 400 }}> · wyżej = gorzej</span> : null}</div>
                       <div className="faint" style={{ fontSize: 12.5, margin: '2px 0 4px' }}>{q.measure}</div>
+                      <div style={{ fontSize: 12.5, margin: '0 0 4px', lineHeight: 1.45 }}><span className="green">Plus (+):</span> <span className="dim">{q.plus}</span><br /><span className="red">Minus (−):</span> <span className="dim">{q.minus}</span><br /><span className="dim">0 = typowo, w okolicy średniej.</span></div>
                       <a href={q.url} target="_blank" rel="noopener noreferrer" className="accent" style={{ fontSize: 13, textDecoration: 'none' }}>↗ {q.label}</a>
                     </div>
                     <div className="flex" style={{ padding: '0 14px 12px', gap: 8 }}>
