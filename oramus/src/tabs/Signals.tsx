@@ -7,7 +7,8 @@ import { stats, monthlyReport, monthOf, type Snapshot, type Flow, type MonthlyRe
 import { shareFile } from '../components/ui';
 import { useBtc } from '../lib/btcStore';
 import { composite } from '../lib/sdcaModel';
-import { backtest, curveRate } from '../lib/quant';
+import { backtest, curveRate, safetyStep } from '../lib/quant';
+import { ltpiStateSeries } from '../lib/tpi';
 import { useRsps, SPLIT_SDCA } from '../lib/useRsps';
 import { LEV_MAX } from '../lib/pyramid';
 import { SDCA_DEFAULTS, type SdcaSettings } from './Sdca';
@@ -22,7 +23,7 @@ const STABLE = 'USDT';
 const MIN_TRADE_USD = 10, MIN_TRADE_FRAC = 0.01;
 
 interface Holdings { sdca: { BTC: number; [STABLE]: number }; rsps: Record<string, number>; }
-interface Portfolio { holdings: Holdings | null; history: { time: number; text: string }[]; }
+interface Portfolio { holdings: Holdings | null; history: { time: number; text: string }[]; safetyOwed?: number; }
 interface Order { id: string; sleeve: 'SDCA' | 'RSPS' | 'Rebalans'; side: 'buy' | 'sell' | 'move'; sym: string; usd: number; units: number; why: string; }
 
 export default function Signals() {
@@ -39,16 +40,19 @@ export default function Signals() {
   const [editOpen, setEditOpen] = useState(false);
   const [flowOpen, setFlowOpen] = useState(false);
   const cfg = { ...SDCA_DEFAULTS, ...sd };
+  const [tpiSrc] = usePersisted<{ ltpiSource: 'ensemble' | 'sma200' }>('signals.tpi', { ltpiSource: 'ensemble' });
+  const ltpiSeries = useMemo(() => (model && cfg.safety ? ltpiStateSeries(model.prices, tpiSrc.ltpiSource ?? 'ensemble') : undefined), [model, cfg.safety, tpiSrc.ltpiSource]);
+  const owed = pf.safetyOwed ?? 0;
 
   const sdcaState = useMemo(() => {
     if (!model) return null;
     const comp = composite(model, cfg.enabled, cfg.manualRisk);
     const last = model.dates.length - 1;
     const start = Math.max(0, model.dates.findIndex((d) => d >= cfg.startDate));
-    const bt = backtest(model.prices, comp.risk, cfg.curve, start, 10000);
+    const bt = backtest(model.prices, comp.risk, cfg.curve, start, 10000, ltpiSeries);
     const price = model.prices[last];
     return { price, risk: comp.risk[last], rate: curveRate(cfg.curve, comp.risk[last]) / 100, modelBtcShare: (bt.btc * price) / bt.value, date: model.dates[last] };
-  }, [model, cfg.enabled, cfg.manualRisk, cfg.curve, cfg.startDate]);
+  }, [model, cfg.enabled, cfg.manualRisk, cfg.curve, cfg.startDate, ltpiSeries]);
 
   const prices: Record<string, number> = { ...R.prices, [STABLE]: 1 };
   if (sdcaState) prices.BTC = sdcaState.price;
@@ -88,6 +92,13 @@ export default function Signals() {
     } else if (r < -1e-6 && H.sdca.BTC > 0) {
       const units = H.sdca.BTC * -r;
       if (units * sdcaState.price >= MIN_TRADE_USD) orders.push({ id: 'sdca', sleeve: 'SDCA', side: 'sell', sym: 'BTC', usd: units * sdcaState.price, units, why: `krzywa ${(r * 100).toFixed(2)}% BTC przy ryzyku ${sdcaState.risk.toFixed(1)}%` });
+    }
+    if (cfg.safety) {
+      const st = safetyStep(sdcaState.risk, R.ltpi, H.sdca.BTC * sdcaState.price, H.sdca[STABLE], owed);
+      if (st.kind === 'sell' && st.usd >= MIN_TRADE_USD)
+        orders.push({ id: 'sdca-safety', sleeve: 'SDCA', side: 'sell', sym: 'BTC', usd: st.usd, units: st.usd / sdcaState.price, why: `bezpiecznik: LTPI ujemne przy ryzyku ${sdcaState.risk.toFixed(1)}% → 2% BTC do stablecoina` });
+      else if (st.kind === 'rebuy' && st.usd >= MIN_TRADE_USD)
+        orders.push({ id: 'sdca-rebuy', sleeve: 'SDCA', side: 'buy', sym: 'BTC', usd: st.usd, units: st.usd / sdcaState.price, why: `odkup po bezpieczniku: LTPI dodatnie, zostało ${usd(owed, 0)} do odkupienia` });
     }
     if (R.scanFresh && rspsVal > 0) {
       const want: Record<string, number> = {};
@@ -131,7 +142,12 @@ export default function Signals() {
       o = { ...o, usd: moved };
       if (moved > 0) addFlow({ amount: 0, sdca: fromSdca ? -moved : moved, rsps: fromSdca ? moved : -moved, note: 'transfer' });
     }
-    setPf({ holdings: h, history: [{ time: Date.now(), text: `${o.sleeve}: ${o.side === 'buy' ? 'kupno' : o.side === 'sell' ? 'sprzedaż' : 'przeniesienie'} ${o.sym} ${usd(o.usd, 0)}` }, ...pf.history].slice(0, 200) });
+    let nOwed = owed;
+    if (o.id === 'sdca-safety') nOwed += o.usd;
+    else if (o.id === 'sdca-rebuy' || (o.sleeve === 'SDCA' && o.side === 'buy')) nOwed = Math.max(0, nOwed - o.usd);
+    else if (o.id === 'sdca' && o.side === 'sell') nOwed *= H.sdca.BTC > 0 ? Math.max(0, 1 - o.units / H.sdca.BTC) : 0;
+    if (nOwed < MIN_TRADE_USD) nOwed = 0;
+    setPf({ holdings: h, safetyOwed: nOwed, history: [{ time: Date.now(), text: `${o.sleeve}: ${o.side === 'buy' ? 'kupno' : o.side === 'sell' ? 'sprzedaż' : 'przeniesienie'} ${o.sym} ${usd(o.usd, 0)}` }, ...pf.history].slice(0, 200) });
     if (!short) toast('Zapisano wykonanie');
   }
 
@@ -306,14 +322,14 @@ export default function Signals() {
           const ds = sv - sdcaVal, dr = rv - rspsVal;
           if (Math.abs(ds) + Math.abs(dr) > 0.01) addFlow({ amount: ds + dr, sdca: ds, rsps: dr, note: 'edit' });
         }
-        setPf({ holdings: h, history: [{ time: Date.now(), text: asFlow ? 'Korekta stanów (wpłata/wypłata)' : 'Korekta stanów (wynik)' }, ...pf.history] });
+        setPf({ ...pf, holdings: h, history: [{ time: Date.now(), text: asFlow ? 'Korekta stanów (wpłata/wypłata)' : 'Korekta stanów (wynik)' }, ...pf.history] });
       }} />
       <FlowSheet open={flowOpen} onClose={() => setFlowOpen(false)} onSave={(amt, target) => {
         const h: Holdings = { sdca: { ...H.sdca }, rsps: { ...H.rsps } };
         const toS = target === 'split' ? amt * SPLIT_SDCA / 100 : target === 'sdca' ? amt : 0;
         h.sdca[STABLE] += toS; h.rsps[STABLE] = (h.rsps[STABLE] ?? 0) + (amt - toS);
         if (h.sdca[STABLE] < -1e-9 || (h.rsps[STABLE] ?? 0) < -1e-9) { toast('Za mało stablecoinów w portfelu — najpierw sprzedaj część pozycji'); return; }
-        setPf({ holdings: h, history: [{ time: Date.now(), text: `${amt >= 0 ? 'Wpłata' : 'Wypłata'} ${usd(Math.abs(amt), 0)} (${target === 'split' ? `${SPLIT_SDCA}/${100 - SPLIT_SDCA}` : target.toUpperCase()})` }, ...pf.history] });
+        setPf({ ...pf, holdings: h, history: [{ time: Date.now(), text: `${amt >= 0 ? 'Wpłata' : 'Wypłata'} ${usd(Math.abs(amt), 0)} (${target === 'split' ? `${SPLIT_SDCA}/${100 - SPLIT_SDCA}` : target.toUpperCase()})` }, ...pf.history] });
         addFlow({ amount: amt, sdca: toS, rsps: amt - toS, note: amt >= 0 ? 'deposit' : 'withdrawal' });
       }} />
       <ReportSheet r={openReport} onClose={() => setOpenReport(null)} />

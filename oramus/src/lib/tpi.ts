@@ -130,3 +130,9 @@ export function computeTpi(prices: S, spec: TpiSpec[], window = 1500): TpiResult
   const stateSeries = hysteresis(series);
   return { value: series[series.length - 1], series, state: stateSeries[stateSeries.length - 1], stateSeries, votes: votes.map((x) => ({ name: x.name, vote: x.v[x.v.length - 1] })) };
 }
+
+/** LTPI state for every day of `prices` (0 during warm-up): 10-signal ensemble with hysteresis or price vs SMA 200. */
+export function ltpiStateSeries(prices: S, source: 'ensemble' | 'sma200' = 'ensemble'): S {
+  if (source === 'sma200') { const m = sma(prices, 200); return prices.map((p, i) => (Number.isFinite(m[i]) ? (p > m[i] ? 1 : -1) : 0)); }
+  return computeTpi(prices, LTPI_SPEC, prices.length).stateSeries;
+}
