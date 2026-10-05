@@ -3,3 +3,4 @@ dist
 ios/App/Pods
 ios/App/build
 *.log
+*.tsbuildinfo

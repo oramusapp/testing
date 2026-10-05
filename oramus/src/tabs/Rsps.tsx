@@ -1,4 +1,5 @@
 import { HYBRID_RISK_MAX } from '../lib/useRsps';
+import { vams3 } from '../lib/quant';
 import { useState } from 'react';
 import { Screen, Card, Row, NumInput, Sheet, toast, Fold, Seg } from '../components/ui';
 import { IcInfo, IcRefresh, IcShield, IcLayers, IcX, IcPlus } from '../components/icons';
@@ -24,7 +25,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
   const [info, setInfo] = useState(false);
   const [tokOpen, setTokOpen] = useState(false);
   const [levOpen, setLevOpen] = useState(false);
-  const R = { ...REGIMES[regime], desc: regime === 'closed' ? (parking.choice === 'stable' ? 'Część RSPS w stablecoinach (Twój wybór).' : parking.choice === 'hybrid' ? (R0.sdcaRisk < HYBRID_RISK_MAX ? `Hybryda: BTC × trend (${btcTrend.toFixed(2)}), bo ryzyko wyceny ${R0.sdcaRisk.toFixed(0)}% < ${HYBRID_RISK_MAX}%.` : `Hybryda: stablecoin, bo ryzyko wyceny ${R0.sdcaRisk.toFixed(0)}% ≥ ${HYBRID_RISK_MAX}%.`) : `Część RSPS w BTC skalowanym trendem (${btcTrend.toFixed(2)}).`) : REGIMES[regime].desc };
+  const R = { ...REGIMES[regime], desc: regime === 'closed' ? (parking.choice === 'stable' ? 'Część RSPS w stablecoinach (Twój wybór).' : parking.choice === 'hybrid' ? (R0.sdcaRisk < HYBRID_RISK_MAX ? `Hybryda: BTC wg VAMS ${Math.round(vams3(btcTrend) * 100)}% (trend ${btcTrend.toFixed(2)}), bo ryzyko wyceny ${R0.sdcaRisk.toFixed(0)}% < ${HYBRID_RISK_MAX}%.` : `Hybryda: stablecoin, bo ryzyko wyceny ${R0.sdcaRisk.toFixed(0)}% ≥ ${HYBRID_RISK_MAX}%.`) : `Część RSPS w BTC wg 3-stanowego VAMS: ${Math.round(vams3(btcTrend) * 100)}% (trend ${btcTrend.toFixed(2)}).`) : REGIMES[regime].desc };
   const split = R0.split;   // same split as in Portfel (tilt 40/60 while LTPI on $TOTAL is positive)
   const rspsCap = s.capital * (1 - split / 100), sdcaCap = s.capital * split / 100;
 
@@ -52,6 +53,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
           <div className="stat" onClick={() => setLevOpen(true)} style={{ cursor: 'pointer' }}><div className="k">Propozycje</div><div className="v">{(gate.allowed ? 1 : 0) + (shortProposal ? 1 : 0)}</div><div className="s">dźwignia {gate.checks.filter((c) => c.ok).length}/{gate.checks.length} · short {shortProposal ? 'tak' : 'nie'}</div></div>
         </div>
         <div className="row compact" style={{ padding: '10px 0 0' }}><span className="dim">LTPI (BTC) · weto RSPS</span><span className={R0.ltpi > 0 ? 'green' : 'red'} style={{ fontWeight: 600 }}>{R0.ltpi > 0 ? 'pozytywne' : 'negatywne → stablecoin'}</span></div>
+        <div className="row compact" style={{ padding: '6px 0 0' }}><span className="dim">Małe coiny vs duże (grupy)</span><span className={scan?.smallOn ? 'green' : 'dim'} style={{ fontWeight: 600 }}>{scan?.smallOn == null ? '—' : scan.smallOn ? 'małe silniejsze → dopuszczone' : 'duże silniejsze → tylko duże'}</span></div>
       </Card>
 
       {(gate.allowed || shortProposal) && <div className="section-title">Propozycje w sygnale</div>}
@@ -73,10 +75,10 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       {regime === 'closed' && (
         <Card>
           <div className="between"><b>Bramka RSPS zamknięta{scan?.gateSince ? ` od ${scan.gateSince}` : ''}</b>{parkingPending && <span className="pill trim">decyzja</span>}</div>
-          <div className="note-text mt8">Gdzie trzymać część RSPS do ponownego otwarcia bramki? Backtest od 2020, portfel 60/40 (SDCA i weto RSPS na LTPI z BTC, research/run48.py): hybryda (BTC × trend, dopóki ryzyko wyceny SDCA jest poniżej 80%) — CAGR 50,8%, maks. obsunięcie −25,3%, Sharpe 2024→ 1,06; BTC × trend (domyślnie) — CAGR 59,6%, obsunięcie −28,0%, Sharpe 2024→ 1,05. Dodatkowe reguły wyjścia z coinów (szybkie wyjście, trailing stop −15/−20/−25%) pogarszały wynik — dzienna rotacja wychodzi z coina, gdy wypada z top-3 lub traci własny trend. Short w żadnym wariancie nie poprawił wyniku, dlatego zostaje tylko warunkową propozycją.</div>
+          <div className="note-text mt8">Gdzie trzymać część RSPS do ponownego otwarcia bramki? Backtest od 2020, portfel 60/40 (SDCA i weto RSPS na LTPI z BTC, research/run48.py): hybryda (BTC × trend, dopóki ryzyko wyceny SDCA jest poniżej 80%) — CAGR 50,8%, maks. obsunięcie −25,3%, Sharpe 2024→ 1,06; BTC × trend (domyślnie) — CAGR 59,6%, obsunięcie −28,0%, Sharpe 2024→ 1,05. Dodatkowe reguły wyjścia z coinów (szybkie wyjście, trailing stop −15/−20/−25%) pogarszały wynik — dzienna rotacja wychodzi z coina, gdy wypada z top-3 lub traci własny trend. Short w żadnym wariancie nie poprawił wyniku, dlatego zostaje tylko warunkową propozycją. Od 2.22.0 udział BTC to 3-stanowy VAMS (trend ≥ 0,75 → 100%, 0,5 → 50%, niżej 0) zamiast liniowego trendu (research/run51.py: portfel CAGR 71,4 → 72,8%, obsunięcie −26,7 → −26,1%, Sharpe 2024→ 1,25 → 1,28).</div>
           <div className="flex mt12">
             <button className="btn small grow" style={parking.choice === 'stable' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('stable'); toast('Wybrano: stablecoin'); }}>Stablecoin</button>
-            <button className="btn small grow" style={parking.choice === 'hybrid' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('hybrid'); toast('Wybrano: hybryda'); }}>Hybryda</button>
+            <button className="btn small grow" style={parking.choice === 'hybrid' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('hybrid'); toast('Wybrano: hybryda'); }}>Hybryda (miesza wycenę z trendem — wbrew notatkom)</button>
             <button className="btn small grow" style={parking.choice === 'btc' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('btc'); toast('Wybrano: BTC × trend'); }}>BTC × trend (domyślnie)</button>
           </div>
         </Card>
@@ -127,7 +129,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
                     const w = r.bench ? sleeve.find((x) => x.sym === 'BTC')?.w : regime === 'rsps' ? picks.sel.find((x) => x.sym === r.sym)?.w : undefined;
                     return (
                       <tr key={r.sym} style={{ opacity: r.inUniverse ? 1 : 0.45, background: w ? 'var(--accent-soft)' : undefined }}>
-                        <td style={{ paddingLeft: 16 }}><b>{r.sym}</b>{r.error && <div className="red" style={{ fontSize: 11 }}>{r.error}</div>}</td>
+                        <td style={{ paddingLeft: 16 }}><b>{r.sym}</b>{r.core && <span className="faint" style={{ fontSize: 11 }}> duży</span>}{r.error && <div className="red" style={{ fontSize: 11 }}>{r.error}</div>}</td>
                         <td className={r.bench ? 'dim' : r.ratioUp ? 'green' : 'red'}>{r.error || r.bench ? (r.bench ? '—' : '') : r.ratioUp ? '▲' : '▼'}</td>
                         <td>{r.bench ? <span className="dim">wzorzec</span> : signed(r.score)}</td><td>{r.error ? '' : r.trend.toFixed(2)}</td>
                         <td className={r.ret >= 0 ? 'green' : 'red'}>{pct(r.ret, 0, true)}</td><td className="dim">{pct(r.vol, 0)}</td>
@@ -151,7 +153,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
               </table>
             </div>
             <div className="note-text" style={{ padding: '6px 16px 0' }}>Informacyjnie, jak w lekcji o wyborze aktywów: Omega = suma zysków / suma strat (&gt; 1 = więcej zysków), Sortino karze tylko spadki, Sharpe całą zmienność. Korelacja dziennych zwrotów z BTC (90 dni): blisko 1 oznacza, że token porusza się prawie jak BTC, więc dywersyfikacja niewiele daje. Ranking według Omega zamiast siły ratio dał w backteście gorszy wynik poza próbą (Sharpe 0,74 vs 0,88), więc nie steruje wyborem.</div>
-            <div className="note-text" style={{ padding: '10px 16px 14px' }}>Zamknięcie {scan.closeDate} UTC. Siła = średnia z momentum ratio do BTC z 30/60/90 dni podzielonego przez zmienność. Przegląd codziennie po zamknięciu 00:00 UTC. Wybór: siła &gt; 0 i trend tokena ≥ 0,5; maks. {s.topN} pozycje, limit {s.cap}% na token. Wyszarzone = poza top {s.universeSize}.</div>
+            <div className="note-text" style={{ padding: '10px 16px 14px' }}>Zamknięcie {scan.closeDate} UTC. Siła = średnia z momentum ratio do BTC z 7/21/42 dni podzielonego przez zmienność. Przegląd codziennie po zamknięciu 00:00 UTC. Wybór: siła &gt; 0 i trend tokena ≥ 0,5; maks. {s.topN} pozycje, limit {s.cap}% na token. Wyszarzone = poza top {s.universeSize}. Warstwy wg notatek: duże coiny (ETH, SOL, XRP, SUI, HYPE) są zawsze kandydatami i mają pierwszeństwo; małe (pozostałe płynne) wchodzą tylko, gdy ich grupa jest silniejsza od dużych (indeks równowagowy nad średnią 50 d i momentum 7/21/42 d &gt; 0). Backtest od 2020 (research/run54.py): portfel 2024→ CAGR 54,8 → 65,4%, bez roku 2021 57,8 → 63,1%, obsunięcie −26,6 → −27,1%; w samym 2021 (mania małych coinów) mniej.</div>
           </>
         )}
       </Card>
@@ -160,7 +162,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       <div className="section-title">Parametry</div>
       <Card className="tight">
         <Row label="Przegląd" value="codziennie, 00:00 UTC" />
-        <Row label="Siła względem BTC" value="średnia 30/60/90 dni" />
+        <Row label="Siła względem BTC" value="średnia 7/21/42 dni" />
         <Row label="Bramka szerokości" value="wejście ≥ 70%, wyjście < 60%" />
         <Row label="Pozycje / limit" value={`maks. ${s.topN} · ${s.cap}% na token`} />
         <div className="note-text" style={{ padding: '4px 16px 14px' }}>Wybrane na danych 2020–2023, sprawdzone poza próbą 01.2024–10.2026 (Binance, 35 tokenów bez memów). Strategia jest wrażliwa na koszty: przy dziennym przeglądzie używaj zleceń z niską prowizją (≤ 0,1%).</div>
@@ -184,7 +186,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       <Sheet open={info} onClose={() => setInfo(false)} title="Jak działa RSPS">
         <div className="note-text" style={{ fontSize: 14.5 }}>
           <p><b className="accent">Podział kapitału.</b> SDCA {split}% (zakładka SDCA) + RSPS {100 - split}% — ten sam cel co w Portfelu ({SPLIT_SDCA}/{100 - SPLIT_SDCA}, przy przechyle {SPLIT_TILT}/{100 - SPLIT_TILT}, gdy LTPI z $TOTAL dodatnie). Rebalans przy odchyleniu ±10 p.p. Dźwignia i shorty nie są częścią alokacji, pojawiają się tylko jako propozycje w sygnale.</p>
-          <p><b className="accent">RSPS.</b> Codziennie, spośród {s.universeSize} najpłynniejszych dużych tokenów (bez memów), wybiera do {s.topN} najsilniejszych względem BTC (średnia momentum ratio z 30/60/90 dni podzielona przez zmienność). Włącza się, gdy ≥ 70% tokenów ma ratio do BTC nad 50-dniową średnią, i wyłącza dopiero poniżej 60%; trend BTC ≥ 0,5 i LTPI ≥ 0. W przeciwnym razie część RSPS trzyma BTC proporcjonalnie do trendu.</p>
+          <p><b className="accent">RSPS.</b> Codziennie, spośród {s.universeSize} najpłynniejszych dużych tokenów (bez memów), wybiera do {s.topN} najsilniejszych względem BTC (średnia momentum ratio z 7/21/42 dni podzielona przez zmienność). Włącza się, gdy ≥ 70% tokenów ma ratio do BTC nad 50-dniową średnią, i wyłącza dopiero poniżej 60%; trend BTC ≥ 0,5 i LTPI ≥ 0. W przeciwnym razie część RSPS trzyma BTC proporcjonalnie do trendu.</p>
           <p><b className="accent">Piramida.</b> Siedem rodzajów analizy w kolejności ważności, wagi metodą ROC (Barron i Barrett 1996). Systematyzacja, on-chain, istotność statystyczna i sentyment aktualizują się automatycznie po zamknięciu świecy 00:00 UTC; ekonomia fundamentalna, makro i analiza techniczna są ręczne i ważne 7 dni.</p>
           <p><b className="accent">Aktualizacja.</b> iOS nie pozwala aplikacjom webowym działać w tle, więc przeliczenie następuje przy pierwszym otwarciu aplikacji po 00:00 UTC (albo automatycznie, jeśli jest wtedy otwarta).</p>
           <p className="faint">Wyniki z backtestu: research/ w repozytorium. Narzędzie analityczne, nie porada inwestycyjna.</p>

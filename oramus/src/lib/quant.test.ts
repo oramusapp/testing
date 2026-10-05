@@ -184,3 +184,32 @@ describe('minimum SDCA buy', () => {
     expect(minBuyRate(-2)).toBe(-2);
   });
 });
+
+import { score42, kissBtc, MACRO42_EMPTY } from './macro42';
+describe('42 Macro weekly readings', () => {
+  it('maps readings to a σ score and applies the KISS Bitcoin rule', () => {
+    const m = { ...MACRO42_EMPTY, regime: 'R' as const, riskOnProb: 75, btcVams: 'bull' as const, crashRisk: 'high' as const };
+    const s = score42(m);
+    expect(s.parts.length).toBe(4);
+    expect(s.z).toBeCloseTo((1 + 1 + 1 - 1) / 4, 2);
+    expect(kissBtc(m)).toBe(10);
+    expect(kissBtc({ ...m, regime: 'I', btcVams: 'neutral' })).toBe(2.5);
+    expect(score42(MACRO42_EMPTY).z).toBeNull();
+  });
+});
+
+import { belowProbableRange, probableRangeRate, vams3 } from './quant';
+describe('42 Macro ideas (run51)', () => {
+  it('Probable Range uses only closes up to i', () => {
+    const p = Array.from({ length: 25 }, (_, k) => 100 + (k % 2));
+    expect(belowProbableRange(p, 23)).toBe(false);
+    const q = [...p.slice(0, 24), 90];
+    expect(belowProbableRange(q, 24)).toBe(true);
+    expect(belowProbableRange(q, 23)).toBe(false);
+    expect(probableRangeRate(2, true)).toBe(4);
+    expect(probableRangeRate(-2, true)).toBe(-2);
+  });
+  it('three-state VAMS sizing', () => {
+    expect([0, 0.25, 0.5, 0.75, 1].map(vams3)).toEqual([0, 0, 0.5, 1, 1]);
+  });
+});

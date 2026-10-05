@@ -15,7 +15,9 @@ describe('TPI parity with research/tpi.py', () => {
         expect(mism, s.name).toBe(0);
       }
       const mean = spec.map((s) => s.fn(prices).slice(-60)).reduce((acc, v) => acc.map((a, i) => a + v[i] / spec.length), new Array(60).fill(0));
-      mean.forEach((m, i) => expect(m).toBeCloseTo((fx as any)[key][i], 6));
+      // expected mean from the research votes of the components in this spec (LTPI keeps only time-coherent ones)
+      const expMean = new Array(60).fill(0).map((_, i) => spec.reduce((acc, s) => acc + ((fx as any)[vkey][s.name][i] as number), 0) / spec.length);
+      mean.forEach((m, i) => expect(m).toBeCloseTo(key === 'mt' ? (fx as any)[key][i] : expMean[i], 6));
     });
   }
   it('hysteresis holds the state inside the ±0.2 band', () => {

@@ -3,6 +3,7 @@ import { usePersisted } from '../lib/db';
 import { freshToday, lastCloseTime, msToNextUtcClose } from '../lib/market';
 import { notifyOnce } from '../lib/notify';
 import { PILLARS } from '../lib/pyramid';
+import { MACRO42_EMPTY, fresh42, type Macro42 } from '../lib/macro42';
 import type { ManualMap, ExtraMap } from '../lib/pyramidStore';
 import { SDCA_DEFAULTS, type LtpiState, type SdcaSettings } from '../tabs/Sdca';
 
@@ -12,7 +13,7 @@ export default function ManualReminder() {
   const [manual] = usePersisted<ManualMap>('pyramid.manual', {});
   const [extra] = usePersisted<ExtraMap>('pyramid.extra', {});
   const [val] = usePersisted<{ z: Record<string, number | null>; updated: number | null }>('sdca.valuation', { z: {}, updated: null });
-  const [grid] = usePersisted<{ updated: number | null }>('macro.grid', { updated: null });
+  const [m42] = usePersisted<Macro42>('macro.42', MACRO42_EMPTY);
   const [ltpi] = usePersisted<LtpiState>('signals.ltpi', { mode: 'proxy', manual: 0 });
   const [sd] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
   const [dismissed, setDismissed] = usePersisted<number>('ui.manualReminder', 0);
@@ -21,10 +22,10 @@ export default function ManualReminder() {
   useEffect(() => { const t = setTimeout(() => tick((x) => x + 1), msToNextUtcClose() + 60000); return () => clearTimeout(t); });
 
   const todo: string[] = [];
-  PILLARS.filter((p) => !p.auto && !freshToday(manual[p.id]?.updated)).forEach((p) => todo.push(`Piramida · ${p.short}`));
+  PILLARS.filter((p) => !p.auto && !freshToday(manual[p.id]?.updated) && !(p.id === 'macro' && fresh42(m42))).forEach((p) => todo.push(`Piramida · ${p.short}`));
+  if (!fresh42(m42)) todo.push('42 Macro · odczyt z cotygodniowego raportu (ważny 7 dni)');
   PILLARS.filter((p) => p.extra && extra[p.id] && !freshToday(extra[p.id]!.updated)).forEach((p) => todo.push(`Piramida · ${p.short} (uzupełnienie)`));
   if (Object.values(val.z).some((x) => x != null) && !freshToday(val.updated)) todo.push('SDCA · arkusz wyceny (wskaźniki ręczne)');
-  if (grid.updated && !freshToday(grid.updated)) todo.push('LTPI·MTPI · 42 Macro GRID');
   if (ltpi.mode === 'manual' && !freshToday(ltpi.updated)) todo.push('LTPI · wartość ręczna');
   const cfg = { ...SDCA_DEFAULTS, ...sd };
   if (cfg.enabled.manual && !freshToday(cfg.manualUpdated)) todo.push('SDCA · wskaźnik ręczny w Composite Risk');

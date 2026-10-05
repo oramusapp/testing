@@ -7,7 +7,7 @@ import { freshToday } from '../lib/market';
 import { askNotify, notifyPermission } from '../lib/notify';
 import { usePersisted } from '../lib/db';
 import { INDICATORS, composite, freshManual, RAIL_TAUS } from '../lib/sdcaModel';
-import { ATH_BACKTEST, ATH_SELL, MIN_BUY_PCT, BANDS, DEFAULT_CURVE, SAFETY, SLOW_BUY_OPTIONS, athSellSeries, slowBuyRate, curveRate, riskZone, safetyStep } from '../lib/quant';
+import { ATH_BACKTEST, ATH_SELL, MIN_BUY_PCT, BANDS, DEFAULT_CURVE, SAFETY, SLOW_BUY_OPTIONS, athSellSeries, slowBuyRate, curveRate, belowProbableRange, probableRangeRate, PR_MULT, riskZone, safetyStep } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
 import { ValuationCard, AccumulationCalc } from '../components/Valuation';
 import { ConeCard } from '../components/Cone';
@@ -86,16 +86,19 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
   const band = BANDS.find((b) => priceRisk / 100 >= b.from && priceRisk / 100 < b.to) ?? (priceRisk < 1 ? BANDS[0] : BANDS[BANDS.length - 1]);
   const ltpiProxy = ltpiSeries?.at(-1) ?? 0;   // LTPI on BTC (ensemble or SMA 200, per settings)
   const ltpiValue = manualLtpiActive(ltpi) ? ltpi.manual : ltpiProxy;
-  const rate = slowBuyRate(rateCurve, ltpiValue, cfg.slowBuy ?? 1);
-  const slowed = rate !== rateCurve;
+  const rateSlow = slowBuyRate(rateCurve, ltpiValue, cfg.slowBuy ?? 1);
+  const slowed = rateSlow !== rateCurve;
+  const prBelow = belowProbableRange(model.prices, last);   // close below 20-day mean − 1.5σ → buy × 2
+  const rate = probableRangeRate(rateSlow, prBelow);
+  const prNote = prBelow && rate > 0 ? ` · cena pod Probable Range: × ${PR_MULT}` : '';
 
   let actionTitle = 'HOLD — brak transakcji', actionSub = `Krzywa ≈ 0% przy dzisiejszym ryzyku`, actionTone = 'dim';
   if (rate > 0.001 && rate <= MIN_BUY_PCT) {
     actionTitle = `HOLD (${rate.toFixed(2).replace('.', ',')}% gotówki)`;
-    actionSub = `Zakup dopiero przy > ${MIN_BUY_PCT}% rezerwy dziennie` + (slowed ? ` · LTPI ujemne: krzywa ${rateCurve.toFixed(2)}% × ${String(cfg.slowBuy).replace('.', ',')}` : '');
+    actionSub = `Zakup dopiero przy > ${MIN_BUY_PCT}% rezerwy dziennie` + (slowed ? ` · LTPI ujemne: krzywa ${rateCurve.toFixed(2)}% × ${String(cfg.slowBuy).replace('.', ',')}` : '') + prNote;
   } else if (rate > 0.001) {
     actionTitle = cfg.cash > 0 ? `KUP ${usd(cfg.cash * rate / 100)}` : `KUP ${rate.toFixed(2)}% gotówki`;
-    actionSub = (cfg.cash > 0 ? `≈ ${(cfg.cash * rate / 100 / price).toFixed(6)} BTC · ${rate.toFixed(2)}% rezerwy` : 'Wpisz rezerwę gotówki, aby zobaczyć kwotę') + (slowed ? ` · LTPI ujemne: krzywa ${rateCurve.toFixed(2)}% × ${String(cfg.slowBuy).replace('.', ',')}` : '');
+    actionSub = (cfg.cash > 0 ? `≈ ${(cfg.cash * rate / 100 / price).toFixed(6)} BTC · ${rate.toFixed(2)}% rezerwy` : 'Wpisz rezerwę gotówki, aby zobaczyć kwotę') + (slowed ? ` · LTPI ujemne: krzywa ${rateCurve.toFixed(2)}% × ${String(cfg.slowBuy).replace('.', ',')}` : '') + prNote;
     actionTone = 'green';
   } else if (rate < -0.001) {
     actionTitle = cfg.btcHeld > 0 ? `SPRZEDAJ ${(cfg.btcHeld * -rate / 100).toFixed(6)} BTC` : `SPRZEDAJ ${(-rate).toFixed(2)}% BTC`;

@@ -98,15 +98,17 @@ export const MTPI_SPEC: TpiSpec[] = [
   { name: 'Regresja liniowa 30', fn: (p) => linreg(p, 30) },
   { name: 'HMA 21 rośnie', fn: (p) => hmaRising(p, 21) }
 ];
+// LTPI: time-coherent components only (course notes: every input should work on the same horizon). The former
+// 'Cena > SMA 200', 'RSI 100 > 50' and 'Supertrend (50, 4)' flipped 15–22×/year next to components flipping 1–8×/year;
+// without them (research/run55–56.py) the LTPI changes state 2.8×/year instead of 5.5× and the portfolio 2020→ gains
+// CAGR 79.8 → 84.4%, Sharpe 2024→ 1.49 → 1.57 at the same max drawdown (also better without 2021 and at double cost).
+export const LTPI_SPEC_LEGACY_REMOVED = ['Cena > SMA 200', 'RSI 100 > 50', 'Supertrend (50, 4)'];
 export const LTPI_SPEC: TpiSpec[] = [
-  { name: 'Cena > SMA 200', fn: (p) => sign(sub(p, sma(p, 200))) },
   { name: 'EMA 50 > EMA 200', fn: (p) => sign(sub(ema(p, 50), ema(p, 200))) },
   { name: 'MACD tygodniowy (84,182,63)', fn: (p) => macd(p, 84, 182, 63) },
-  { name: 'RSI 100 > 50', fn: (p) => sign(rsi(p, 100).map((v) => v - 50)) },
   { name: 'ROC 180 > 0', fn: (p) => sign(roc(p, 180)) },
   { name: 'Donchian 100', fn: (p) => donchian(p, 100) },
   { name: 'Aroon 100', fn: (p) => aroon(p, 100) },
-  { name: 'Supertrend (50, 4)', fn: (p) => supertrend(p, 50, 4) },
   { name: 'Regresja liniowa 180', fn: (p) => linreg(p, 180) },
   { name: 'HMA 100 rośnie', fn: (p) => hmaRising(p, 100) }
 ];

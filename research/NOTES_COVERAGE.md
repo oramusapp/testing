@@ -9,7 +9,7 @@ Status: **W** = wdrożone w aplikacji · **T** = przetestowane i odrzucone (wyni
 | TPI: definicja, stany > 0 / < 0, rosnący/malejący | 3 wymiary sygnału, wskazówki | W | LTPI · MTPI (stan, ROC, zgodność), próg 0 domyślnie |
 | „The TPI is built for $TOTAL” | TPI na całym rynku | W | LTPI/MTPI liczone z $TOTAL (indeks 45 aktywów Coin Metrics, run44) |
 | TPI poniżej zera i spada → rozważ short | short | W | propozycja shortu przy MTPI < 0 i ROC < 0 |
-| RSPS: benchmark $TOTAL | porównanie | W | Backtest: linia $TOTAL kup i trzymaj |
+| RSPS: benchmark $TOTAL | porównanie | W | Backtest: linia i wiersz „$TOTAL kup i trzymaj” (od 2.24.0; wcześniej błędnie oznaczone — była tylko linia BTC) |
 | TPI × reżim (slajd 005) | dźwignia 2× tylko LTPI+ MTPI+ i trend; spot przy konsolidacji | W | Macierz decyzji (LTPI · MTPI), dźwignia tylko propozycja |
 | RSPS (podstawowy/zaawansowany) | rotacja siły względnej, bramka | W | RSPS |
 | Signal definitions / execution guides | wykonanie, rebalans | W | Portfel |
@@ -38,7 +38,7 @@ Status: **W** = wdrożone w aplikacji · **T** = przetestowane i odrzucone (wyni
 | Tempo akumulacji: 114 ± 32 d, regresja faz 145 ± 27 (109) | kalkulator | W | SDCA → narzędzia (oba warianty) |
 | Tempo dystrybucji: ATH dni, harmonogramy (117–119) | sprzedaż przy ATH | W | propozycja + powiadomienie (run36–37) |
 | NUPL strefy, zysk netto (120) | presja sprzedaży | W | NUPL auto w arkuszu |
-| Model hiperboliczny, „Hype-to-FOMO” (121–122) | scenariusz ogona | K | tylko ostrzeżenie (sprzedaż 90/10 T) |
+| Model hiperboliczny, „Hype-to-FOMO” (121–122) | scenariusz ogona | K | brak osobnego ostrzeżenia w aplikacji (wcześniej błędnie opisane); sprzedaż 90% wycena / 10% trend testowana — neutralna (run24–25) |
 | Długoterminowy bull/bear −1…+1 (123) | wskaźnik | W | LTPI |
 | Wielkości i czasy rajdów (124–125, 135, 137) | oczekiwania | K | stożek wyników |
 | Średni termin: horyzonty, kotwica, hierarchia interwałów | czas | K/W | MTPI/LTPI na 1D |
@@ -55,3 +55,11 @@ Status: **W** = wdrożone w aplikacji · **T** = przetestowane i odrzucone (wyni
 | Podatki, „jak nie rebalansować” | tylko tytuł | W/K | pasmo ±10 p.p. ogranicza rebalanse |
 | Qualitative alpha #1–#11 | narracje, zespół, tokenomia | R | Piramida · fundamenty (rubryka) |
 | CACRI, Shorter Term Trading, Post-Grad | tylko nagłówki | N | brak treści |
+
+## Audyt 2026-10-05 (trzy niezależne przeglądy notatek vs kod)
+Uzupełnione po audycie: RSPS warstwowy — duże vs małe coiny jako grupy, duże zawsze kandydatami (run54, 2.24.0); benchmark $TOTAL w backteście.
+Odstępstwa świadome: weto RSPS/SDCA na LTPI z BTC zamiast $TOTAL (run45/47 — $TOTAL gorzej); parking „hybryda” miesza wycenę z trendem
+(notatki: nie mieszać) — opcja, domyślnie wyłączona. Do zbadania (run55): spójność czasowa składników LTPI (Supertrend 50/4 zmienia znak
+ok. 22×/rok przy EMA50>200 0,5×/rok), neutralne głosy (strefa martwa), ważność TPI wg udziału coina w $TOTAL, lump sum reszty gotówki
+przy zmianie LTPI na dodatnie, SDCA na ETH/SOL. Brak danych/niemożliwe: ISM PMI, makro w TPI (S&P, DXY, TLT — brak darmowego źródła
+dziennego w aplikacji), DMI / Parabolic SAR (wymagają high/low), modele per token, „Metcalfe”.

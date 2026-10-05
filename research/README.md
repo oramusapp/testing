@@ -231,3 +231,50 @@ obecnie (BTC→stable) — CAGR 65,5%, DD −29,3%, OOS 1,00, RSPS IS 1,59; BTC�
 złoto w trendzie → BTC → stable — 51,2%, −26,0%, 1,22, IS 1,07 (złoto wypycha BTC); złoto silne = trend i PAXG/BTC > średnia 50 d —
 72,8%, −29,0%, 1,37, IS 1,49; złoto silne = trend i momentum PAXG/BTC 30/60/90 d > 0 (wybrane) — 71,4%, −26,7%, 1,25, IS 1,55.
 Średni udział w RSPS (wybrany wariant): złoto 28%, BTC 30%. Silnik aplikacji (fixture): CAGR RSPS 87,2 → 99,3%, IS 1,88 → 1,84, OOS 0,88 → 1,27.
+
+## 42 Macro — cotygodniowe odczyty (2.21.0)
+Raport 42 Macro jest płatny i objęty zakazem redystrybucji — w repozytorium nie ma jego treści. Aplikacja ma kartę, w której
+użytkownik co tydzień wpisuje odczyty modeli: Global Macro Risk Matrix (reżim, P(risk-on)), VAMS BTC/ETH/złota, Macro Weather Model
+(BTC, utrzymanie risk-on), Global Liquidity (trend, wskaźniki wyprzedzające), GRID (modalny wynik), Positioning (ryzyko korekty
+i krachu), KISS i Dr. Mo dla BTC. Punktacja (własne przypisanie, równe wagi, bez backtestu — historie modeli nie są publiczne)
+zasila filar Makro w Piramidzie przez 7 dni; reguła KISS dla BTC (10%/5% wg risk-on/off × 100/50/0% wg VAMS) liczona dla podglądu.
+
+## Pomysły z metodologii 42 Macro przetestowane na strategii (run51.py) — wdrożone B i C w 2.22.0
+Bez danych z raportu — tylko reguły. Portfel z przechyłem, 2020→ (Dale = lata odrabiania maks. obsunięcia przy CAGR):
+baza — CAGR 71,2%, DD −26,7%, IS 1,77, OOS 1,25, Dale 0,58. A: pół pozycji alta przy trendzie 0,5 (Dr. Mo) — bez zmian.
+B: BTC w rezerwie RSPS 0/50/100% wg trendu (VAMS 3-stanowy) — 72,8%, −26,1%, OOS 1,28. C: SDCA ×2 pod Probable Range
+(średnia 20 d − 1,5σ) — SDCA CAGR 43,0 → 45,8%, DD −37,1 → −37,3%, IS 1,42 → 1,48, OOS 0,99 bez zmian; portfel 72,5%.
+B + C razem — CAGR 74,2%, DD −26,1%, IS 1,80, OOS 1,28, Dale 0,54. Odrzucone: D przechył wg ETH/BTC (65,9%), E cel zmienności
+RSPS 60/80/100% (63,0–69,7%). Statystyka zdarzeń: 5 dni po zamknięciu pod dolną granicą średnio −0,37% (z −1,98), nad górną +1,46% (z 3,34)
+— dlatego ×0,5 nad zakresem nie zostało wybrane.
+
+## Dalsze szukanie zwrotu (run52.py, run53.py) — wdrożone okna 7/21/42 w 2.23.0
+Baza = 2.22.0 (VAMS BTC, SDCA ×2 pod zakresem, przechył 40/60), portfel 2020→: CAGR 74,2%, DD −26,1%, IS 1,80, OOS 1,28.
+Okna siły względnej RSPS (portfel CAGR / IS / OOS): 30/60/90 — 74,2 / 1,80 / 1,28; 7/21/42 — 81,7 / 1,87 / 1,32 (wybrane);
+10/20/40 — 80,0 / 1,83 / 1,32; 14/30/60 — 80,9 / 1,89 / 1,25; 7/14/30 — 78,0 / 1,78 / 1,34; 21/42/63 — 79,8 / 1,88 / 1,22;
+60/90/120 — 68,9 / 1,71 / 1,24. Krótsze okna poprawiają wynik w całym sąsiedztwie. Sprawdzenia 7/21/42: portfel bez roku 2021 —
+57,8% vs 55,0%; koszt 0,3% za stronę — 73,6% vs 67,6% (OOS 1,21 vs 1,17); obrót podobny (ok. 50× rocznie). Silnik aplikacji
+(fixture, bez PAXG): RSPS CAGR 91,9 → 101,7%, DD −33,4 → −31,3%, IS 1,89 → 1,92, OOS 0,96 → 1,07.
+Odrzucone: bufor rankingu (trzymaj, dopóki w top 5/6) — 67,6/62,9%; ETH jako druga ławka — 67,8%, DD −35%; top 2/4 z buforem — 66,8/70,1%;
+pasmo rebalansu 5% — bez zmian, 20% — gorzej; przechył 30/70 — 77,5% ale DD −29,3%; SDCA bez sprzedaży z krzywej — DD −51,9%;
+SDCA ×1,5 przy LTPI+ — bez zmian. Informacyjnie (założenie, nie reguła): oprocentowanie stablecoinów 4%/rok — portfel 76,3% zamiast 74,2%.
+
+## RSPS warstwowy wg notatek (run54.py) — wdrożony w 2.24.0
+Notatki: RSPS zarządza ekspozycją na rynek, proporcją między dużymi coinami, dużymi vs małymi jako grupami i małymi vs ich dużym
+„referencyjnym”; „czasem trzyma tylko BTC i ETH, gdy dominacja dużych rośnie”. Duże (lista użytkownika): BTC, ETH, SOL, XRP, SUI
+(HYPE — brak historii w dostępnych tu danych; w aplikacji pobierany z Hyperliquid). Małe = pozostałe z top 10 płynności (point-in-time).
+Portfel 2020→ (CAGR / IS / OOS / DD): baza 2.23.0 — 81,7 / 1,87 / 1,32 / −26,6; tylko duże — 70,4 / 1,70 / 1,43 / −31,4;
+jedna pula duże+małe — 80,0 / 1,86 / 1,32 / −26,6; warstwy (małe, gdy grupa silna) — 79,6 / 1,81 / 1,47 / −27,1; + małe vs referencyjny —
+79,9 / 1,82 / 1,47 / −27,1; warstwy + najpierw duże (wybrane) — 79,8 / 1,79 / 1,49 / −27,3. Wybrany wariant: 2024→ CAGR 54,8 → 65,4%,
+bez roku 2021 57,8 → 63,1%, przy koszcie 0,3% 2024→ 47,9 → 58,6%. Niższy wynik całości tylko przez 2021 (mania małych: 661% → 404%).
+Małe silniejsze od dużych: 27% dni od 2020. Silnik aplikacji (fixture): RSPS CAGR 101,7 → 109,2%, OOS 1,07 → 1,25, DD −31,3 → −32,5%.
+
+## Luki z audytu notatek (run55.py, run56.py) — wdrożone LTPI spójne czasowo w 2.25.0
+Notatki: składniki TPI mają działać na tym samym horyzoncie. W LTPI trzy składniki zmieniały znak 15–22×/rok (Supertrend 50/4, RSI 100,
+cena > SMA 200) obok 1–8×/rok pozostałych. Portfel 2.24.0, 2020→ (CAGR / DD / IS / OOS / bez 2021 / 2024→ CAGR):
+obecne — 79,8 / −27,3 / 1,79 / 1,49 / 63,1 / 65,4; bez Supertrend — 80,1 / … / 1,46; bez RSI 100 — 79,7; bez SMA 200 — 79,6;
+bez Supertrend i RSI — 82,9 / −27,3 / 1,83 / 1,54; bez wszystkich trzech — 83,0 / −27,3 / 1,83 / 1,55 / 66,1 / 67,8; to samo na $TOTAL
+(przechył) — 84,4 / −27,3 / 1,84 / 1,57 / 67,0 / 70,0 (wybrane). Koszt 0,3%: 72,7 → 75,8%. SDCA: DD −37,3 → −34,0%. Zmiany stanu LTPI 5,5 → 2,8/rok.
+Odrzucone: wolniejsze zamienniki (Supertrend 100/6, RSI 180, SMA 365) — 78,8%; głosy neutralne (strefy martwe) — 79,7%, DD −28,9%;
+alty bez weta LTPI (ważność TPI ∝ udział w rynku) — 84,3%, ale DD −33,6%; lump sum reszty gotówki SDCA przy LTPI → + (ryzyko < 50%) —
+85,1%, ale DD −35,1%. SDCA na ETH/SOL nietestowalne bez modelu wyceny dla tych coinów (model wyceny jest specyficzny dla BTC).
