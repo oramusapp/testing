@@ -90,9 +90,7 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
   const labels = view ? view.main[0].run.dates : [];
   const btcPrices = model ? new Map(model.dates.map((d, i) => [d, model.prices[i]])) : new Map<string, number>();
   const bh: Run | null = labels.length ? buyHold(labels, labels.map((d) => btcPrices.get(d)!)) : null;
-  // course notes: $TOTAL is the benchmark RSPS should beat on the upside
-  const totMap = model && base ? new Map(model.dates.map((d, i) => [d, base.tp[i]])) : new Map<string, number>();
-  const bhTot: Run | null = labels.length && totMap.size ? buyHold(labels, labels.map((d) => totMap.get(d)!)) : null;
+
 
   return (
     <Screen nav={nav} title="Backtest" subtitle="Cała strategia i jej części · ustawienia jak w aplikacji">
@@ -111,11 +109,11 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
           <Card className="mt12">
             <div className="eyebrow" style={{ margin: 0 }}>Kapitał (skala log) · start {fmtDate(labels[0])}</div>
             <Chart labels={labels} log height={240}
-              lines={[{ values: equity(bh.ret), color: '#8e8e93', width: 1.1 }, ...(bhTot ? [{ values: equity(bhTot.ret), color: '#6f6a60', width: 1 }] : []), ...view.main.map((m, k) => ({ values: equity(m.run.ret), color: m.color, width: k === 0 ? 1.8 : 1.2 }))]}
+              lines={[{ values: equity(bh.ret), color: '#8e8e93', width: 1.1 }, ...view.main.map((m, k) => ({ values: equity(m.run.ret), color: m.color, width: k === 0 ? 1.8 : 1.2 }))]}
               tip={(i) => `${fmtDate(labels[i])} · ` + view.main.map((m) => `${m.name} ${equity(m.run.ret.slice(0, i + 1)).at(-1)!.toFixed(2)}×`).join(' · ')} />
-            <div className="legend">{view.main.map((m) => <span key={m.name}><i style={{ background: m.color }} />{m.name}</span>)}<span><i style={{ background: '#8e8e93' }} />BTC kup i trzymaj</span><span><i style={{ background: '#6f6a60' }} />$TOTAL kup i trzymaj</span></div>
+            <div className="legend">{view.main.map((m) => <span key={m.name}><i style={{ background: m.color }} />{m.name}</span>)}<span><i style={{ background: '#8e8e93' }} />BTC kup i trzymaj</span></div>
           </Card>
-          {[...view.main.map((m) => ({ name: m.name, run: m.run })), { name: 'BTC kup i trzymaj', run: bh }, ...(bhTot ? [{ name: '$TOTAL kup i trzymaj (benchmark RSPS)', run: bhTot }] : [])].map((m) => (
+          {[...view.main.map((m) => ({ name: m.name, run: m.run })), { name: 'BTC kup i trzymaj', run: bh }].map((m) => (
             <Card key={m.name} className="tight">
               <div className="row"><b>{m.name}</b><span className="faint" style={{ fontSize: 12 }}>CAGR · Sharpe · Sortino · maks. DD · ekspozycja</span></div>
               {PERIODS.map((p) => {
@@ -127,8 +125,8 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
         </>
       )}
       <div className="note-text mt12">
-        Zasady jak w sygnałach. Uwaga: model wyceny SDCA w aplikacji jest dopasowany do całej historii (szyny kwantylowe i percentyl MVRV), więc wynik SDCA i całości zawiera efekt patrzenia w przyszłość — testy bez tego efektu (model liczony tylko na przeszłości) są w research/ i dają niższe wyniki (np. SDCA od 2020: CAGR ok. 41–44%). decyzja na zamknięciu dnia, transakcja następnego dnia, koszt 0,15% za stronę. SDCA: krzywa, bezpiecznik LTPI, tempo zakupów przy LTPI− i (jeśli włączona) sprzedaż przy ATH — od 100% stablecoinów w dniu startu.
-        LTPI · MTPI: BTC, gdy stan TPI jest dodatni, w przeciwnym razie stablecoin. TPI liczone z $TOTAL (całego rynku), jak w notatkach; próg stanu wg ustawień (domyślnie 0).
+        Bez patrzenia w przyszłość: każdy dzień używa tylko danych do zamknięcia swojej świecy (00:00 UTC) — model wyceny przeliczany co rok na danych sprzed 1 stycznia, percentyle tylko z przeszłości, TPI z wcześniejszych zamknięć; decyzja na zamknięciu, transakcja następnego dnia. Zasady jak w sygnałach: decyzja na zamknięciu dnia, transakcja następnego dnia, koszt 0,15% za stronę. SDCA: krzywa, bezpiecznik LTPI, tempo zakupów przy LTPI− i (jeśli włączona) sprzedaż przy ATH — od 100% stablecoinów w dniu startu.
+        LTPI · MTPI: BTC, gdy stan TPI jest dodatni, w przeciwnym razie stablecoin. Kupowany jest BTC; $TOTAL (cały rynek) służy wyłącznie do odczytu kierunku i trendu (TPI), jak w notatkach — nie jest aktywem do kupienia. Próg stanu wg ustawień (domyślnie 0).
         RSPS: codzienna rotacja siły względnej wśród {rs.universeSize - 1} najpłynniejszych altów (plus BTC), bramka szerokości 70%/60%, LTPI− → stablecoin, parking: {parking.choice === 'stable' ? 'stablecoin' : parking.choice === 'btc' ? 'BTC × trend' : `hybryda (ryzyko < ${HYBRID_RISK_MAX}%)`}.
         Używa dzisiejszej listy kandydatów, więc tokeny, które zniknęły z rynku, są pominięte — wynik RSPS jest optymistyczny (błąd przeżywalności).
         Całość: {SPLIT_SDCA}% SDCA / {100 - SPLIT_SDCA}% RSPS z rebalansem przy odchyleniu ±10 p.p. Wyniki historyczne nie gwarantują przyszłych.

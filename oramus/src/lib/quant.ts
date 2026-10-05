@@ -220,6 +220,46 @@ export function detrendedRisk(dates: string[], values: Series) {
   return { risk, z: risk.map((r) => (Number.isFinite(r) ? -normInv(Math.min(Math.max(r, 0.001), 0.999)) : NaN)) };
 }
 
+// ---------- point-in-time (no look-ahead) versions ----------
+/** Percentile rank of each value among all finite values up to and including that day (expanding window). */
+export function percentileRankExpanding(a: Series, minN = 365): Series {
+  const sorted: number[] = [];
+  return a.map((v) => {
+    if (!Number.isFinite(v)) return NaN;
+    let lo = 0, hi = sorted.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (sorted[m] < v) lo = m + 1; else hi = m; }
+    sorted.splice(lo, 0, v);
+    return sorted.length >= minN ? lo / (sorted.length - 1) : NaN;
+  });
+}
+
+/** Detrended MVRV percentile without look-ahead: for each calendar year the log-time trend and the residual
+ *  distribution are fitted only on data before 1 January of that year (as research/sdca.py mvrv_risk_expanding). */
+export function detrendedRiskExpanding(dates: string[], values: Series, firstYear = 2013) {
+  const risk: number[] = new Array(values.length).fill(NaN);
+  const lastYear = +dates[dates.length - 1].slice(0, 4);
+  for (let Y = firstYear; Y <= lastYear; Y++) {
+    const start = `${Y}-01-01`, end = `${Y + 1}-01-01`;
+    const X: number[][] = [], y: number[] = [];
+    values.forEach((v, i) => {
+      if (!(v > 0) || dates[i] >= start || dates[i] < '2011-01-01') return;
+      const x = Math.log10(Math.max(daysSinceGenesis(dates[i]), 1)); X.push([1, x]); y.push(Math.log(v));
+    });
+    if (X.length < 365) continue;
+    const { beta } = wls(X, y);
+    const hist = y.map((v, k) => v - dot(X[k], beta)).sort((a, b) => a - b);
+    values.forEach((v, i) => {
+      if (!(v > 0) || dates[i] < start || dates[i] >= end) return;
+      const x = Math.log10(Math.max(daysSinceGenesis(dates[i]), 1));
+      const r = Math.log(v) - (beta[0] + beta[1] * x);
+      let lo = 0, hi = hist.length;
+      while (lo < hi) { const m = (lo + hi) >> 1; if (hist[m] < r) lo = m + 1; else hi = m; }
+      risk[i] = lo / hist.length;
+    });
+  }
+  return { risk, z: risk.map((r) => (Number.isFinite(r) ? -normInv(Math.min(Math.max(r, 0.001), 0.999)) : NaN)) };
+}
+
 /** Rolling annualised Sharpe of daily log returns. */
 export function rollingSharpe(prices: Series, n = 365): Series {
   const out: number[] = new Array(prices.length).fill(NaN);

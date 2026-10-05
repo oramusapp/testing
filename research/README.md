@@ -180,3 +180,9 @@ short jako propozycja przy MTPI < 0 i spadającym (notatki: „below zero and fa
 Silnik RSPS w aplikacji (lib/backtestAll.ts) odtwarza research przy tych samych danych: stablecoin IS 1,37 / OOS 0,33, CAGR 36%, DD −40%
 (research 1,29 / 0,34 / 34% / −40%); BTC×trend 1,88 / 0,88 / 87% / −33% (research 1,82 / 0,88 / 84% / −35%). Ujednolicone definicje:
 siła względna = zmiana log relacji do BTC / zmienność coina (30/60/90), BTC liczony do top-10 płynności, nieprzydzielona część wg parkingu.
+
+## Model bez patrzenia w przyszłość w aplikacji (2.13.0)
+Aplikacja liczy wycenę SDCA tak jak research: szyny kwantylowe przeliczane co rok na danych sprzed 1 stycznia (pierwszy model 2013),
+percentyl MVRV po odtrendowaniu tylko z danych sprzed roku, percentyl Sharpe z przeszłych dni. Kontrola (wbudowane dane, od 2020):
+SDCA z bezpiecznikiem, LTPI z $TOTAL próg 0, zakupy × 0,25 — CAGR 42,2%, Sharpe 2024→ 0,89, DD −32,9% (research run44: 41,4%, 0,89).
+$TOTAL nie jest aktywem w backteście — służy tylko jako wejście TPI (kierunek i trend rynku).
