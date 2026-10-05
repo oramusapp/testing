@@ -98,11 +98,16 @@ export async function refreshBtcHistory(h: BtcHistory, onProgress?: (msg: string
 }
 
 /** Crypto Fear & Greed index (alternative.me), 0 = extreme fear … 100 = extreme greed. */
-export async function fearGreed(): Promise<{ value: number; label: string; time: number } | null> {
+export async function fearGreed(): Promise<{ value: number; label: string; time: number; mu: number; sd: number; n: number } | null> {
   try {
-    const j = await getJSON('https://api.alternative.me/fng/?limit=1');
+    // full history (limit=0) so the reading can be standardised against its own distribution
+    const j = await getJSON('https://api.alternative.me/fng/?limit=0');
+    const all = (j?.data ?? []).map((d: { value: string }) => +d.value).filter(Number.isFinite) as number[];
     const d = j?.data?.[0];
-    return d ? { value: +d.value, label: d.value_classification, time: +d.timestamp * 1000 } : null;
+    if (!d || all.length < 30) return null;
+    const mu = all.reduce((a, b) => a + b, 0) / all.length;
+    const sd = Math.sqrt(all.reduce((a, b) => a + (b - mu) ** 2, 0) / (all.length - 1));
+    return { value: +d.value, label: d.value_classification, time: +d.timestamp * 1000, mu, sd, n: all.length };
   } catch { return null; }
 }
 

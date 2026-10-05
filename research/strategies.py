@@ -79,7 +79,7 @@ def breadth(ctx, d, sma=50):
             vals.append(ratio.iloc[-1] > ratio.iloc[:-1].mean())
     return np.mean(vals) if vals else np.nan
 
-def rsps(ctx, lookback=30, top=3, cap=0.5, conf=0.0, every=7, fallback='trend', short_k=0, short_gross=0.0, buffer=0, sticky=False, exit_conf=None):
+def rsps(ctx, lookback=30, top=3, cap=0.5, conf=0.0, every=7, fallback='trend', short_k=0, short_gross=0.0, buffer=0, sticky=False, exit_conf=None, ltpi_veto=False):
     """Relative-strength rotation among point-in-time large caps.
     Active only when breadth ≥ conf; picks must also be in their own uptrend (ensemble ≥ 0.5).
     Weights ∝ score / vol, capped; unfilled weight goes to BTC scaled by BTC trend (fallback).
@@ -94,12 +94,21 @@ def rsps(ctx, lookback=30, top=3, cap=0.5, conf=0.0, every=7, fallback='trend', 
         w = {}
         sc = rs_scores(ctx, d, lookback)
         br = breadth(ctx, d)
-        btc_w = bt if fallback == 'trend' else 1.0
+        if fallback == 'trend':
+            btc_w = bt
+        elif fallback == 'trend_ltpi':      # BTC × trend, but all stablecoin while LTPI (SMA200) is negative
+            btc_w = bt if ctx.ltpi.get(d, 1) > 0 else 0.0
+        elif fallback == 'cash':
+            btc_w = 0.0
+        elif fallback == 'series':          # follow an external BTC weight path (e.g. the SDCA sleeve)
+            btc_w = float(ctx.fallback_series.get(d, 0.0))
+        else:
+            btc_w = 1.0
         if exit_conf is None:
             active = np.isfinite(br) and br >= conf
         else:   # hysteresis: enter at conf, leave only below exit_conf
             active = np.isfinite(br) and (br >= exit_conf if active else br >= conf)
-        if sc and active and bt >= 0.5:
+        if sc and active and bt >= 0.5 and not (ltpi_veto and ctx.ltpi.get(d, 1) <= 0):
             ranked = [a for a, s in sorted(sc.items(), key=lambda x: -x[1]) if s > 0 and ctx.trend[a].get(d, 0) >= 0.5]
             if buffer:
                 # rank buffer: keep a held name while it stays within top+buffer, fill the rest by rank

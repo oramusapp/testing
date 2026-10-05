@@ -37,7 +37,7 @@ export default function Sdca() {
   const [s, setS] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
   const [ltpi, setLtpi] = usePersisted<LtpiState>('signals.ltpi', { mode: 'proxy', manual: 0 });
   const [trades, setTrades] = usePersisted<Trade[]>('sdca.journal', []);
-  const [pyrHist] = usePersisted<{ date: string; score: number; coverage: number }[]>('pyramid.history', []);
+  const [pyrHist] = usePersisted<{ date: string; z: number; p: number; coverage: number }[]>('pyramid.history', []);
   const [view, setView] = useState<'rainbow' | 'risk' | 'curve'>('rainbow');
   const [info, setInfo] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
@@ -108,7 +108,7 @@ export default function Sdca() {
         <Row className="compact" label="Composite Risk dziś" value={pct(riskToday)} />
         <Row className="compact" label="Krzywa dziś" value={signed(rate) + '%/dzień'} />
         <Row className="compact" label="Cena BTC" value={usd(price)} />
-        {pyrHist.length > 0 && <Row className="compact" label="Piramida analizy" value={<span style={{ color: pyrHist.at(-1)!.score >= 0.15 ? 'var(--green)' : pyrHist.at(-1)!.score <= -0.15 ? 'var(--red)' : 'var(--amber)' }}>{signed(pyrHist.at(-1)!.score)} <span className="dim">· pokrycie {Math.round(pyrHist.at(-1)!.coverage * 100)}%</span></span>} />}
+        {pyrHist.length > 0 && Number.isFinite(pyrHist.at(-1)!.z) && <Row className="compact" label="Piramida analizy" value={<span style={{ color: pyrHist.at(-1)!.z >= 0.25 ? 'var(--green)' : pyrHist.at(-1)!.z <= -0.25 ? 'var(--red)' : 'var(--amber)' }}>{signed(pyrHist.at(-1)!.z)}σ <span className="dim">· P {Math.round(pyrHist.at(-1)!.p * 100)}% · pokrycie {Math.round(pyrHist.at(-1)!.coverage * 100)}%</span></span>} />}
         <Row className="compact" label="Rezerwa gotówki" value={<NumInput className="inline-input" value={cfg.cash} onChange={(v) => upd({ cash: v ?? 0 })} suffix="$" />} />
         <Row className="compact" label="Posiadane BTC" value={<NumInput className="inline-input" value={cfg.btcHeld} onChange={(v) => upd({ btcHeld: v ?? 0 })} />} />
       </Card>

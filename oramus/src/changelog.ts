@@ -1,5 +1,32 @@
 export const CHANGELOG = [
   {
+    v: '1.6.0', date: '2026-10-04',
+    items: [
+      'Sygnały: wyniki portfela od startu (TWR całości, SDCA i RSPS, porównanie z BTC, obsunięcie, zmienność, Sharpe)',
+      'Codzienny zapis stanu po zamknięciu 00:00 UTC i wykres wyniku',
+      'Automatyczne raporty miesięczne zapisywane w historii, z możliwością udostępnienia'
+    ]
+  },
+  {
+    v: '1.5.0', date: '2026-10-04',
+    items: [
+      'Model rozkładu normalnego: każdy filar piramidy jako z-score (σ), P = Φ(z); średnia ważona z',
+      'Auto: z momentum BTC 90 dni, z wyceny SDCA, z MVRV, statystyka t, z Fear & Greed względem całej historii',
+      'Ręczne filary: odczyt w σ (−2σ…+2σ), np. pozycja w Bollinger Bands',
+      'Sygnały: dwa oddzielne portfele SDCA i RSPS z własnymi stablecoinami i wskazówkami; przeniesienie tylko po przekroczeniu ±10 p.p. i kliknięciu'
+    ]
+  },
+  {
+    v: '1.4.0', date: '2026-10-04',
+    items: [
+      'Nowy ekran Sygnały: rozpisanie kwoty na SDCA/RSPS i aktywa, codzienne zlecenia z przyciskiem „Wykonano”',
+      'Rotacja SDCA ↔ RSPS przy odchyleniu ±10 p.p., wpłaty i wypłaty, ręczna edycja stanów',
+      'Zamknięta bramka RSPS: decyzja użytkownika, domyślnie stablecoin; LTPI < 0 → 100% stablecoin',
+      'Propozycja zmniejszenia ekspozycji przy wysokiej zmienności portfela',
+      'Ręczne filary: standardowe pytania z linkami do źródeł (FRED, FedWatch, Farside, DefiLlama, TradingView…)'
+    ]
+  },
+  {
     v: '1.3.0', date: '2026-10-04',
     items: [
       'RSPS przeliczony na danych Binance (35 tokenów bez memów, w tym SOL, AVAX, NEAR, SUI)',

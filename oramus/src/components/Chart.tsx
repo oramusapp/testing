@@ -93,10 +93,16 @@ export function Chart(p: ChartProps) {
     }
     // x axis years
     g.textAlign = 'center'; g.textBaseline = 'top';
-    let lastYear = '', lastX = -100;
+    // year ticks for long ranges, month ticks (MM.YY) for ranges under ~2 years
+    const monthly = n < 730;
+    let lastKey = '', lastX = -100;
     for (let i = 0; i < n; i++) {
-      const yr = p.labels[i].slice(0, 4);
-      if (yr !== lastYear) { lastYear = yr; const x = X(i); if (x - lastX > 38) { g.fillText(yr, x, y1 + 5); lastX = x; } }
+      const key = monthly ? p.labels[i].slice(0, 7) : p.labels[i].slice(0, 4);
+      if (key !== lastKey) {
+        lastKey = key; const x = X(i);
+        const text = monthly ? `${p.labels[i].slice(5, 7)}.${p.labels[i].slice(2, 4)}` : key;
+        if (x - lastX > 38) { g.fillText(text, x, y1 + 5); lastX = x; }
+      }
     }
 
     // bands

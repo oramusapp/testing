@@ -1,133 +1,26 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Screen, Card, Row, Seg, NumInput, Sheet, toast } from '../components/ui';
-import { IcInfo, IcRefresh, IcShield, IcBolt, IcLayers, IcX, IcPlus } from '../components/icons';
+import { useState } from 'react';
+import { Screen, Card, Row, NumInput, Sheet, toast } from '../components/ui';
+import { IcInfo, IcRefresh, IcShield, IcLayers, IcX, IcPlus } from '../components/icons';
 import { PyramidCard } from '../components/Pyramid';
-import { usePersisted } from '../lib/db';
-import { klines, lastClosedDay } from '../lib/market';
-import { vams, annVol, capWeights } from '../lib/quant';
-import { leverageGate, LEV_MAX } from '../lib/pyramid';
-import { usePyramid } from '../lib/pyramidStore';
+import { LEV_MAX } from '../lib/pyramid';
+import { useRsps, DEFAULT_TOKENS, MEME, RSPS_DEF, SPLIT_SDCA } from '../lib/useRsps';
 import { pct, signed, usd } from '../lib/format';
-import type { LtpiState } from './Sdca';
 
-// Large-cap, non-meme candidates (Binance <SYMBOL>USDT). The scanner keeps the 10 most liquid.
-export const DEFAULT_TOKENS = ['ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'TRX', 'LINK', 'AVAX', 'DOT', 'LTC', 'BCH', 'XLM', 'ATOM', 'NEAR', 'UNI', 'AAVE', 'ETC', 'ICP',
-  'FIL', 'POL', 'ALGO', 'XTZ', 'VET', 'HBAR', 'APT', 'SUI', 'TON', 'ARB', 'OP', 'INJ', 'MANA'];
-export const MEME = ['DOGE', 'SHIB', 'PEPE', 'WIF', 'BONK', 'FLOKI', 'TRUMP', 'MEME', 'BOME', 'POPCAT'];
-
-// Parameters chosen on 2020–2023 data, tested out of sample 2024-01…2026-10 on Binance data (research/run9–13.py).
-export interface RspsSettings { tokens: string[]; universeSize: number; topN: number; cap: number; capital: number; }
-export const RSPS_DEF: RspsSettings = { tokens: DEFAULT_TOKENS, universeSize: 10, topN: 3, cap: 50, capital: 10000 };
-export const LOOKBACKS = [30, 60, 90];          // relative-strength ensemble
-export const BREADTH_ENTER = 0.7, BREADTH_EXIT = 0.6;   // gate hysteresis
-// Split with the highest Sharpe (1.52, tie 40/50%) and the better Calmar of the two (research/run8.py).
-export const SPLIT_SDCA = 60;
-interface ScanRow { sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; }
-interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; gateOpen: boolean; }
-interface LogEntry { time: number; regime: string; lev?: number; }
+export { DEFAULT_TOKENS, MEME, RSPS_DEF, SPLIT_SDCA } from '../lib/useRsps';
 
 const REGIMES = {
-  defense: { title: 'Ochrona kapitału', tone: 'red', icon: IcShield, desc: 'LTPI ujemne: sygnał wyjścia z SDCA. Bez RSPS, bez dźwigni.' },
+  defense: { title: 'Ochrona kapitału', tone: 'red', icon: IcShield, desc: 'LTPI ujemne: cała część RSPS w stablecoinach. Bez nowych pozycji.' },
   rsps: { title: 'RSPS aktywny', tone: 'accent', icon: IcLayers, desc: 'Szerokość rynku ≥ próg: część RSPS rotuje do najsilniejszych tokenów względem BTC.' },
-  btc: { title: 'BTC skalowany trendem', tone: 'dim', icon: IcShield, desc: 'RSPS nieaktywny: część RSPS trzyma BTC proporcjonalnie do siły trendu.' }
+  closed: { title: 'Bramka RSPS zamknięta', tone: 'dim', icon: IcShield, desc: '' }
 } as const;
-type RegimeId = keyof typeof REGIMES;
-
-const trendOf = (c: number[]) => {
-  const n = c.length - 1;
-  return [20, 50, 100, 200].map((L) => (n >= L && c[n] > c.slice(n - L + 1).reduce((a, b) => a + b, 0) / L ? 1 : 0) as number).reduce((a, b) => a + b, 0) / 4;
-};
 
 export default function Rsps() {
-  const pyr = usePyramid();
-  const [s0, setS] = usePersisted<RspsSettings>('rsps.settings', RSPS_DEF);
-  const s = { ...RSPS_DEF, ...s0 };
-  const upd = (p: Partial<RspsSettings>) => setS((o) => ({ ...RSPS_DEF, ...o, ...p }));
-  const [ltpiManual] = usePersisted<LtpiState>('signals.ltpi', { mode: 'proxy', manual: 0 });
-  const [scan, setScan] = usePersisted<Scan | null>('rsps.scan2', null);
-  const [log, setLog] = usePersisted<LogEntry[]>('rsps.log', []);
-  const [busy, setBusy] = useState(false);
+  const R0 = useRsps();
+  const { pyr, s, upd, scan, scanFresh, busy, runScan, breadth, btcTrend, regime, gate, picks, sleeve, shortProposal, log, parking, parkingPending, confirmParking } = R0;
   const [info, setInfo] = useState(false);
   const [tokOpen, setTokOpen] = useState(false);
   const [levOpen, setLevOpen] = useState(false);
-  const a = pyr.auto;
-
-  const ltpi = ltpiManual.mode === 'manual' ? ltpiManual.manual : a?.ltpi ?? 0;
-  const scanFresh = !!scan && scan.closeDate >= lastClosedDay();
-  const breadth = scan?.breadth ?? NaN;
-  const btcTrend = a?.trendEnsemble ?? scan?.btcTrend ?? 0;
-  const rspsActive = scanFresh && !!scan?.gateOpen && btcTrend >= 0.5 && ltpi >= 0;
-
-  const gate = leverageGate({
-    trendEnsemble: a?.trendEnsemble ?? 0, adfTrending: !!a?.adfTrending, ltpi, sdcaRisk: a?.sdcaRisk ?? 100,
-    volBelowMedian: !!a?.volBelowMedian, persistDays: a?.persistDays ?? 0, rspsActive, pyramid: pyr.comp, state: pyr.state
-  });
-  const regime: RegimeId = ltpi < 0 ? 'defense' : rspsActive ? 'rsps' : 'btc';
-  const R = REGIMES[regime];
-
-  useEffect(() => {
-    if (!a) return;
-    if (log[0]?.regime !== regime) setLog([{ time: Date.now(), regime }, ...log].slice(0, 200));
-  }, [regime, a?.date]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // automatic scan after each daily close (when the app is open)
-  useEffect(() => { if (!busy && !scanFresh) void runScan(true); }, [a?.date]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function runScan(silent = false) {
-    setBusy(true);
-    try {
-      const closed = (k: { t: number; c: number; q?: number }[]) => k.filter((x) => x.t + 86400000 <= Date.now());
-      const btc = closed(await klines('BTCUSDT', 400));
-      const btcMap = new Map(btc.map((k) => [k.t, k.c]));
-      const rows: ScanRow[] = [];
-      await Promise.all(s.tokens.filter((t) => !MEME.includes(t)).map(async (sym) => {
-        try {
-          const k = closed(await klines(sym + 'USDT', 400));
-          const c = k.map((x) => x.c);
-          if (c.length < 150) throw new Error('za krótka historia');
-          const ratio = k.filter((x) => btcMap.has(x.t)).map((x) => x.c / btcMap.get(x.t)!);
-          const r50 = ratio.slice(-51, -1).reduce((p, v) => p + v, 0) / 50;
-          const vol = annVol(c, 30);
-          rows.push({
-            sym, price: c.at(-1)!, ret: (c.at(-1)! / c[c.length - 31] - 1) * 100, vol: vol * 100,
-            liq: k.slice(-30).reduce((p, x) => p + (x.q ?? 0), 0) / 30, ratioUp: ratio.at(-1)! > r50, trend: trendOf(c),
-            score: LOOKBACKS.map((L) => vams(ratio, L, 30)).reduce((p, v) => p + v, 0) / LOOKBACKS.length
-          });
-        } catch (e) { rows.push({ sym, price: NaN, ret: NaN, vol: NaN, liq: 0, ratioUp: false, trend: 0, score: NaN, error: (e as Error).message }); }
-      }));
-      // point-in-time universe: the N most liquid (30-day average quote volume)
-      const ok = rows.filter((r) => !r.error).sort((x, y) => y.liq - x.liq);
-      ok.slice(0, s.universeSize).forEach((r) => (r.inUniverse = true));
-      const uni = ok.filter((r) => r.inUniverse);
-      const br = uni.length ? uni.filter((r) => r.ratioUp).length / uni.length : NaN;
-      rows.sort((x, y) => (y.inUniverse ? 1 : 0) - (x.inUniverse ? 1 : 0) || (y.score || -99) - (x.score || -99));
-      // hysteresis: open at ≥ 70%, stay open until breadth falls below 60%
-      const wasOpen = !!scan?.gateOpen;
-      const gateOpen = Number.isFinite(br) && (wasOpen ? br >= BREADTH_EXIT : br >= BREADTH_ENTER);
-      setScan({ time: Date.now(), closeDate: lastClosedDay(), rows, breadth: br, btcTrend: trendOf(btc.map((x) => x.c)), gateOpen });
-      if (!silent) toast('Skan zakończony');
-    } catch (e) {
-      if (!silent) toast('Brak połączenia z Binance: ' + (e as Error).message);
-    } finally { setBusy(false); }
-  }
-
-  const picks = useMemo(() => {
-    const uni = (scan?.rows ?? []).filter((r) => r.inUniverse && Number.isFinite(r.score));
-    const sel = uni.filter((r) => r.score > 0 && r.trend >= 0.5).sort((x, y) => y.score - x.score).slice(0, s.topN);
-    const w = capWeights(sel.map((r) => r.score / (r.vol / 100)), s.cap / 100).map((x) => Math.min(x, s.cap / 100));
-    const shorts = uni.filter((r) => r.score < 0 && r.trend <= 0.25).sort((x, y) => x.score - y.score).slice(0, 3);
-    return { sel: sel.map((r, i) => ({ sym: r.sym, w: w[i] })), shorts };
-  }, [scan, s.topN, s.cap]);
-
-  // RSPS-sleeve allocation (fraction of the RSPS part of the capital)
-  const sleeve: { sym: string; w: number; note?: string }[] = [];
-  if (regime === 'rsps') {
-    picks.sel.forEach((p) => sleeve.push(p));
-    const rest = 1 - picks.sel.reduce((x, p) => x + p.w, 0);
-    if (rest > 0.001) sleeve.push({ sym: 'BTC', w: rest * btcTrend, note: 'reszta × trend BTC' });
-  } else if (regime === 'btc') sleeve.push({ sym: 'BTC', w: btcTrend, note: `trend ${btcTrend.toFixed(2)}` });
-  // short proposal: the backtested condition (BTC trend ensemble ≤ 0.25), weakest alts in their own downtrend
-  const shortProposal = btcTrend <= 0.25 && picks.shorts.length > 0 && scanFresh;
+  const R = { ...REGIMES[regime], desc: regime === 'closed' ? (parking.choice === 'stable' ? 'Część RSPS w stablecoinach (Twój wybór).' : `Część RSPS w BTC skalowanym trendem (${btcTrend.toFixed(2)}).`) : REGIMES[regime].desc };
   const rspsCap = s.capital * (1 - SPLIT_SDCA / 100), sdcaCap = s.capital * SPLIT_SDCA / 100;
 
   return (
@@ -171,6 +64,17 @@ export default function Rsps() {
         </Card>
       )}
 
+      {regime === 'closed' && (
+        <Card>
+          <div className="between"><b>Bramka RSPS zamknięta{scan?.gateSince ? ` od ${scan.gateSince}` : ''}</b>{parkingPending && <span className="pill trim">decyzja</span>}</div>
+          <div className="note-text mt8">Gdzie trzymać część RSPS do ponownego otwarcia bramki? Backtest 2020–10.2026 (cały portfel): stablecoin — CAGR 54%, Sharpe 1,57, maks. obsunięcie −26%, ekspozycja śr. 48%; BTC × trend — CAGR 73%, Sharpe 1,64, obsunięcie −32%, ekspozycja śr. 62%.</div>
+          <div className="flex mt12">
+            <button className="btn small grow" style={parking.choice === 'stable' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('stable'); toast('Wybrano: stablecoin'); }}>Stablecoin (domyślnie)</button>
+            <button className="btn small grow" style={parking.choice === 'btc' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('btc'); toast('Wybrano: BTC × trend'); }}>BTC × trend</button>
+          </div>
+        </Card>
+      )}
+
       <PyramidCard p={pyr} />
 
       <div className="section-title">Alokacja</div>
@@ -180,14 +84,15 @@ export default function Rsps() {
         <Row className="compact" label={<b>RSPS ({100 - SPLIT_SDCA}%)</b>} value={usd(rspsCap, 0)} />
         <div className="note-text mb12">Podział z najwyższym Sharpe w backteście 2020–2026 (1,52), rebalans raz w roku.</div>
         <div className="mt12" />
-        {regime === 'defense' && <div className="note-text">LTPI ujemne: część RSPS w gotówce, bez nowych pozycji.</div>}
+        {regime === 'defense' && <div className="note-text">LTPI ujemne: cała część RSPS w stablecoinach.</div>}
+        {regime === 'closed' && parking.choice === 'stable' && <div className="note-text">Bramka zamknięta: część RSPS w stablecoinach.</div>}
         {sleeve.map((x) => (
           <div key={x.sym} className="mb12">
             <div className="between"><b>{x.sym}</b><span className="num">{pct(x.w * 100, 0)} · {usd(x.w * rspsCap, 0)}{x.note ? <span className="dim"> ({x.note})</span> : null}</span></div>
             <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 3, marginTop: 6 }}><div style={{ width: Math.min(100, x.w * 100) + '%', height: '100%', background: 'var(--accent)', borderRadius: 3 }} /></div>
           </div>
         ))}
-        {regime !== 'defense' && sleeve.reduce((p, x) => p + x.w, 0) < 0.999 && <div className="note-text">Reszta części RSPS w gotówce (stablecoin).</div>}
+        {regime === 'rsps' && sleeve.reduce((p, x) => p + x.w, 0) < 0.999 && <div className="note-text">Reszta części RSPS w stablecoinach.</div>}
       </Card>
 
       <div className="section-title">Skaner (top {s.universeSize} wg płynności, bez memów)</div>
@@ -232,7 +137,7 @@ export default function Rsps() {
       <div className="section-title">Historia reżimów</div>
       <Card className="tight">
         {log.length === 0 && <div className="empty">Brak zmian</div>}
-        {log.slice(0, 20).map((l, i) => <Row key={i} label={REGIMES[l.regime as RegimeId]?.title ?? l.regime} value={<span className="dim">{new Date(l.time).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })}</span>} />)}
+        {log.slice(0, 20).map((l, i) => <Row key={i} label={(REGIMES as Record<string, { title: string }>)[l.regime]?.title ?? l.regime} value={<span className="dim">{new Date(l.time).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })}</span>} />)}
       </Card>
 
       <Sheet open={levOpen} onClose={() => setLevOpen(false)} title="Propozycja dźwigni">
