@@ -62,3 +62,14 @@ SDCA (część bezpieczniejsza) — `run22.py`, `run23.py`:
   wszystkie warianty obniżały obsunięcie OOS, ale wybór progu częściowo widział OOS.
 - stopy finansowania (Binance BTCUSDT, kontrariańsko): poprawa tylko dla jednego progu (|z| ≥ 1), brak efektu przy
   1,5 → zbyt kruche, nie wdrożone. Wolniejsze zakupy przy LTPI < 0 pogarszały wynik; lump sum nie zadziałał.
+
+## Notatki z Crypto Investing Masterclass (run24–run25)
+
+Przetestowane reguły z notatek użytkownika (ten sam protokół):
+- SDCA: wolniejsze tempo akumulacji (×0,5 / ×0,2 / ×0,1) obniża obsunięcie IS, ale tnie CAGR (57,6% → 35–51%);
+  LSI po zwrocie LTPI prawie bez efektu (gotówka zwykle już wydana); dystrybucja 90/10 neutralna → bez zmian.
+- RSPS warstwowy (najsilniejszy z BTC/ETH/SOL przy zamkniętej bramce): IS lepiej (2,02), OOS gorzej (0,40, DD −52%).
+- Ranking Omega zamiast VAMS: OOS 0,74 vs 0,88. Skalowanie po tempie zmian MTPI: OOS 0,73 vs 0,88.
+- SUPT (podział optymalny wg Omega na 2020–2023): 30% SDCA — sprzeczne z rolą SDCA jako części bezpieczniejszej, OOS Sharpe niższy.
+Wdrożone jako narzędzia (bez zmiany reguł): trzy pochodne TPI, spójność czasowa składników, istotność TPI,
+arkusz wyceny z-score, kalkulator tempa akumulacji, Omega/Sortino/Sharpe.

@@ -120,7 +120,26 @@ export function hysteresis(tpi: S, h = HYSTERESIS): S {
   return out;
 }
 
-export interface TpiResult { value: number; series: S; state: number; stateSeries: S; votes: { name: string; vote: number }[]; }
+export interface TpiSignificance { h: number; up: number; down: number; all: number; nUp: number; nDown: number; t: number; }
+export interface TpiResult {
+  value: number; series: S; state: number; stateSeries: S;
+  votes: { name: string; vote: number; flipsPerYear: number }[];
+  roc5: number;                       // 'rate of change': TPI today minus 5 days ago
+  sig: TpiSignificance | null;        // forward returns by state (statistical significance)
+}
+
+/** Mean forward log return over h days when the state is positive vs negative, with a Welch t-statistic. */
+function significance(p: S, state: S, h = 30, skip = 400): TpiSignificance | null {
+  const up: number[] = [], dn: number[] = [];
+  for (let i = skip; i + h < p.length; i++) { const r = Math.log(p[i + h] / p[i]); if (!Number.isFinite(r)) continue; (state[i] > 0 ? up : state[i] < 0 ? dn : []).push(r); }
+  if (up.length < 30 || dn.length < 30) return null;
+  const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+  const vr = (a: number[], m: number) => a.reduce((x, y) => x + (y - m) ** 2, 0) / (a.length - 1);
+  const mu = mean(up), md = mean(dn);
+  // overlapping windows inflate the sample: effective n ≈ n / h
+  const t = (mu - md) / Math.sqrt(vr(up, mu) / (up.length / h) + vr(dn, md) / (dn.length / h));
+  return { h, up: Math.exp(mu) - 1, down: Math.exp(md) - 1, all: Math.exp(mean([...up, ...dn])) - 1, nUp: up.length, nDown: dn.length, t };
+}
 
 /** Runs on the last `window` closes (long enough for every warm-up) to stay fast on a phone. */
 export function computeTpi(prices: S, spec: TpiSpec[], window = 1500): TpiResult {
@@ -128,7 +147,14 @@ export function computeTpi(prices: S, spec: TpiSpec[], window = 1500): TpiResult
   const votes = spec.map((s) => ({ name: s.name, v: s.fn(p) }));
   const series = p.map((_, i) => votes.reduce((a, x) => a + x.v[i], 0) / votes.length);
   const stateSeries = hysteresis(series);
-  return { value: series[series.length - 1], series, state: stateSeries[stateSeries.length - 1], stateSeries, votes: votes.map((x) => ({ name: x.name, vote: x.v[x.v.length - 1] })) };
+  const flips = (v: S) => { const a = v.slice(-730); let n = 0; for (let i = 1; i < a.length; i++) if (a[i] !== a[i - 1]) n++; return (n * 365) / Math.max(a.length - 1, 1); };
+  const n = series.length;
+  return {
+    value: series[n - 1], series, state: stateSeries[n - 1], stateSeries,
+    votes: votes.map((x) => ({ name: x.name, vote: x.v[x.v.length - 1], flipsPerYear: flips(x.v) })),
+    roc5: n > 5 ? series[n - 1] - series[n - 6] : 0,
+    sig: significance(p, stateSeries)
+  };
 }
 
 /** LTPI state for every day of `prices` (0 during warm-up): 10-signal ensemble with hysteresis or price vs SMA 200. */

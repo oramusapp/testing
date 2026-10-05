@@ -243,6 +243,7 @@ export default function Signals() {
               <Stat k="SDCA / RSPS" v={`${pct(perf.sdcaTwr * 100, 1, true)} / ${pct(perf.rspsTwr * 100, 1, true)}`} s="TWR każdego portfela" />
               <Stat k="Maks. obsunięcie" v={<span className="red">{pct(perf.maxDD * 100, 1)}</span>} s={`obecnie ${pct(perf.currentDD * 100, 1)}`} />
               <Stat k="Zmienność / Sharpe" v={`${pct(perf.vol * 100, 0)} / ${perf.sharpe == null ? '—' : perf.sharpe.toFixed(2)}`} s={perf.sharpe == null ? 'Sharpe od 30 dni danych' : 'roczne'} />
+              <Stat k="Sortino / Omega" v={`${perf.sortino == null ? '—' : perf.sortino.toFixed(2)} / ${perf.omega == null ? '—' : perf.omega.toFixed(2)}`} s="Sortino karze tylko spadki; Omega = suma zysków / suma strat" />
             </div>
             <div className="mt12" />
             <Chart labels={snaps.map((x) => x.date)} height={180}

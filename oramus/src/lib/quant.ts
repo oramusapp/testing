@@ -428,3 +428,15 @@ export function capWeights(w: number[], cap = 0.5): number[] {
   }
   return out;
 }
+
+/** Annualised Sharpe, Sortino and Omega (threshold 0) of daily returns over the last n closes. */
+export function ratios(closes: number[], n = 365): { sharpe: number; sortino: number; omega: number } {
+  const c = closes.slice(-(n + 1));
+  const r = c.slice(1).map((v, i) => v / c[i] - 1).filter(Number.isFinite);
+  if (r.length < 30) return { sharpe: NaN, sortino: NaN, omega: NaN };
+  const m = r.reduce((a, b) => a + b, 0) / r.length;
+  const sd = Math.sqrt(r.reduce((a, b) => a + (b - m) ** 2, 0) / (r.length - 1));
+  const dn = Math.sqrt(r.reduce((a, b) => a + Math.min(b, 0) ** 2, 0) / r.length);
+  const g = r.reduce((a, b) => a + Math.max(b, 0), 0), l = r.reduce((a, b) => a - Math.min(b, 0), 0);
+  return { sharpe: sd ? (m * 365) / (sd * Math.sqrt(365)) : NaN, sortino: dn ? (m * 365) / (dn * Math.sqrt(365)) : NaN, omega: l ? g / l : NaN };
+}
