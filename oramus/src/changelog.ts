@@ -1,4 +1,11 @@
 export const CHANGELOG = [
+  {
+    v: '2.1.0', date: '2026-10-05',
+    items: [
+      'LTPI · MTPI: macierz decyzji (LTPI + MTPI + reżim rynku: trend / powrót do średniej) z wynikiem backtestu',
+      'Inne: kalkulator statystyczny — σ (÷N i ÷N−1), z-score i pole z tablicy rozkładu normalnego, krok po kroku'
+    ]
+  },
   { v: '2.0.1', date: '2026-10-05', items: ['Stopka: credits (Prof. Adam · Crypto Investing Masterclass · The Real World) z podglądem zdjęć'] },
   {
     v: '2.0.0', date: '2026-10-05',

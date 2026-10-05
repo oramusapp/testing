@@ -70,3 +70,13 @@ describe('risk-adjusted ratios', () => {
     expect(r.omega).toBeGreaterThan(1); expect(r.sharpe).toBeGreaterThan(0); expect(r.sortino).toBeGreaterThan(r.sharpe);
   });
 });
+
+import { varianceRatio } from './quant';
+describe('variance ratio', () => {
+  it('is > 1 for a persistent trend in returns and < 1 for alternating returns', () => {
+    let p = 100; const trend: number[] = [p], alt: number[] = [p];
+    for (let i = 0; i < 300; i++) { p *= 1 + 0.01 * Math.sign(Math.sin(i / 15)); trend.push(p); }
+    p = 100; for (let i = 0; i < 300; i++) { p *= i % 2 ? 1.02 : 0.98; alt.push(p); }
+    expect(varianceRatio(trend)).toBeGreaterThan(1); expect(varianceRatio(alt)).toBeLessThan(1);
+  });
+});

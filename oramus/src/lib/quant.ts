@@ -440,3 +440,13 @@ export function ratios(closes: number[], n = 365): { sharpe: number; sortino: nu
   const g = r.reduce((a, b) => a + Math.max(b, 0), 0), l = r.reduce((a, b) => a - Math.min(b, 0), 0);
   return { sharpe: sd ? (m * 365) / (sd * Math.sqrt(365)) : NaN, sortino: dn ? (m * 365) / (dn * Math.sqrt(365)) : NaN, omega: l ? g / l : NaN };
 }
+
+/** Variance ratio of q-day vs 1-day log returns over the last n days (> 1 = trending, < 1 = mean reverting). */
+export function varianceRatio(prices: number[], q = 10, n = 90): number {
+  const lr = prices.slice(-(n + q + 1)).map((p, i, a) => (i ? Math.log(p / a[i - 1]) : NaN)).slice(1);
+  if (lr.length < n + q) return NaN;
+  const d = lr.slice(-n), sums: number[] = [];
+  for (let i = lr.length - n; i < lr.length; i++) { let s = 0; for (let k = i - q + 1; k <= i; k++) s += lr[k]; sums.push(s); }
+  const v = (a: number[]) => { const m = a.reduce((x, y) => x + y, 0) / a.length; return a.reduce((x, y) => x + (y - m) ** 2, 0) / (a.length - 1); };
+  return v(sums) / (q * v(d));
+}

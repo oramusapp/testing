@@ -73,3 +73,8 @@ Przetestowane reguły z notatek użytkownika (ten sam protokół):
 - SUPT (podział optymalny wg Omega na 2020–2023): 30% SDCA — sprzeczne z rolą SDCA jako części bezpieczniejszej, OOS Sharpe niższy.
 Wdrożone jako narzędzia (bez zmiany reguł): trzy pochodne TPI, spójność czasowa składników, istotność TPI,
 arkusz wyceny z-score, kalkulator tempa akumulacji, Omega/Sortino/Sharpe.
+
+## Macierz TPI + reżim rynku (run26.py, slajd z kursu)
+BTC 2020→: dźwignia 2× przy LTPI+, MTPI+ i trendzie zwiększała obsunięcie (−57…−86%) bez poprawy Sharpe → tylko odczyt.
+Kupowanie przy MTPI < 0 w reżimie powrotu do średniej (błąd ze slajdu) pogarszało OOS (0,87 → 0,72; 0,63 → 0,52).
+Reżim: ADF (90 d) wskazywał trend w 96% dni → słaby; iloraz wariancji 10/1 d (90 d) dzieli 25/75 → użyty w aplikacji.

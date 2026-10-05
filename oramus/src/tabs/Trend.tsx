@@ -4,6 +4,8 @@ import { usePersisted } from '../lib/db';
 import { usePyramid, TPI_DEFAULTS, type TpiSettings } from '../lib/pyramidStore';
 import type { LtpiState } from './Sdca';
 import { signed } from '../lib/format';
+import { useBtc } from '../lib/btcStore';
+import { varianceRatio } from '../lib/quant';
 
 /** LTPI / MTPI: trend-following signals (not valuation). */
 export default function Trend({ nav }: { nav?: React.ReactNode }) {
@@ -13,6 +15,16 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
   const tpi = { ...TPI_DEFAULTS, ...tpi0 };
   const a = pyr.auto;
   const ltpiValue = ltpi.mode === 'manual' ? ltpi.manual : a?.ltpi ?? 0;
+  const { model } = useBtc();
+  // decision matrix from the masterclass: LTPI + MTPI + market regime
+  const vr = model ? varianceRatio(model.prices) : NaN;
+  const trending = vr > 1;
+  const mtpiUp = a ? (tpi.mtpiSizing === 'ensemble' ? a.mtpi.state > 0 : a.trendEnsemble >= 0.5) : false;
+  const cell = !a ? null : !mtpiUp
+    ? { t: 'Cash', tone: 'red', d: 'MTPI negatywne: poza rynkiem bez względu na reżim. Nie kupuj „na odbicie” w rynku z powrotem do średniej.' }
+    : ltpiValue > 0 && trending
+      ? { t: 'Long + dźwignia dopuszczalna (maks. 2×)', tone: 'green', d: 'LTPI i MTPI dodatnie, rynek w trendzie. W tym systemie dźwignia pozostaje tylko propozycją przy spełnieniu ścisłych warunków (RSPS → Propozycje).' }
+      : { t: 'Long spot', tone: 'green', d: trending ? 'MTPI dodatnie, ale LTPI nie jest dodatnie: tylko spot, bez dźwigni.' : 'MTPI dodatnie, rynek z powrotem do średniej: tylko spot, bez dźwigni.' };
   return (
     <Screen nav={nav} title="LTPI · MTPI" subtitle="Sygnały podążania za trendem · zamknięcie 00:00 UTC">
       <Card className="hero">
@@ -25,6 +37,20 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
             <div className="note-text">Wpisz LTPI z własnego systemu (−1 … +1). Używają go: bezpiecznik SDCA, reżim RSPS i Portfel.</div></div>
         ) : <div className="note-text mt12">{tpi.ltpiSource === 'sma200' ? 'Źródło: cena vs SMA 200.' : 'Źródło: 10 wskaźników trendu z histerezą ±0,2.'} Steruje: bezpiecznikiem SDCA (LTPI &lt; 0 i ryzyko ≥ 70%) oraz RSPS (LTPI &lt; 0 → stablecoiny).</div>}
       </Card>
+
+      {cell && (
+        <Card>
+          <div className="eyebrow" style={{ margin: 0 }}>Macierz decyzji · TPI + reżim rynku</div>
+          <div className={'mid-number mt8 ' + cell.tone} style={{ fontSize: 22 }}>{cell.t}</div>
+          <div className="mt8">
+            <div className="row compact"><span>LTPI</span><span className={ltpiValue > 0 ? 'green' : 'red'}>{ltpiValue > 0 ? 'dodatnie' : 'ujemne'}</span></div>
+            <div className="row compact"><span>MTPI ({tpi.mtpiSizing === 'ensemble' ? '10 wsk.' : '4 średnie'})</span><span className={mtpiUp ? 'green' : 'red'}>{mtpiUp ? 'dodatnie' : 'ujemne'}</span></div>
+            <div className="row compact"><span>Reżim (iloraz wariancji 10/1 d, 90 d)</span><span className={trending ? 'green' : 'amber'}>{Number.isFinite(vr) ? `${trending ? 'trend' : 'powrót do średniej'} · ${vr.toFixed(2)}` : '—'}</span></div>
+          </div>
+          <div className="note-text mt8">{cell.d}</div>
+          <div className="note-text mt8">Backtest BTC 2020→: dźwignia według macierzy zwiększała obsunięcie (do −57…−86%) bez poprawy Sharpe, a kupowanie przy ujemnym MTPI w rynku z powrotem do średniej pogarszało wynik od 2024. Reżim liczę ilorazem wariancji (&gt; 1 = trend); test ADF wskazywał trend w 96% dni, więc słabo rozróżniał.</div>
+        </Card>
+      )}
 
       {a && <TpiCard title="LTPI · składniki (10 wskaźników)" res={a.ltpiTpi} stateLabel
         note={tpi.ltpiSource === 'ensemble' ? 'Steruje bezpiecznikiem SDCA i reżimem RSPS.' : 'Informacyjnie: wybrane źródło LTPI to cena vs SMA 200.'} />}
