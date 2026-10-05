@@ -1,4 +1,5 @@
 import { HYBRID_RISK_MAX } from '../lib/useRsps';
+import { vams3 } from '../lib/quant';
 import { useState } from 'react';
 import { Screen, Card, Row, NumInput, Sheet, toast, Fold, Seg } from '../components/ui';
 import { IcInfo, IcRefresh, IcShield, IcLayers, IcX, IcPlus } from '../components/icons';
@@ -24,7 +25,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
   const [info, setInfo] = useState(false);
   const [tokOpen, setTokOpen] = useState(false);
   const [levOpen, setLevOpen] = useState(false);
-  const R = { ...REGIMES[regime], desc: regime === 'closed' ? (parking.choice === 'stable' ? 'Część RSPS w stablecoinach (Twój wybór).' : parking.choice === 'hybrid' ? (R0.sdcaRisk < HYBRID_RISK_MAX ? `Hybryda: BTC × trend (${btcTrend.toFixed(2)}), bo ryzyko wyceny ${R0.sdcaRisk.toFixed(0)}% < ${HYBRID_RISK_MAX}%.` : `Hybryda: stablecoin, bo ryzyko wyceny ${R0.sdcaRisk.toFixed(0)}% ≥ ${HYBRID_RISK_MAX}%.`) : `Część RSPS w BTC skalowanym trendem (${btcTrend.toFixed(2)}).`) : REGIMES[regime].desc };
+  const R = { ...REGIMES[regime], desc: regime === 'closed' ? (parking.choice === 'stable' ? 'Część RSPS w stablecoinach (Twój wybór).' : parking.choice === 'hybrid' ? (R0.sdcaRisk < HYBRID_RISK_MAX ? `Hybryda: BTC wg VAMS ${Math.round(vams3(btcTrend) * 100)}% (trend ${btcTrend.toFixed(2)}), bo ryzyko wyceny ${R0.sdcaRisk.toFixed(0)}% < ${HYBRID_RISK_MAX}%.` : `Hybryda: stablecoin, bo ryzyko wyceny ${R0.sdcaRisk.toFixed(0)}% ≥ ${HYBRID_RISK_MAX}%.`) : `Część RSPS w BTC wg 3-stanowego VAMS: ${Math.round(vams3(btcTrend) * 100)}% (trend ${btcTrend.toFixed(2)}).`) : REGIMES[regime].desc };
   const split = R0.split;   // same split as in Portfel (tilt 40/60 while LTPI on $TOTAL is positive)
   const rspsCap = s.capital * (1 - split / 100), sdcaCap = s.capital * split / 100;
 
@@ -73,7 +74,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       {regime === 'closed' && (
         <Card>
           <div className="between"><b>Bramka RSPS zamknięta{scan?.gateSince ? ` od ${scan.gateSince}` : ''}</b>{parkingPending && <span className="pill trim">decyzja</span>}</div>
-          <div className="note-text mt8">Gdzie trzymać część RSPS do ponownego otwarcia bramki? Backtest od 2020, portfel 60/40 (SDCA i weto RSPS na LTPI z BTC, research/run48.py): hybryda (BTC × trend, dopóki ryzyko wyceny SDCA jest poniżej 80%) — CAGR 50,8%, maks. obsunięcie −25,3%, Sharpe 2024→ 1,06; BTC × trend (domyślnie) — CAGR 59,6%, obsunięcie −28,0%, Sharpe 2024→ 1,05. Dodatkowe reguły wyjścia z coinów (szybkie wyjście, trailing stop −15/−20/−25%) pogarszały wynik — dzienna rotacja wychodzi z coina, gdy wypada z top-3 lub traci własny trend. Short w żadnym wariancie nie poprawił wyniku, dlatego zostaje tylko warunkową propozycją.</div>
+          <div className="note-text mt8">Gdzie trzymać część RSPS do ponownego otwarcia bramki? Backtest od 2020, portfel 60/40 (SDCA i weto RSPS na LTPI z BTC, research/run48.py): hybryda (BTC × trend, dopóki ryzyko wyceny SDCA jest poniżej 80%) — CAGR 50,8%, maks. obsunięcie −25,3%, Sharpe 2024→ 1,06; BTC × trend (domyślnie) — CAGR 59,6%, obsunięcie −28,0%, Sharpe 2024→ 1,05. Dodatkowe reguły wyjścia z coinów (szybkie wyjście, trailing stop −15/−20/−25%) pogarszały wynik — dzienna rotacja wychodzi z coina, gdy wypada z top-3 lub traci własny trend. Short w żadnym wariancie nie poprawił wyniku, dlatego zostaje tylko warunkową propozycją. Od 2.22.0 udział BTC to 3-stanowy VAMS (trend ≥ 0,75 → 100%, 0,5 → 50%, niżej 0) zamiast liniowego trendu (research/run51.py: portfel CAGR 71,4 → 72,8%, obsunięcie −26,7 → −26,1%, Sharpe 2024→ 1,25 → 1,28).</div>
           <div className="flex mt12">
             <button className="btn small grow" style={parking.choice === 'stable' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('stable'); toast('Wybrano: stablecoin'); }}>Stablecoin</button>
             <button className="btn small grow" style={parking.choice === 'hybrid' ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined} onClick={() => { confirmParking('hybrid'); toast('Wybrano: hybryda'); }}>Hybryda</button>

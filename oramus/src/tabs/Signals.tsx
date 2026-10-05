@@ -7,7 +7,7 @@ import { stats, monthlyReport, monthOf, type Snapshot, type Flow, type MonthlyRe
 import { shareFile } from '../components/ui';
 import { useBtc } from '../lib/btcStore';
 import { composite, freshManual } from '../lib/sdcaModel';
-import { athSellSeries, backtest, curveRate, minBuyRate, safetyStep, slowBuyRate } from '../lib/quant';
+import { athSellSeries, backtest, belowProbableRange, curveRate, minBuyRate, probableRangeRate, safetyStep, slowBuyRate } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
 import { PaperCard } from '../components/Paper';
 import type { PaperInputs } from '../lib/paper';
@@ -59,7 +59,7 @@ export default function Signals() {
     const slow = ltpiSeries && (cfg.slowBuy ?? 1) < 1 ? { ltpi: ltpiSeries, mult: cfg.slowBuy! } : undefined;
     const bt = backtest(model.prices, comp.risk, cfg.curve, start, 10000, cfg.safety ? ltpiSeries : undefined, cfg.athSell ? ath.frac : undefined, slow);
     const price = model.prices[last];
-    return { price, risk: comp.risk[last], rate: minBuyRate(slow ? slowBuyRate(curveRate(cfg.curve, comp.risk[last]), slow.ltpi[last] ?? 0, slow.mult) : curveRate(cfg.curve, comp.risk[last])) / 100, slowed: !!slow && (slow.ltpi[last] ?? 0) < 0, modelBtcShare: (bt.btc * price) / bt.value, date: model.dates[last], athFrac: ath.frac[last] ?? 0, athK: ath.k[last] ?? 0 };
+    return { price, risk: comp.risk[last], rate: minBuyRate(probableRangeRate(slow ? slowBuyRate(curveRate(cfg.curve, comp.risk[last]), slow.ltpi[last] ?? 0, slow.mult) : curveRate(cfg.curve, comp.risk[last]), belowProbableRange(model.prices, last))) / 100, slowed: !!slow && (slow.ltpi[last] ?? 0) < 0, modelBtcShare: (bt.btc * price) / bt.value, date: model.dates[last], athFrac: ath.frac[last] ?? 0, athK: ath.k[last] ?? 0 };
   }, [model, cfg.enabled, cfg.manualRisk, cfg.curve, cfg.startDate, ltpiSeries, cfg.athSell, cfg.safety, cfg.slowBuy]);
 
   // live testing input: today's closed-candle signals (RSPS only when the scan is fresh and the signal is released)

@@ -238,3 +238,12 @@ użytkownik co tydzień wpisuje odczyty modeli: Global Macro Risk Matrix (reżim
 (BTC, utrzymanie risk-on), Global Liquidity (trend, wskaźniki wyprzedzające), GRID (modalny wynik), Positioning (ryzyko korekty
 i krachu), KISS i Dr. Mo dla BTC. Punktacja (własne przypisanie, równe wagi, bez backtestu — historie modeli nie są publiczne)
 zasila filar Makro w Piramidzie przez 7 dni; reguła KISS dla BTC (10%/5% wg risk-on/off × 100/50/0% wg VAMS) liczona dla podglądu.
+
+## Pomysły z metodologii 42 Macro przetestowane na strategii (run51.py) — wdrożone B i C w 2.22.0
+Bez danych z raportu — tylko reguły. Portfel z przechyłem, 2020→ (Dale = lata odrabiania maks. obsunięcia przy CAGR):
+baza — CAGR 71,2%, DD −26,7%, IS 1,77, OOS 1,25, Dale 0,58. A: pół pozycji alta przy trendzie 0,5 (Dr. Mo) — bez zmian.
+B: BTC w rezerwie RSPS 0/50/100% wg trendu (VAMS 3-stanowy) — 72,8%, −26,1%, OOS 1,28. C: SDCA ×2 pod Probable Range
+(średnia 20 d − 1,5σ) — SDCA CAGR 43,0 → 45,8%, DD −37,1 → −37,3%, IS 1,42 → 1,48, OOS 0,99 bez zmian; portfel 72,5%.
+B + C razem — CAGR 74,2%, DD −26,1%, IS 1,80, OOS 1,28, Dale 0,54. Odrzucone: D przechył wg ETH/BTC (65,9%), E cel zmienności
+RSPS 60/80/100% (63,0–69,7%). Statystyka zdarzeń: 5 dni po zamknięciu pod dolną granicą średnio −0,37% (z −1,98), nad górną +1,46% (z 3,34)
+— dlatego ×0,5 nad zakresem nie zostało wybrane.

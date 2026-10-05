@@ -351,6 +351,18 @@ export const SLOW_BUY_OPTIONS = [1, 0.5, 0.25, 0.1];
 export const slowBuyRate = (ratePct: number, ltpi: number, mult: number) => (ratePct > 0 && ltpi < 0 ? ratePct * mult : ratePct);
 /** Buys of 1% of the remaining stablecoin per day or less are shown as HOLD and not executed (sells unaffected). */
 export const MIN_BUY_PCT = 1;
+/** Probable Range (42 Macro idea, research/run51.py): when BTC closes below its 20-day mean − 1.5σ the SDCA buy is
+ *  doubled (SDCA CAGR 43.0 → 45.8%, same drawdown). Uses closes up to and including index i only. */
+export const PR_LOOKBACK = 20, PR_SIGMA = 1.5, PR_MULT = 2;
+export function belowProbableRange(prices: Series, i: number): boolean {
+  if (i < PR_LOOKBACK - 1) return false;
+  const w = prices.slice(i - PR_LOOKBACK + 1, i + 1);
+  if (w.some((x) => !(x > 0))) return false;
+  return prices[i] < mean(w) - PR_SIGMA * std(w);
+}
+export const probableRangeRate = (ratePct: number, below: boolean) => (ratePct > 0 && below ? ratePct * PR_MULT : ratePct);
+/** Three-state VAMS sizing for BTC (research/run51.py): trend ≥ 0.75 → 100%, ≥ 0.5 → 50%, otherwise 0. */
+export const vams3 = (t: number) => (t >= 0.75 ? 1 : t >= 0.5 ? 0.5 : 0);
 export const minBuyRate = (ratePct: number) => (ratePct > 0 && ratePct <= MIN_BUY_PCT ? 0 : ratePct);
 
 /** ltpiState: optional LTPI state per day (aligned with prices) — enables the SDCA safety.
@@ -366,7 +378,7 @@ export function backtest(prices: Series, riskPct: Series, curve: number[], start
     // no look-ahead: signals from the previous close (i − 1), executed at today's close (as research/sdca.py)
     const r = i > 0 ? riskPct[i - 1] : NaN;
     const rate0 = Number.isFinite(r) ? curveRate(curve, r) / 100 : 0;
-    const rate = minBuyRate((slow ? slowBuyRate(rate0, slow.ltpi[i - 1] ?? 0, slow.mult) : rate0) * 100) / 100;   // rate is a fraction here
+    const rate = minBuyRate(probableRangeRate((slow ? slowBuyRate(rate0, slow.ltpi[i - 1] ?? 0, slow.mult) : rate0) * 100, belowProbableRange(prices, i - 1))) / 100;   // rate is a fraction here
     let act = rate;
     if (rate > 1e-6 && cash > 0) {
       const amt = cash * rate;

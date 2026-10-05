@@ -1,7 +1,7 @@
 // In-app backtests of the whole strategy and of its parts (SDCA, RSPS, LTPI / MTPI), with the same rules as the
 // live signals and the research scripts: decisions at the daily close, traded the next day, 0.15% cost per side.
 // RSPS uses today's candidate list (survivorship bias: coins that died are missing), so its result is optimistic.
-import { capWeights, mean, std } from './quant';
+import { capWeights, mean, std, vams3 } from './quant';
 import { klinesAny } from './market';
 
 export const COST = 0.0015;
@@ -12,7 +12,8 @@ export const PERIODS = [
 ] as const;
 
 export interface Run { dates: string[]; ret: number[]; expo: number[]; held?: Record<string, number>[] }
-export interface Perf { cagr: number; vol: number; sharpe: number; sortino: number; maxDD: number; total: number; expo: number; days: number }
+/** dale: years to recover the max drawdown if the strategy compounds at its CAGR (42 Macro's "Dale Test"). */
+export interface Perf { cagr: number; vol: number; sharpe: number; sortino: number; maxDD: number; total: number; expo: number; days: number; dale: number }
 
 export function perf(run: Run, from = '', to = ''): Perf | null {
   const idx = run.dates.map((d, i) => [d, i] as const).filter(([d]) => (!from || d >= from) && (!to || d <= to)).map(([, i]) => i);
@@ -22,7 +23,8 @@ export function perf(run: Run, from = '', to = ''): Perf | null {
   for (const x of r) { eq *= 1 + x; peak = Math.max(peak, eq); dd = Math.min(dd, eq / peak - 1); }
   const yrs = r.length / 365, m = mean(r), sd = std(r);
   const down = Math.sqrt(r.reduce((a, x) => a + Math.min(x, 0) ** 2, 0) / Math.max(r.length - 1, 1));
-  return { cagr: eq ** (1 / yrs) - 1, vol: sd * Math.sqrt(365), sharpe: sd > 0 ? (m / sd) * Math.sqrt(365) : NaN, sortino: down > 0 ? (m / down) * Math.sqrt(365) : NaN, maxDD: dd, total: eq - 1, expo: mean(e), days: r.length };
+  const cagr = eq ** (1 / yrs) - 1;
+  return { cagr, vol: sd * Math.sqrt(365), sharpe: sd > 0 ? (m / sd) * Math.sqrt(365) : NaN, sortino: down > 0 ? (m / down) * Math.sqrt(365) : NaN, maxDD: dd, total: eq - 1, expo: mean(e), days: r.length, dale: cagr > 0 && dd < 0 ? Math.log(1 / (1 + dd)) / Math.log(1 + cagr) : NaN };
 }
 
 export const equity = (ret: number[]) => { let e = 1; return ret.map((x) => (e *= 1 + x)); };
@@ -111,8 +113,8 @@ export function rspsRun(dates: string[], btc: number[], coins: CoinSeries[], ltp
         const cw = capWeights(picks.map((r) => r.score / (r.vol || 1)), o.cap).map((x) => Math.min(x, o.cap));
         picks.forEach((r, k) => (w[r.sym] = cw[k]));
         const rest = 1 - cw.reduce((a, b) => a + b, 0);
-        if (rest > 1e-6 && bt > 0 && parkBtc) w.BTC = rest * bt;
-      } else if (bt > 0 && parkBtc) w.BTC = bt;
+        if (rest > 1e-6 && vams3(bt) > 0 && parkBtc) w.BTC = rest * vams3(bt);
+      } else if (vams3(bt) > 0 && parkBtc) w.BTC = vams3(bt);
       // reserve: the share not in coins goes to tokenized gold (PAXG) instead of stablecoin, if chosen
       const gold = coins.find((c) => c.sym === 'PAXG');
       const gMom = gold && i > 90 && gold.close[i - 90] > 0 ? [30, 60, 90].reduce((a, L) => a + Math.log((gold.close[i] / btc[i]) / (gold.close[i - L] / btc[i - L])), 0) / 3 : NaN;

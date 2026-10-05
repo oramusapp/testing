@@ -122,10 +122,10 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
           </Card>
           {[...view.main.map((m) => ({ name: m.name, run: m.run })), { name: 'BTC kup i trzymaj', run: bh }].map((m) => (
             <Card key={m.name} className="tight">
-              <div className="row"><b>{m.name}</b><span className="faint" style={{ fontSize: 12 }}>CAGR · Sharpe · Sortino · maks. DD · ekspozycja</span></div>
+              <div className="row"><b>{m.name}</b><span className="faint" style={{ fontSize: 12 }}>CAGR · Sharpe · Sortino · maks. DD · Dale · ekspozycja</span></div>
               {PERIODS.map((p) => {
                 const r = perf(m.run, p.from && p.from > labels[0] ? p.from : (p.id === 'full' ? '' : p.from), p.to);
-                return <div key={p.id} className="row compact"><span className="dim">{p.label}</span><span className="num" style={{ fontSize: 13 }}>{r ? `${pc(r.cagr)} · ${nm(r.sharpe)} · ${nm(r.sortino)} · ${pc(r.maxDD)} · ${Math.round(r.expo * 100)}%` : '—'}</span></div>;
+                return <div key={p.id} className="row compact"><span className="dim">{p.label}</span><span className="num" style={{ fontSize: 13 }}>{r ? `${pc(r.cagr)} · ${nm(r.sharpe)} · ${nm(r.sortino)} · ${pc(r.maxDD)} · ${Number.isFinite(r.dale) ? r.dale.toFixed(1).replace('.', ',') + ' l.' : '—'} · ${Math.round(r.expo * 100)}%` : '—'}</span></div>;
               })}
             </Card>
           ))}
@@ -136,7 +136,7 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
         LTPI · MTPI: BTC, gdy stan TPI jest dodatni, w przeciwnym razie stablecoin. Kupowany jest BTC; $TOTAL (cały rynek) służy wyłącznie do odczytu kierunku i trendu (TPI), jak w notatkach — nie jest aktywem do kupienia. Próg stanu wg ustawień (domyślnie 0).
         RSPS: weto LTPI liczone z BTC; codzienna rotacja siły względnej wśród {rs.universeSize - 1} najpłynniejszych altów (plus BTC), bramka szerokości 70%/60%, LTPI− → stablecoin, parking: {parking.choice === 'stable' ? 'stablecoin' : parking.choice === 'btc' ? 'BTC × trend' : `hybryda (ryzyko < ${HYBRID_RISK_MAX}%)`}.
         Używa dzisiejszej listy kandydatów, więc tokeny, które zniknęły z rynku, są pominięte — wynik RSPS jest optymistyczny (błąd przeżywalności).
-        Całość: {SPLIT_SDCA}% SDCA / {100 - SPLIT_SDCA}% RSPS{tilt ? ` (przechył: ${SPLIT_TILT}/${100 - SPLIT_TILT}, gdy LTPI z $TOTAL dodatnie)` : ''} z rebalansem przy odchyleniu ±10 p.p. Wyniki historyczne nie gwarantują przyszłych.
+        Całość: {SPLIT_SDCA}% SDCA / {100 - SPLIT_SDCA}% RSPS{tilt ? ` (przechył: ${SPLIT_TILT}/${100 - SPLIT_TILT}, gdy LTPI z $TOTAL dodatnie)` : ''} z rebalansem przy odchyleniu ±10 p.p. Dale = liczba lat potrzebna do odrobienia maks. obsunięcia przy danym CAGR (miara z raportów 42 Macro; mniej = lepiej). Wyniki historyczne nie gwarantują przyszłych.
       </div>
     </Screen>
   );

@@ -197,3 +197,19 @@ describe('42 Macro weekly readings', () => {
     expect(score42(MACRO42_EMPTY).z).toBeNull();
   });
 });
+
+import { belowProbableRange, probableRangeRate, vams3 } from './quant';
+describe('42 Macro ideas (run51)', () => {
+  it('Probable Range uses only closes up to i', () => {
+    const p = Array.from({ length: 25 }, (_, k) => 100 + (k % 2));
+    expect(belowProbableRange(p, 23)).toBe(false);
+    const q = [...p.slice(0, 24), 90];
+    expect(belowProbableRange(q, 24)).toBe(true);
+    expect(belowProbableRange(q, 23)).toBe(false);
+    expect(probableRangeRate(2, true)).toBe(4);
+    expect(probableRangeRate(-2, true)).toBe(-2);
+  });
+  it('three-state VAMS sizing', () => {
+    expect([0, 0.25, 0.5, 0.75, 1].map(vams3)).toEqual([0, 0, 0.5, 1, 1]);
+  });
+});

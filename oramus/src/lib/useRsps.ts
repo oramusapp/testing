@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from '../components/ui';
 import { usePersisted } from './db';
 import { klines, klinesAny, lastClosedDay } from './market';
-import { annVol, capWeights, ratios, linfit } from './quant';
+import { annVol, capWeights, ratios, linfit, vams3 } from './quant';
 import { leverageGate, PILLARS, isFresh } from './pyramid';
 import { usePyramid } from './pyramidStore';
 import { rsScore } from './backtestAll';
@@ -169,13 +169,14 @@ export function useRsps() {
   const manualMissing = PILLARS.filter((p) => !p.auto && !isFresh(pyr.state[p.id])).map((p) => p.name);
   const signalReady = manualMissing.length === 0;
   const sleeve: { sym: string; w: number; note?: string }[] = [];
+  const btcSize = vams3(btcTrend);   // three-state BTC sizing 0 / 50 / 100% (research/run51.py)
   const parkBtc = parking.choice === 'btc' || (parking.choice === 'hybrid' && Number.isFinite(sdcaRisk) && sdcaRisk < HYBRID_RISK_MAX);
   if (regime === 'rsps') {
     picks.sel.forEach((p) => sleeve.push(p));
     const rest = 1 - picks.sel.reduce((x, p) => x + p.w, 0);
-    if (rest > 0.001 && btcTrend > 0 && parkBtc) sleeve.push({ sym: 'BTC', w: rest * btcTrend, note: 'reszta × trend BTC' });
-  } else if (regime === 'closed' && btcTrend > 0 && (parking.choice === 'btc' || (parking.choice === 'hybrid' && Number.isFinite(sdcaRisk) && sdcaRisk < HYBRID_RISK_MAX)))
-    sleeve.push({ sym: 'BTC', w: btcTrend, note: `trend ${btcTrend.toFixed(2)}${parking.choice === 'hybrid' ? ` · ryzyko ${sdcaRisk.toFixed(0)}% < ${HYBRID_RISK_MAX}%` : ''}` });
+    if (rest > 0.001 && btcSize > 0 && parkBtc) sleeve.push({ sym: 'BTC', w: rest * btcSize, note: `reszta × VAMS BTC ${Math.round(btcSize * 100)}%` });
+  } else if (regime === 'closed' && btcSize > 0 && (parking.choice === 'btc' || (parking.choice === 'hybrid' && Number.isFinite(sdcaRisk) && sdcaRisk < HYBRID_RISK_MAX)))
+    sleeve.push({ sym: 'BTC', w: btcSize, note: `VAMS ${Math.round(btcSize * 100)}% (trend ${btcTrend.toFixed(2)})${parking.choice === 'hybrid' ? ` · ryzyko ${sdcaRisk.toFixed(0)}% < ${HYBRID_RISK_MAX}%` : ''}` });
   // reserve in tokenized gold instead of stablecoin (research/run49.py)
   const reserve = s.reserve ?? 'stable';
   const goldStrong = !!scan?.gold && goldIsStrong(scan.gold);
