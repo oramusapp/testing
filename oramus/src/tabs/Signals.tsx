@@ -9,6 +9,8 @@ import { useBtc } from '../lib/btcStore';
 import { composite, freshManual } from '../lib/sdcaModel';
 import { athSellSeries, backtest, curveRate, safetyStep, slowBuyRate } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
+import { PaperCard } from '../components/Paper';
+import type { PaperInputs } from '../lib/paper';
 import { useRsps, splitTarget, SPLIT_SDCA, SPLIT_TILT } from '../lib/useRsps';
 import { LEV_MAX } from '../lib/pyramid';
 import { SDCA_DEFAULTS, type SdcaSettings, manualLtpiActive, type LtpiState } from './Sdca';
@@ -60,6 +62,12 @@ export default function Signals() {
     return { price, risk: comp.risk[last], rate: (slow ? slowBuyRate(curveRate(cfg.curve, comp.risk[last]), slow.ltpi[last] ?? 0, slow.mult) : curveRate(cfg.curve, comp.risk[last])) / 100, slowed: !!slow && (slow.ltpi[last] ?? 0) < 0, modelBtcShare: (bt.btc * price) / bt.value, date: model.dates[last], athFrac: ath.frac[last] ?? 0, athK: ath.k[last] ?? 0 };
   }, [model, cfg.enabled, cfg.manualRisk, cfg.curve, cfg.startDate, ltpiSeries, cfg.athSell, cfg.safety, cfg.slowBuy]);
 
+  // live testing input: today's closed-candle signals (RSPS only when the scan is fresh and the signal is released)
+  const paperInputs: PaperInputs | null = sdcaState && (R.scanFresh || !R.busy) ? {
+    date: sdcaState.date, btcPrice: sdcaState.price, prices: R.prices, sdcaRate: sdcaState.rate, risk: sdcaState.risk, ltpi: sdcaLtpi, safety: cfg.safety,
+    rspsTarget: R.scanFresh && R.signalReady ? (R.regime === 'defense' ? [] : R.sleeve.map((x) => ({ sym: x.sym, w: x.w }))) : null,
+    split: splitSdca / 100
+  } : null;
   const prices: Record<string, number> = { ...R.prices, [STABLE]: 1 };
   if (sdcaState) prices.BTC = sdcaState.price;
   const px = (sym: string) => prices[sym] ?? NaN;
@@ -110,7 +118,7 @@ export default function Signals() {
       const units = H.sdca.BTC * sdcaState.athFrac;
       if (units * sdcaState.price >= MIN_TRADE_USD) orders.push({ id: 'sdca-ath', sleeve: 'SDCA', side: 'sell', sym: 'BTC', usd: units * sdcaState.price, units, why: `PROPOZYCJA · nowy szczyt (ATH) przy ryzyku ${sdcaState.risk.toFixed(1)}% → ${(sdcaState.athFrac * 100).toFixed(2)}% BTC (${sdcaState.athK + 1}. w cyklu)` });
     }
-    if (R.scanFresh && rspsVal > 0) {
+    if (R.scanFresh && R.signalReady && rspsVal > 0) {
       const want: Record<string, number> = {};
       target.forEach((t) => (want[t.sym] = t.w * rspsVal));
       const syms = new Set([...Object.keys(want), ...Object.keys(H.rsps).filter((k) => k !== STABLE)]);
@@ -204,6 +212,9 @@ export default function Signals() {
           toast('Portfele utworzone — start śledzenia wyników');
         }}>Kupiłem według planu — utwórz oba portfele</button>}
         {!R.scanFresh && <div className="warn-box mt12">Skan RSPS nieaktualny — otwórz Strategia → RSPS lub poczekaj na skan, aby plan RSPS był aktualny.</div>}
+        <Fold id="pf.paper" title="Live testing" hint="Wirtualny portfel od startu wykonuje sygnały · statystyki, tygodnie, miesiące" defaultOpen>
+          <PaperCard inputs={paperInputs} />
+        </Fold>
       </Screen>
     );
   }
@@ -318,6 +329,9 @@ export default function Signals() {
         <div className="row"><div className="grow"><div>Więcej RSPS, gdy rynek w trendzie</div><div className="faint" style={{ fontSize: 12 }}>LTPI z $TOTAL dodatnie → cel SDCA {SPLIT_TILT}% / RSPS {100 - SPLIT_TILT}% (zamiast {SPLIT_SDCA}/{100 - SPLIT_SDCA}) · teraz cel {splitSdca}/{100 - splitSdca}</div></div><Switch checked={tilt} onChange={setTilt} /></div>
         <div className="note-text" style={{ padding: '0 14px 12px' }}>Backtest od 2020 przy parkingu BTC × trend (research/run48.py): CAGR 59,6% → 66,7%, maks. obsunięcie −28,0% → −29,3%, Sharpe od 2024 1,05 → 1,00. Wyższy zwrot kosztem nieco większego ryzyka.</div>
       </Card>
+      <Fold id="pf.paper" title="Live testing" hint="Wirtualny portfel od startu wykonuje sygnały · statystyki, tygodnie, miesiące" defaultOpen>
+        <PaperCard inputs={paperInputs} />
+      </Fold>
       <Fold id="pf.rules" title="Zasady i historia operacji">
       <div className="section-title">Zasady</div>
       <Card>

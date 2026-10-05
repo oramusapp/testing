@@ -156,3 +156,21 @@ describe('taAuto', () => {
     expect(taAuto(down).z).toBeLessThan(0);
   });
 });
+
+import { startPaper, stepPaper, paperStats, paperSummary } from './paper';
+describe('live testing (paper portfolio)', () => {
+  it('follows SDCA buys and RSPS targets once per closed day, with stats and summaries', () => {
+    const base = { prices: { ETH: 2000 }, risk: 20, ltpi: 1, safety: true, split: 0.6 };
+    let s = startPaper('2026-01-01', 10000, 50000, 0.6);
+    s = stepPaper(s, { ...base, date: '2026-01-01', btcPrice: 50000, sdcaRate: 0.1, rspsTarget: [{ sym: 'ETH', w: 0.5 }] });
+    expect(s.sdca.btc).toBeGreaterThan(0);
+    expect(s.rsps.units.ETH).toBeCloseTo((0.5 * 4000) / 2000, 2);
+    const same = stepPaper(s, { ...base, date: '2026-01-01', btcPrice: 60000, sdcaRate: 0.1, rspsTarget: null });
+    expect(same).toBe(s);                                   // idempotent per date
+    s = stepPaper(s, { ...base, date: '2026-01-02', btcPrice: 55000, prices: { ETH: 2200 }, sdcaRate: 0, rspsTarget: null });
+    expect(s.points.length).toBe(2);
+    const st = paperStats(s)!;
+    expect(st.value).toBeGreaterThan(10000);
+    expect(paperSummary(s, 'month')[0].period).toBe('2026-01');
+  });
+});

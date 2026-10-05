@@ -4,7 +4,7 @@ import { toast } from '../components/ui';
 import { usePersisted } from './db';
 import { klines, lastClosedDay } from './market';
 import { annVol, capWeights, ratios, linfit } from './quant';
-import { leverageGate } from './pyramid';
+import { leverageGate, PILLARS, isFresh } from './pyramid';
 import { usePyramid } from './pyramidStore';
 import { rsScore } from './backtestAll';
 import { SDCA_DEFAULTS, manualLtpiActive, type LtpiState, type SdcaSettings } from '../tabs/Sdca';
@@ -142,6 +142,9 @@ export function useRsps() {
   }, [scan, s.topN, s.cap]);
 
   // RSPS-sleeve target weights (fractions of the RSPS part); the remainder is stablecoin
+  // the RSPS signal is released only after today's manual inputs are filled in (they reset at every 00:00 UTC close)
+  const manualMissing = PILLARS.filter((p) => !p.auto && !isFresh(pyr.state[p.id])).map((p) => p.name);
+  const signalReady = manualMissing.length === 0;
   const sleeve: { sym: string; w: number; note?: string }[] = [];
   const parkBtc = parking.choice === 'btc' || (parking.choice === 'hybrid' && Number.isFinite(sdcaRisk) && sdcaRisk < HYBRID_RISK_MAX);
   if (regime === 'rsps') {
@@ -162,7 +165,7 @@ export function useRsps() {
   (scan?.rows ?? []).forEach((r) => { if (Number.isFinite(r.vol)) vols[r.sym] = r.vol / 100; });
   if (a) vols.BTC = a.vol30;
 
-  return { pyr, s, upd, scan, scanFresh, busy, runScan, breadth, btcTrend, ltpi, regime, gate, picks, sleeve, shortProposal,
+  return { pyr, s, upd, scan, scanFresh, busy, runScan, breadth, btcTrend, ltpi, regime, gate, picks, sleeve, shortProposal, signalReady, manualMissing,
     parking, parkingPending, confirmParking, log, prices, vols, sdcaRisk };
 }
 

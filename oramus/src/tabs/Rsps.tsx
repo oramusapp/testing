@@ -92,11 +92,12 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
         <div className="between mb12"><span className="dim">Kapitał całkowity</span><NumInput className="inline-input" value={s.capital} onChange={(v) => upd({ capital: v ?? 0 })} suffix="$" /></div>
         <Row className="compact" label={<b>SDCA ({SPLIT_SDCA}%)</b>} value={<span>{usd(sdcaCap, 0)} <span className="dim">wg podzakładki SDCA</span></span>} />
         <Row className="compact" label={<b>RSPS ({100 - SPLIT_SDCA}%)</b>} value={usd(rspsCap, 0)} />
-        <div className="note-text mb12">Podział z najwyższym Sharpe w backteście 2020–2026 (1,52), rebalans raz w roku.</div>
+        <div className="note-text mb12">Podział bazowy 60/40; przy LTPI z $TOTAL dodatnim cel 40/60 (przechył w Portfelu). Rebalans przy odchyleniu ±10 p.p.</div>
         <div className="mt12" />
         {regime === 'defense' && <div className="note-text">LTPI ujemne: cała część RSPS w stablecoinach.</div>}
         {regime === 'closed' && (parking.choice === 'stable' || (parking.choice === 'hybrid' && !(R0.sdcaRisk < HYBRID_RISK_MAX))) && <div className="note-text">Bramka zamknięta: część RSPS w stablecoinach.</div>}
-        {sleeve.map((x) => (
+        {!R0.signalReady && <div className="warn-box">Sygnał RSPS zablokowany do uzupełnienia dzisiejszych danych ręcznych (resetują się o 00:00 UTC): {R0.manualMissing.join(', ')}. Uzupełnij je w Piramidzie powyżej — wtedy pojawi się alokacja i zlecenia w Portfelu.</div>}
+        {R0.signalReady && sleeve.map((x) => (
           <div key={x.sym} className="mb12">
             <div className="between"><b>{x.sym}</b><span className="num">{pct(x.w * 100, 0)} · {usd(x.w * rspsCap, 0)}{x.note ? <span className="dim"> ({x.note})</span> : null}</span></div>
             <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 3, marginTop: 6 }}><div style={{ width: Math.min(100, x.w * 100) + '%', height: '100%', background: 'var(--accent)', borderRadius: 3 }} /></div>
