@@ -38,7 +38,7 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
         {ltpi.mode === 'manual' ? (
           <div className="mt12"><input type="range" min={-1} max={1} step={0.05} value={ltpi.manual} onChange={(e) => setLtpi({ ...ltpi, manual: +e.target.value, updated: Date.now() })} />
             <div className="note-text">{manualOn ? 'Wpisz LTPI z własnego systemu (−1 … +1). Wpis jest ważny do najbliższego zamknięcia świecy (00:00 UTC). Zastępuje LTPI z BTC w SDCA (bezpiecznik, tempo zakupów) i w RSPS (weto).' : 'Ręczny wpis wygasł przy zamknięciu świecy (00:00 UTC) — działa automatyczne LTPI. Przesuń suwak, aby wpisać nową wartość na dziś.'}</div></div>
-        ) : <div className="note-text mt12">{`Wskaźnik kierunku całego rynku: liczone z $TOTAL, jak w notatkach. SDCA i RSPS działają na LTPI liczonym z BTC (lepszy wynik w backteście); LTPI z $TOTAL może przechylić podział w stronę RSPS (Portfel). ${tpi.ltpiSource === 'sma200' ? 'Źródło: $TOTAL vs SMA 200.' : '10 wskaźników trendu'}; stan ${(tpi.hyst ?? 0) > 0 ? 'z histerezą ±0,2' : 'zmienia się przy przejściu przez 0 (notatki)'}.`} Steruje: bezpiecznikiem SDCA (LTPI &lt; 0 i ryzyko ≥ 70%) oraz RSPS (LTPI &lt; 0 → stablecoiny).</div>}
+        ) : <div className="note-text mt12">{`Wskaźnik kierunku całego rynku: liczone z $TOTAL, jak w notatkach. SDCA i RSPS działają na LTPI liczonym z BTC (lepszy wynik w backteście); LTPI z $TOTAL może przechylić podział w stronę RSPS (Portfel). ${tpi.ltpiSource === 'sma200' ? 'Źródło: $TOTAL vs SMA 200.' : '7 wskaźników trendu o spójnym horyzoncie (notatki: spójność czasowa)'}; stan ${(tpi.hyst ?? 0) > 0 ? 'z histerezą ±0,2' : 'zmienia się przy przejściu przez 0 (notatki)'}.`} Steruje: bezpiecznikiem SDCA (LTPI &lt; 0 i ryzyko ≥ 70%) oraz RSPS (LTPI &lt; 0 → stablecoiny).</div>}
       </Card>
 
       {cell && (
@@ -55,7 +55,7 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
         </Card>
       )}
 
-      {a && <TpiCard title="LTPI · składniki (10 wskaźników)" res={a.ltpiTpi} stateLabel
+      {a && <TpiCard title="LTPI · składniki (7 wskaźników, spójny horyzont)" res={a.ltpiTpi} stateLabel
         note={tpi.ltpiSource === 'ensemble' ? 'Steruje bezpiecznikiem SDCA i reżimem RSPS.' : 'Informacyjnie: wybrane źródło LTPI to cena vs SMA 200.'} />}
       {a && <TpiCard title="MTPI · średnioterminowy (10 wskaźników)" res={a.mtpi}
         note={tpi.mtpiSizing === 'ensemble' ? 'Steruje skalowaniem BTC w części RSPS (MTPI przeliczony na 0…1).' : 'Informacyjnie: skalowanie BTC używa 4 średnich (wariant z backtestu).'} />}

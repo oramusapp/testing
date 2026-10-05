@@ -268,3 +268,13 @@ jedna pula duże+małe — 80,0 / 1,86 / 1,32 / −26,6; warstwy (małe, gdy gru
 79,9 / 1,82 / 1,47 / −27,1; warstwy + najpierw duże (wybrane) — 79,8 / 1,79 / 1,49 / −27,3. Wybrany wariant: 2024→ CAGR 54,8 → 65,4%,
 bez roku 2021 57,8 → 63,1%, przy koszcie 0,3% 2024→ 47,9 → 58,6%. Niższy wynik całości tylko przez 2021 (mania małych: 661% → 404%).
 Małe silniejsze od dużych: 27% dni od 2020. Silnik aplikacji (fixture): RSPS CAGR 101,7 → 109,2%, OOS 1,07 → 1,25, DD −31,3 → −32,5%.
+
+## Luki z audytu notatek (run55.py, run56.py) — wdrożone LTPI spójne czasowo w 2.25.0
+Notatki: składniki TPI mają działać na tym samym horyzoncie. W LTPI trzy składniki zmieniały znak 15–22×/rok (Supertrend 50/4, RSI 100,
+cena > SMA 200) obok 1–8×/rok pozostałych. Portfel 2.24.0, 2020→ (CAGR / DD / IS / OOS / bez 2021 / 2024→ CAGR):
+obecne — 79,8 / −27,3 / 1,79 / 1,49 / 63,1 / 65,4; bez Supertrend — 80,1 / … / 1,46; bez RSI 100 — 79,7; bez SMA 200 — 79,6;
+bez Supertrend i RSI — 82,9 / −27,3 / 1,83 / 1,54; bez wszystkich trzech — 83,0 / −27,3 / 1,83 / 1,55 / 66,1 / 67,8; to samo na $TOTAL
+(przechył) — 84,4 / −27,3 / 1,84 / 1,57 / 67,0 / 70,0 (wybrane). Koszt 0,3%: 72,7 → 75,8%. SDCA: DD −37,3 → −34,0%. Zmiany stanu LTPI 5,5 → 2,8/rok.
+Odrzucone: wolniejsze zamienniki (Supertrend 100/6, RSI 180, SMA 365) — 78,8%; głosy neutralne (strefy martwe) — 79,7%, DD −28,9%;
+alty bez weta LTPI (ważność TPI ∝ udział w rynku) — 84,3%, ale DD −33,6%; lump sum reszty gotówki SDCA przy LTPI → + (ryzyko < 50%) —
+85,1%, ale DD −35,1%. SDCA na ETH/SOL nietestowalne bez modelu wyceny dla tych coinów (model wyceny jest specyficzny dla BTC).
