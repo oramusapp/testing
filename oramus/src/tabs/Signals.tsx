@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Screen, Card, Row, NumInput, Sheet, Switch, toast } from '../components/ui';
+import { Screen, Card, Row, NumInput, Sheet, Switch, toast, Fold } from '../components/ui';
 import { IcPlus, IcTrash } from '../components/icons';
 import { usePersisted, load } from '../lib/db';
 import { Chart } from '../components/Chart';
@@ -7,7 +7,7 @@ import { stats, monthlyReport, monthOf, type Snapshot, type Flow, type MonthlyRe
 import { shareFile } from '../components/ui';
 import { useBtc } from '../lib/btcStore';
 import { composite } from '../lib/sdcaModel';
-import { athSellSeries, backtest, curveRate, safetyStep } from '../lib/quant';
+import { athSellSeries, backtest, curveRate, safetyStep, slowBuyRate } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
 import { useRsps, SPLIT_SDCA } from '../lib/useRsps';
 import { LEV_MAX } from '../lib/pyramid';
@@ -17,7 +17,7 @@ import { usd, pct } from '../lib/format';
 // Rotation rules (research/run14.py, run15.py):
 //  • sleeves SDCA 60 / RSPS 40, rebalanced only when the SDCA share leaves 50–70% (±10 p.p.), checked daily
 //  • SDCA ↔ stablecoin: the accumulation/distribution curve (daily)
-//  • RSPS ↔ stablecoin: gate closed → user's parking choice (stablecoin by default); LTPI < 0 → 100% stablecoin
+//  • RSPS ↔ stablecoin: gate closed → user's parking choice (hybrid by default: BTC × trend while SDCA risk < 80%); LTPI < 0 → 100% stablecoin
 export const BAND = 0.10;
 const STABLE = 'USDT';
 const MIN_TRADE_USD = 10, MIN_TRADE_FRAC = 0.01;
@@ -41,7 +41,7 @@ export default function Signals() {
   const [flowOpen, setFlowOpen] = useState(false);
   const cfg = { ...SDCA_DEFAULTS, ...sd };
   const [tpiSrc] = usePersisted<{ ltpiSource: 'ensemble' | 'sma200' }>('signals.tpi', { ltpiSource: 'ensemble' });
-  const ltpiSeries = useMemo(() => (model && cfg.safety ? ltpiStateSeries(model.prices, tpiSrc.ltpiSource ?? 'ensemble') : undefined), [model, cfg.safety, tpiSrc.ltpiSource]);
+  const ltpiSeries = useMemo(() => (model && (cfg.safety || (cfg.slowBuy ?? 1) < 1) ? ltpiStateSeries(model.prices, tpiSrc.ltpiSource ?? 'ensemble') : undefined), [model, cfg.safety, cfg.slowBuy, tpiSrc.ltpiSource]);
   const owed = pf.safetyOwed ?? 0;
 
   const sdcaState = useMemo(() => {
@@ -49,11 +49,12 @@ export default function Signals() {
     const comp = composite(model, cfg.enabled, cfg.manualRisk);
     const last = model.dates.length - 1;
     const start = Math.max(0, model.dates.findIndex((d) => d >= cfg.startDate));
-    const ath = cfg.athSell ? athSellSeries(model.prices, comp.risk) : null;
-    const bt = backtest(model.prices, comp.risk, cfg.curve, start, 10000, ltpiSeries, ath?.frac);
+    const ath = athSellSeries(model.prices, comp.risk);
+    const slow = ltpiSeries && (cfg.slowBuy ?? 1) < 1 ? { ltpi: ltpiSeries, mult: cfg.slowBuy! } : undefined;
+    const bt = backtest(model.prices, comp.risk, cfg.curve, start, 10000, cfg.safety ? ltpiSeries : undefined, cfg.athSell ? ath.frac : undefined, slow);
     const price = model.prices[last];
-    return { price, risk: comp.risk[last], rate: curveRate(cfg.curve, comp.risk[last]) / 100, modelBtcShare: (bt.btc * price) / bt.value, date: model.dates[last], athFrac: ath?.frac[last] ?? 0, athK: ath?.k[last] ?? 0 };
-  }, [model, cfg.enabled, cfg.manualRisk, cfg.curve, cfg.startDate, ltpiSeries, cfg.athSell]);
+    return { price, risk: comp.risk[last], rate: (slow ? slowBuyRate(curveRate(cfg.curve, comp.risk[last]), slow.ltpi[last] ?? 0, slow.mult) : curveRate(cfg.curve, comp.risk[last])) / 100, slowed: !!slow && (slow.ltpi[last] ?? 0) < 0, modelBtcShare: (bt.btc * price) / bt.value, date: model.dates[last], athFrac: ath.frac[last] ?? 0, athK: ath.k[last] ?? 0 };
+  }, [model, cfg.enabled, cfg.manualRisk, cfg.curve, cfg.startDate, ltpiSeries, cfg.athSell, cfg.safety, cfg.slowBuy]);
 
   const prices: Record<string, number> = { ...R.prices, [STABLE]: 1 };
   if (sdcaState) prices.BTC = sdcaState.price;
@@ -89,7 +90,7 @@ export default function Signals() {
     const r = sdcaState.rate;
     if (r > 1e-6 && H.sdca[STABLE] > 0) {
       const u = H.sdca[STABLE] * r;
-      if (u >= MIN_TRADE_USD) orders.push({ id: 'sdca', sleeve: 'SDCA', side: 'buy', sym: 'BTC', usd: u, units: u / sdcaState.price, why: `krzywa ${(r * 100).toFixed(2)}% rezerwy przy ryzyku ${sdcaState.risk.toFixed(1)}%` });
+      if (u >= MIN_TRADE_USD) orders.push({ id: 'sdca', sleeve: 'SDCA', side: 'buy', sym: 'BTC', usd: u, units: u / sdcaState.price, why: `krzywa ${(r * 100).toFixed(2)}% rezerwy przy ryzyku ${sdcaState.risk.toFixed(1)}%${sdcaState.slowed ? ` (LTPI ujemne: × ${cfg.slowBuy})` : ''}` });
     } else if (r < -1e-6 && H.sdca.BTC > 0) {
       const units = H.sdca.BTC * -r;
       if (units * sdcaState.price >= MIN_TRADE_USD) orders.push({ id: 'sdca', sleeve: 'SDCA', side: 'sell', sym: 'BTC', usd: units * sdcaState.price, units, why: `krzywa ${(r * 100).toFixed(2)}% BTC przy ryzyku ${sdcaState.risk.toFixed(1)}%` });
@@ -103,7 +104,7 @@ export default function Signals() {
     }
     if (sdcaState.athFrac > 0 && H.sdca.BTC > 0) {
       const units = H.sdca.BTC * sdcaState.athFrac;
-      if (units * sdcaState.price >= MIN_TRADE_USD) orders.push({ id: 'sdca-ath', sleeve: 'SDCA', side: 'sell', sym: 'BTC', usd: units * sdcaState.price, units, why: `nowy szczyt (ATH) przy ryzyku ${sdcaState.risk.toFixed(1)}% → ${(sdcaState.athFrac * 100).toFixed(2)}% BTC (${sdcaState.athK + 1}. w cyklu)` });
+      if (units * sdcaState.price >= MIN_TRADE_USD) orders.push({ id: 'sdca-ath', sleeve: 'SDCA', side: 'sell', sym: 'BTC', usd: units * sdcaState.price, units, why: `PROPOZYCJA · nowy szczyt (ATH) przy ryzyku ${sdcaState.risk.toFixed(1)}% → ${(sdcaState.athFrac * 100).toFixed(2)}% BTC (${sdcaState.athK + 1}. w cyklu)` });
     }
     if (R.scanFresh && rspsVal > 0) {
       const want: Record<string, number> = {};
@@ -309,6 +310,7 @@ export default function Signals() {
       {R.shortProposal && <Card><b className="red">Short altów: {R.picks.shorts.map((r) => r.sym).join(', ')}</b><div className="note-text mt8">Pełny trend spadkowy BTC. 15–30% portfela RSPS jako zabezpieczenie (kontrakty perpetual). Tylko propozycja.</div></Card>}
       {volEst > 0.6 && <Card><b className="amber">Zmienność portfela ≈ {pct(volEst * 100, 0)} rocznie</b><div className="note-text mt8">Szacunek ostrożny (pełna korelacja). Propozycja: ekspozycja ok. {pct(Math.min(1, 0.6 / volEst) * exposure * 100, 0)}, reszta w stablecoinach. W backteście limit zmienności nie poprawiał istotnie wyników.</div></Card>}
 
+      <Fold id="pf.rules" title="Zasady i historia operacji">
       <div className="section-title">Zasady</div>
       <Card>
         <ol className="step-list">
@@ -320,6 +322,8 @@ export default function Signals() {
       </Card>
 
       {pf.history.length > 0 && <><div className="section-title">Historia</div><Card className="tight">{pf.history.slice(0, 15).map((h, i) => <Row key={i} label={h.text} value={<span className="dim">{new Date(h.time).toLocaleDateString('pl-PL')}</span>} />)}</Card></>}
+      </Fold>
+
       <button className="btn danger block mt12" onClick={() => { if (confirm('Usunąć zapisane portfele, wyniki i raporty i zacząć od nowa?')) { setPf({ holdings: null, history: [] }); setSnaps([]); setFlows([]); setReports([]); } }}>Zacznij od nowa</button>
 
       <EditSheet open={editOpen} onClose={() => setEditOpen(false)} h={H} onSave={(h, asFlow) => {

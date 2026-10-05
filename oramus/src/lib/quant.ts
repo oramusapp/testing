@@ -282,6 +282,7 @@ export function safetyStep(riskPct: number, ltpi: number, btcUsd: number, cashUs
 // unit × growth^k of its BTC, where k = ATH sales already made this cycle (slide schedule "×1.1").
 // The counter resets once price is 50% below its ATH. Proceeds stay in stablecoin for the curve to reinvest.
 export const ATH_SELL = { unit: 0.01, growth: 1.1, riskMin: 70, reset: 0.5 };
+export const ATH_BACKTEST = 'Backtest SDCA z bezpiecznikiem: 2024→ Sharpe 0,98 → 1,22, obsunięcie −34,8% → −28,7%; 2020–2023 Sharpe 1,65 → 1,63 (2021: +16% → +13%). Portfel 60/40: 2024→ Sharpe 1,04 → 1,18. Tylko dwie hossy w danych.';
 
 /** Fraction of BTC to sell on each day (0 on non-ATH days) and the per-cycle sale counter. */
 export function athSellSeries(prices: Series, riskPct: Series): { frac: number[]; k: number[] } {
@@ -300,9 +301,19 @@ export function athSellSeries(prices: Series, riskPct: Series): { frac: number[]
   return { frac, k: ks };
 }
 
+// ---------- LTPI-scaled accumulation (research/run40.py, run41.py) ----------
+// Masterclass, rate of accumulation: buy a % of the REMAINING stablecoin every day; "too slow is marginally
+// preferred over too fast". While LTPI < 0 the curve's buy rate is multiplied by SLOW_BUY (default 0.25);
+// with LTPI > 0 the full curve applies (the trend-positive catch-up, close to "LSI on positive trend").
+// 27 quarterly start dates 2018–2024: smaller max drawdown in 100% of starts (worst −59% → −43%),
+// Sharpe better in about half, median CAGR 43.7% → 40.1%.
+export const SLOW_BUY_OPTIONS = [1, 0.5, 0.25, 0.1];
+export const slowBuyRate = (ratePct: number, ltpi: number, mult: number) => (ratePct > 0 && ltpi < 0 ? ratePct * mult : ratePct);
+
 /** ltpiState: optional LTPI state per day (aligned with prices) — enables the SDCA safety.
- *  athSell: optional per-day fraction of BTC to sell (athSellSeries().frac). */
-export function backtest(prices: Series, riskPct: Series, curve: number[], startIndex: number, capital: number, ltpiState?: Series, athSell?: number[]): BacktestResult {
+ *  athSell: optional per-day fraction of BTC to sell (athSellSeries().frac).
+ *  slow: optional LTPI-scaled accumulation (buy rate × mult while LTPI < 0). */
+export function backtest(prices: Series, riskPct: Series, curve: number[], startIndex: number, capital: number, ltpiState?: Series, athSell?: number[], slow?: { ltpi: Series; mult: number }): BacktestResult {
   let cash = capital, btc = 0, spent = 0, bought = 0, buys = 0, sells = 0, holds = 0, owed = 0;
   let peak = 0, maxDD = 0, peakL = 0, maxDDL = 0, rateSum = 0, riskSum = 0, n = 0;
   const p0 = prices[startIndex];
@@ -310,7 +321,8 @@ export function backtest(prices: Series, riskPct: Series, curve: number[], start
   for (let i = startIndex; i < prices.length; i++) {
     const p = prices[i];
     const r = riskPct[i];
-    const rate = Number.isFinite(r) ? curveRate(curve, r) / 100 : 0;
+    const rate0 = Number.isFinite(r) ? curveRate(curve, r) / 100 : 0;
+    const rate = slow ? slowBuyRate(rate0, slow.ltpi[i] ?? 0, slow.mult) : rate0;
     let act = rate;
     if (rate > 1e-6 && cash > 0) {
       const amt = cash * rate;

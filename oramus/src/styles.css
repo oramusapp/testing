@@ -328,3 +328,11 @@ table.data tr:last-child td { border-bottom: 0; }
 .credits-note { margin-bottom: 6px; color: var(--dim); }
 .credits-view { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.85); display: flex; align-items: center; justify-content: center; padding: calc(var(--safe-top) + 16px) 16px calc(var(--safe-bottom) + 16px); }
 .credits-view img { max-width: 100%; max-height: 100%; border-radius: 12px; }
+
+/* collapsible sections */
+.fold { margin-top: 14px; }
+.fold-head { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 12px 14px; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.fold-title { display: block; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+.fold-hint { display: block; font-size: 12.5px; color: var(--faint, var(--dim)); margin-top: 2px; }
+.fold-icon { font-size: 20px; line-height: 1; color: var(--dim); width: 18px; text-align: center; }
+.fold-body > .section-title:first-child { margin-top: 12px; }

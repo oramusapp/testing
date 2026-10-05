@@ -131,3 +131,28 @@ describe('athSellSeries', () => {
     expect(frac[7]).toBeCloseTo(0.011);
   });
 });
+
+import { autoValuation, dailyIssuance, supplySeries } from './onchain';
+describe('onchain', () => {
+  it('follows the halving schedule and gives finite z for the built-in history', () => {
+    expect(dailyIssuance('2012-01-01')).toBe(7200);
+    expect(dailyIssuance('2025-01-01')).toBe(450);
+    const s = supplySeries(['2020-05-11', '2024-04-20']);
+    expect(s[0]).toBeGreaterThan(18.1e6); expect(s[0]).toBeLessThan(18.6e6);
+    expect(s[1]).toBeGreaterThan(19.5e6); expect(s[1]).toBeLessThan(19.9e6);
+    const v = autoValuation(rows);
+    for (const k of ['mvrvz', 'nupl', 'realized', '2yma', 'puell']) expect(Number.isFinite(v.z[k])).toBe(true);
+  });
+});
+
+import { structureScore, taAuto } from './autoSignals';
+describe('taAuto', () => {
+  it('scores an uptrend positive and a downtrend negative', () => {
+    const up = Array.from({ length: 400 }, (_, i) => 100 + i + 15 * Math.sin(i / 6));
+    const down = up.map((x) => 1000 - x);
+    expect(structureScore(up)).toBe(1);
+    expect(structureScore(down)).toBe(-1);
+    expect(taAuto(up).z).toBeGreaterThan(0);
+    expect(taAuto(down).z).toBeLessThan(0);
+  });
+});

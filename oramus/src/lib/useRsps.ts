@@ -6,7 +6,9 @@ import { klines, lastClosedDay } from './market';
 import { vams, annVol, capWeights, ratios, linfit } from './quant';
 import { leverageGate } from './pyramid';
 import { usePyramid } from './pyramidStore';
-import type { LtpiState } from '../tabs/Sdca';
+import { SDCA_DEFAULTS, type LtpiState, type SdcaSettings } from '../tabs/Sdca';
+import { useBtc } from './btcStore';
+import { composite } from './sdcaModel';
 
 // Large-cap, non-meme candidates (Binance <SYMBOL>USDT). The scanner keeps the 10 most liquid.
 export const DEFAULT_TOKENS = ['ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'TRX', 'LINK', 'AVAX', 'DOT', 'LTC', 'BCH', 'XLM', 'ATOM', 'NEAR', 'UNI', 'AAVE', 'ETC', 'ICP',
@@ -25,7 +27,10 @@ export interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadt
 interface LogEntry { time: number; regime: string; lev?: number; }
 
 export type RegimeId = 'defense' | 'rsps' | 'closed';
-export type Parking = 'stable' | 'btc';
+export type Parking = 'stable' | 'btc' | 'hybrid';
+// Hybrid parking (research/run39.py): BTC × trend while SDCA valuation risk < 80%, stablecoin above.
+// Portfolio 2020→: CAGR 54.4% (stablecoin) → 67.2%, max drawdown −24.2% (same), 2024→ Sharpe 0.94 → 1.07.
+export const HYBRID_RISK_MAX = 80;
 
 const trendOf = (c: number[]) => {
   const n = c.length - 1;
@@ -36,7 +41,14 @@ let scanInFlight = false;
 
 export function useRsps() {
   const pyr = usePyramid();
-  const [parking, setParking] = usePersisted<{ choice: Parking; ack?: string }>('rsps.parking', { choice: 'stable' });
+  const { model: btcModel } = useBtc();
+  const [sdcaCfg] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
+  const sdcaRisk = useMemo(() => {
+    if (!btcModel) return NaN;
+    const c = { ...SDCA_DEFAULTS, ...sdcaCfg };
+    return composite(btcModel, c.enabled, c.manualRisk).risk.at(-1) ?? NaN;
+  }, [btcModel, sdcaCfg]);
+  const [parking, setParking] = usePersisted<{ choice: Parking; ack?: string }>('rsps.parking', { choice: 'hybrid' });
   const [s0, setS] = usePersisted<RspsSettings>('rsps.settings', RSPS_DEF);
   const s = { ...RSPS_DEF, ...s0 };
   const upd = (p: Partial<RspsSettings>) => setS((o) => ({ ...RSPS_DEF, ...o, ...p }));
@@ -129,7 +141,8 @@ export function useRsps() {
     picks.sel.forEach((p) => sleeve.push(p));
     const rest = 1 - picks.sel.reduce((x, p) => x + p.w, 0);
     if (rest > 0.001 && btcTrend > 0) sleeve.push({ sym: 'BTC', w: rest * btcTrend, note: 'reszta × trend BTC' });
-  } else if (regime === 'closed' && parking.choice === 'btc' && btcTrend > 0) sleeve.push({ sym: 'BTC', w: btcTrend, note: `trend ${btcTrend.toFixed(2)}` });
+  } else if (regime === 'closed' && btcTrend > 0 && (parking.choice === 'btc' || (parking.choice === 'hybrid' && Number.isFinite(sdcaRisk) && sdcaRisk < HYBRID_RISK_MAX)))
+    sleeve.push({ sym: 'BTC', w: btcTrend, note: `trend ${btcTrend.toFixed(2)}${parking.choice === 'hybrid' ? ` · ryzyko ${sdcaRisk.toFixed(0)}% < ${HYBRID_RISK_MAX}%` : ''}` });
   // a decision is pending whenever the gate closed since the user last confirmed where to park
   const parkingPending = regime === 'closed' && scanFresh && parking.ack !== (scan?.gateSince ?? '');
   const confirmParking = (choice: Parking) => setParking({ choice, ack: scan?.gateSince ?? lastClosedDay() });
@@ -142,6 +155,6 @@ export function useRsps() {
   if (a) vols.BTC = a.vol30;
 
   return { pyr, s, upd, scan, scanFresh, busy, runScan, breadth, btcTrend, ltpi, regime, gate, picks, sleeve, shortProposal,
-    parking, parkingPending, confirmParking, log, prices, vols };
+    parking, parkingPending, confirmParking, log, prices, vols, sdcaRisk };
 }
 

@@ -1,4 +1,4 @@
-import { Screen, Card, Seg } from '../components/ui';
+import { Screen, Card, Seg, Fold } from '../components/ui';
 import { TpiCard } from '../components/Tpi';
 import { usePersisted } from '../lib/db';
 import { usePyramid, TPI_DEFAULTS, type TpiSettings } from '../lib/pyramidStore';
@@ -7,6 +7,7 @@ import { signed } from '../lib/format';
 import { useBtc } from '../lib/btcStore';
 import { varianceRatio } from '../lib/quant';
 import { SeasonalityCard } from '../components/Seasonality';
+import { GridCard } from '../components/Grid';
 
 /** LTPI / MTPI: trend-following signals (not valuation). */
 export default function Trend({ nav }: { nav?: React.ReactNode }) {
@@ -59,8 +60,12 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
         note={tpi.mtpiSizing === 'ensemble' ? 'Steruje skalowaniem BTC w części RSPS (MTPI przeliczony na 0…1).' : 'Informacyjnie: skalowanie BTC używa 4 średnich (wariant z backtestu).'} />}
       {!a && <Card><div className="dim">Ładowanie danych BTC…</div></Card>}
 
-      <SeasonalityCard />
+      <Fold id="trend.macro" title="Makro i sezonowość" hint="42 Macro GRID (ręcznie), sezonowość BTC">
+        <GridCard />
+        <SeasonalityCard />
+      </Fold>
 
+      <Fold id="trend.settings" title="Ustawienia i jak czytać TPI">
       <div className="section-title">Ustawienia</div>
       <Card className="tight">
         <div className="row"><div className="grow"><div>Źródło LTPI</div><div className="faint" style={{ fontSize: 12 }}>Backtest: ensemble ≈ SMA 200 (Sharpe OOS 1,03 vs 1,03), mniejsze obsunięcie</div></div>
@@ -74,6 +79,8 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
       <Card>
         <div className="note-text">TPI podąża za trendem: kupuje wysoko, żeby sprzedać wyżej, i sprzedaje nisko, zanim spadnie niżej. Nie wskazuje szczytów ani dołków i nie mierzy wyceny. Wycena (SDCA) to osobny system typu „kup tanio, sprzedaj drogo”, więc te dwa sygnały są liczone oddzielnie. TPI ponosi serie małych strat w rynku bocznym i odrabia je dużymi zyskami w trendzie. Najważniejszy jest stan (powyżej/poniżej zera), potem tempo zmian; siła oznacza tylko zgodność składników.</div>
       </Card>
+      </Fold>
+
     </Screen>
   );
 }

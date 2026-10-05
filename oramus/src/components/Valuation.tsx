@@ -31,16 +31,17 @@ function parse(t: string): number | null {
 const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
 
 /** Returns the long-term valuation z (TRW sign: + = cheap) and its risk-% equivalent. */
-export function useValuation() {
+export function useValuation(auto?: Record<string, number>) {
   const [v, setV] = usePersisted<ValState>('sdca.valuation', { z: {}, updated: null });
-  const longZ = avg(VAL_ITEMS.filter((i) => i.horizon === 'long').map((i) => v.z[i.id]).filter((x): x is number => x != null));
-  const medZ = avg(VAL_ITEMS.filter((i) => i.horizon === 'medium').map((i) => v.z[i.id]).filter((x): x is number => x != null));
-  const filled = VAL_ITEMS.filter((i) => i.horizon === 'long' && v.z[i.id] != null).length;
-  return { v, setV, longZ, medZ, filled, risk: longZ == null ? null : normCdf(-longZ) * 100 };
+  const zOf = (id: string): number | null => auto?.[id] ?? v.z[id] ?? null;
+  const longZ = avg(VAL_ITEMS.filter((i) => i.horizon === 'long').map((i) => zOf(i.id)).filter((x): x is number => x != null));
+  const medZ = avg(VAL_ITEMS.filter((i) => i.horizon === 'medium').map((i) => zOf(i.id)).filter((x): x is number => x != null));
+  const filled = VAL_ITEMS.filter((i) => i.horizon === 'long' && zOf(i.id) != null).length;
+  return { v, setV, zOf, longZ, medZ, filled, risk: longZ == null ? null : normCdf(-longZ) * 100 };
 }
 
-export function ValuationCard({ onUse }: { onUse: (riskPct: number) => void }) {
-  const val = useValuation();
+export function ValuationCard({ onUse, auto }: { onUse: (riskPct: number) => void; auto?: Record<string, number> }) {
+  const val = useValuation(auto);
   const [txt, setTxt] = useState<Record<string, string>>({});
   const set = (id: string, t: string) => {
     setTxt({ ...txt, [id]: t });
@@ -57,7 +58,7 @@ export function ValuationCard({ onUse }: { onUse: (riskPct: number) => void }) {
         <div className="dim" style={{ fontSize: 13 }}>{val.filled}/{nLong} wskaźników długoterminowych{val.risk != null ? ` · odpowiada ryzyku ${val.risk.toFixed(1)}%` : ''}</div>
       </div>
       <div style={{ display: 'flex', gap: 3, marginTop: 10 }}>
-        {VAL_ITEMS.map((i) => <div key={i.id} title={i.name} style={{ flex: 1, height: 8, borderRadius: 2, background: heat(val.v.z[i.id] ?? null), opacity: i.horizon === 'medium' ? 0.5 : 1 }} />)}
+        {VAL_ITEMS.map((i) => <div key={i.id} title={i.name} style={{ flex: 1, height: 8, borderRadius: 2, background: heat(val.zOf(i.id)), opacity: i.horizon === 'medium' ? 0.5 : 1 }} />)}
       </div>
       <div className="mt12" style={{ display: 'grid', gap: 10 }}>
         {VAL_ITEMS.map((i) => (
@@ -67,14 +68,16 @@ export function ValuationCard({ onUse }: { onUse: (riskPct: number) => void }) {
               <div className="faint" style={{ fontSize: 12.5 }}>{i.hint}</div>
               <a href={i.url} target="_blank" rel="noopener noreferrer" className="accent" style={{ fontSize: 12.5, textDecoration: 'none' }}>↗ {i.label}</a>
             </div>
-            <input className="input" style={{ width: 84, textAlign: 'center', borderColor: heat(val.v.z[i.id] ?? null) }} inputMode="decimal" placeholder="z"
-              value={txt[i.id] ?? (val.v.z[i.id] == null ? '' : String(val.v.z[i.id]))} onChange={(e) => set(i.id, e.target.value)} />
+            {auto?.[i.id] != null
+              ? <div className="num" style={{ width: 84, textAlign: 'center', fontWeight: 600, color: heat(auto[i.id]) }}>{sz(auto[i.id])}<div className="faint" style={{ fontSize: 11, fontWeight: 400 }}>auto</div></div>
+              : <input className="input" style={{ width: 84, textAlign: 'center', borderColor: heat(val.v.z[i.id] ?? null) }} inputMode="decimal" placeholder="z"
+                  value={txt[i.id] ?? (val.v.z[i.id] == null ? '' : String(val.v.z[i.id]))} onChange={(e) => set(i.id, e.target.value)} />}
           </div>
         ))}
       </div>
       {val.medZ != null && <div className="note-text mt8">Średni horyzont (osobno): {sz(val.medZ)}σ. Nie wchodzi do wyceny długoterminowej.</div>}
       <button className="btn block mt12" disabled={val.risk == null} onClick={() => { onUse(Math.round(val.risk! * 10) / 10); toast('Ustawiono jako wskaźnik ręczny'); }}>Użyj jako wskaźnik ręczny w Composite Risk</button>
-      <div className="note-text mt8">Wpisz z-score każdego wskaźnika (−3…+3, np. 1,5 lub −0,75). Konwencja TRW: plus = wysoka wartość (tanio, strefa akumulacji), minus = drogo (strefa sprzedaży); ±1,5–2σ to skrajności. Wszystkie wskaźniki mają równe wagi, więc błędy ocen się uśredniają. Wskaźniki o krótszym horyzoncie liczone są osobno. Wyższa jakość danych (on-chain, fundamenty) jest ważniejsza niż wskaźniki techniczne. Wynik zamieniany jest na ryzyko 0–100% wzorem Φ(−z) i może zasilić Composite Risk jako wskaźnik ręczny. {val.v.updated ? `Ostatnia zmiana: ${new Date(val.v.updated).toLocaleDateString('pl-PL')}.` : ''}</div>
+      <div className="note-text mt8">Wskaźniki oznaczone „auto” liczy aplikacja z ceny i MVRV (Coin Metrics); podaż i emisja według harmonogramu halvingów, z-score względem całej historii od 2011 — bez ręcznej oceny. Pozostałe wpisz ręcznie: z-score każdego wskaźnika (−3…+3, np. 1,5 lub −0,75). Konwencja TRW: plus = wysoka wartość (tanio, strefa akumulacji), minus = drogo (strefa sprzedaży); ±1,5–2σ to skrajności. Wszystkie wskaźniki mają równe wagi, więc błędy ocen się uśredniają. Wskaźniki o krótszym horyzoncie liczone są osobno. Wyższa jakość danych (on-chain, fundamenty) jest ważniejsza niż wskaźniki techniczne. Wynik zamieniany jest na ryzyko 0–100% wzorem Φ(−z) i może zasilić Composite Risk jako wskaźnik ręczny. {val.v.updated ? `Ostatnia zmiana: ${new Date(val.v.updated).toLocaleDateString('pl-PL')}.` : ''}</div>
     </Card>
   );
 }
@@ -86,6 +89,10 @@ export function AccumulationCalc({ cash }: { cash: number }) {
   return (
     <Card>
       <div className="eyebrow" style={{ margin: 0 }}>Tempo akumulacji (kalkulator)</div>
+      <div className="flex mt8" style={{ gap: 6, flexWrap: 'wrap' }}>
+        <button className="btn small" onClick={() => setDays({ mean: 114, sd: 32 })}>Średnia bess · 114 ± 32</button>
+        <button className="btn small" onClick={() => setDays({ mean: 145, sd: 27 })}>Regresja faz · 145 ± 27</button>
+      </div>
       <div className="flex mt8" style={{ gap: 8, flexWrap: 'wrap' }}>
         <label className="dim" style={{ fontSize: 13 }}>Dni wartości: średnio <input className="input" style={{ width: 70 }} inputMode="numeric" value={days.mean} onChange={(e) => setDays({ ...days, mean: Math.max(1, +e.target.value || 1) })} /></label>
         <label className="dim" style={{ fontSize: 13 }}>odchylenie <input className="input" style={{ width: 70 }} inputMode="numeric" value={days.sd} onChange={(e) => setDays({ ...days, sd: Math.max(0, +e.target.value || 0) })} /></label>
@@ -93,7 +100,7 @@ export function AccumulationCalc({ cash }: { cash: number }) {
       <div className="mt8">
         {rows.map((r) => <div key={r.l} className="row compact"><span>{r.l} · {r.d} dni</span><span className="num">{(100 / r.d).toFixed(2).replace('.', ',')}%/dzień{cash > 0 ? ` · ${Math.round(cash / r.d).toLocaleString('pl-PL')} $` : ''}</span></div>)}
       </div>
-      <div className="note-text mt8">Domyślnie 114 ± 32 dni, czyli średnia długość okresów wysokiej wartości w poprzednich bessach według notatek z kursu. To tylko szacunek z kilku cykli. Zbyt wolne tempo jest bezpieczniejsze niż zbyt szybkie, bo resztę gotówki można dokupić przy powrocie dodatniego trendu. Decyzję podejmuje krzywa akumulacji; w backteście wolniejsze tempo od 2020 obniżyło CAGR, choć zmniejszyło obsunięcie.</div>
+      <div className="note-text mt8">Domyślnie 114 ± 32 dni, czyli średnia długość okresów wysokiej wartości w poprzednich bessach według notatek z kursu. Wariant „regresja faz” pochodzi ze slajdu: regresja liniowa długości 4 poprzednich faz (77, 147, 98, 135 dni; R² = 0,25) daje 145 dni dla fazy 5, z odchyleniem reszt 27 dni. To tylko szacunek z kilku cykli. Zbyt wolne tempo jest bezpieczniejsze niż zbyt szybkie, bo resztę gotówki można dokupić przy powrocie dodatniego trendu. Decyzję podejmuje krzywa akumulacji; w backteście wolniejsze tempo od 2020 obniżyło CAGR, choć zmniejszyło obsunięcie.</div>
     </Card>
   );
 }

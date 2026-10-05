@@ -138,3 +138,31 @@ DD −27,3% → −24,4%, FULL CAGR 72,8 → 73,7%. Tylko dwie hossy w próbie �
 ## Rotacja bety w RSPS (run38.py, notatki TPI: „increase beta” / „reduce beta”)
 Alty RSPS → BTC lub stablecoin, gdy ryzyko wyceny ≥ 60/70/80%: IS Sharpe 1,82 → 1,16–1,23, FULL CAGR 84 → 39–45%.
 Sezon altów 2021 wypadł przy wysokiej wycenie BTC, więc cięcie bety po wycenie usuwa główne źródło alfy. Nie wdrożone.
+
+## Parking RSPS: „BTC do pewnego momentu trendu, potem stablecoin” + warunkowy short (run39.py)
+Bramka zamknięta, LTPI > 0: BTC × trend, dopóki warunek „wcześnie” trwa, potem stablecoin. Cały portfel 60/40 z bezpiecznikiem:
+stablecoin — FULL CAGR 54,4%, DD −24,2%, OOS Sharpe 0,94; BTC×trend — 72,8%, −27,3%, 1,04;
+ryzyko wyceny < 80% — 67,2%, −24,2%, 1,07 (wybrane jako „hybryda”, domyślnie); < 70% — 62,9%, −24,2%, 1,02;
+do 1. dnia ATH — 65,3%, −23,3%, 1,09; 365 dni trendu — 73,4%, −27,3%, 1,04; do +100% — 67,2%, −27,9%, 1,08.
+Short BTC przy LTPI < 0 i trendzie ≤ 0,25 (finansowanie 10%/rok): każdy wariant gorszy (np. BTC×trend + short 25%: 69,6%, OOS 1,00) —
+short zostaje wyłącznie warunkową propozycją.
+
+## Akumulacja SDCA według wyceny i LTPI (run40.py, run41.py, lekcja „Rate of Accumulation”)
+Codziennie % pozostałych stablecoinów wg krzywej; przy LTPI < 0 × m. Start 2020: obecna 57,6% CAGR, × 0,25 43,6%;
+start 2018: obecna DD −49,6%, × 0,25 −34,1%, Sharpe 1,24 → 1,27. 27 kwartalnych startów 2018–2024: × 0,25 mniejsze DD
+w 100% startów (najgorsze −59,0% → −43,1%), Sharpe lepszy w 48%, mediana CAGR 43,7 → 40,1%. Harmonogram 1/(N − d) dni
+(N = 82/114/146) gorszy od mnożnika. W aplikacji: ustawienie „Tempo zakupów przy ujemnym LTPI”, domyślnie × 0,25.
+
+## Analiza zdjęć z notatek (167 slajdów, dopasowanych do tekstu)
+Nowe i wdrożone: sprzedaż przy ATH jako propozycja z powiadomieniem; tempo akumulacji wg LTPI; parking hybrydowy;
+42 Macro GRID (OECD CLI Δ3m × CPI r/r Δ3m; BTC rocznie: Goldilocks +483%, Reflacja +104%, Inflacja +64%, Deflacja −10%, n 7–22)
+jako ręczna karta makro; automatyczne z-score MVRV Z, NUPL, cena zrealizowana, 2Y MA, Puell w arkuszu wyceny.
+Już obecne lub odrzucone wcześniej: macierz TPI × reżim, F&G w badaniu zdarzeń, rotacja bety, dźwignia, Omega/SUPT, sezonowość,
+analiza techniczna. Bez danych w sandboxie: cykl kredytowy (HY), opóźnienia płynności (CrossBorder), Realized Loss, CACRI (brak slajdu).
+
+## Automatyczny filar TA (run42.py) i breadth thrust (run43.py)
+TA = średnia: pozycja BTC w BB 1W(20) i 1D(50) w σ (±3) oraz struktura z punktów zwrotnych ±10 d (HH/HL +1, LH/LL −1, bez look-ahead).
+Spearman z zwrotem 90 d: 2014–19 0,28, 2020→ 0,07; filtr TA > 0: Sharpe 1,00 / 0,70 vs B&H 0,51 / 0,61 (4 średnie: 0,88 / 0,77).
+Słaby, dodatni → filar z najniższą wagą, liczony automatycznie (TOTAL i wolumen tylko w ręcznej korekcie).
+Breadth thrust krypto (≥ 90–100% top-10 na plus w 3–4 z 8 dni, 2019→, n = 54–84): |z| < 1 dla 7/30/90 d → odrzucone.
+Pełna lista pokrycia notatek: NOTES_COVERAGE.md.
