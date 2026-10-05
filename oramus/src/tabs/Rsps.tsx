@@ -1,6 +1,6 @@
 import { HYBRID_RISK_MAX } from '../lib/useRsps';
 import { useState } from 'react';
-import { Screen, Card, Row, NumInput, Sheet, toast, Fold } from '../components/ui';
+import { Screen, Card, Row, NumInput, Sheet, toast, Fold, Seg } from '../components/ui';
 import { IcInfo, IcRefresh, IcShield, IcLayers, IcX, IcPlus } from '../components/icons';
 import { PyramidCard } from '../components/Pyramid';
 import { SentimentCard } from '../components/Sentiment';
@@ -104,6 +104,12 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
           </div>
         ))}
         {regime === 'rsps' && sleeve.reduce((p, x) => p + x.w, 0) < 0.999 && <div className="note-text">Reszta części RSPS w stablecoinach.</div>}
+      </Card>
+
+      <Card className="tight">
+        <div className="row"><div className="grow"><div>Rezerwa RSPS</div><div className="faint" style={{ fontSize: 12 }}>Gdzie leży część RSPS, która nie jest w coinach</div></div></div>
+        <div style={{ padding: '0 14px 10px' }}><Seg value={s.reserve ?? 'stable'} onChange={(v: 'stable' | 'gold' | 'goldTrend') => upd({ reserve: v })} options={[{ v: 'stable', l: 'Stablecoin' }, { v: 'goldTrend', l: 'PAXG w trendzie' }, { v: 'gold', l: 'PAXG zawsze' }]} /></div>
+        <div className="note-text" style={{ padding: '0 14px 12px' }}>PAXG = tokenizowane złoto (1 token = 1 uncja, Binance PAXGUSDT). „W trendzie”: złoto tylko, gdy jego trend z 4 średnich ≥ 0,5, inaczej stablecoin. Backtest od 2020, portfel z przechyłem (research/run49.py): stablecoin — CAGR 65,5%, obsunięcie −29,3%, Sharpe 2024→ 1,00; PAXG w trendzie — 68,0%, −29,4%, 1,13; PAXG zawsze — 69,3%, −31,2%, 1,13. Złoto mocno rosło w latach 2024–2026, więc część przewagi to ta hossa; PAXG ma dane od 08.2020.{scan?.gold ? ` Dziś złoto: trend ${scan.gold.trend.toFixed(2)}.` : ''}</div>
       </Card>
 
       <div className="section-title">Skaner (top {s.universeSize} wg płynności, bez memów)</div>

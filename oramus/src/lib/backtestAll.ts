@@ -81,7 +81,7 @@ export function rsScore(ratio: number[], coinVol: number): number {
   return mean([30, 60, 90].map((L) => Math.log(ratio[n] / ratio[n - L]) / coinVol));
 }
 
-export interface RspsOpts { universe: number; topN: number; cap: number; parking: 'stable' | 'btc' | 'hybrid'; hybridMax: number; every?: number }
+export interface RspsOpts { universe: number; topN: number; cap: number; parking: 'stable' | 'btc' | 'hybrid'; hybridMax: number; every?: number; reserve?: 'stable' | 'gold' | 'goldTrend' }
 
 /** Weekly relative-strength rotation with the live rules: point-in-time liquidity universe, VAMS of the coin/BTC ratio
  *  (30/60/90), breadth gate 70%/60%, own trend ≥ 0.5, LTPI < 0 → all stablecoin, parking per choice when the gate is closed. */
@@ -93,7 +93,7 @@ export function rspsRun(dates: string[], btc: number[], coins: CoinSeries[], ltp
   for (let i = 0; i < n; i++) {
     if (i >= start && (i - start) % every === 0) {
       const bt = trend4(btc, i);
-      const rows = coins.filter((c) => finiteFrom(c.close, i, 91)).map((c) => {
+      const rows = coins.filter((c) => c.sym !== 'PAXG' && finiteFrom(c.close, i, 91)).map((c) => {
         const ratio: number[] = []; for (let k = i - 90; k <= i; k++) ratio.push(c.close[k] / btc[k]);
         const r50 = mean(ratio.slice(-51, -1));
         let q = 0; for (let k = i - 29; k <= i; k++) q += c.quote[k] || 0;
@@ -113,6 +113,12 @@ export function rspsRun(dates: string[], btc: number[], coins: CoinSeries[], ltp
         const rest = 1 - cw.reduce((a, b) => a + b, 0);
         if (rest > 1e-6 && bt > 0 && parkBtc) w.BTC = rest * bt;
       } else if (bt > 0 && parkBtc) w.BTC = bt;
+      // reserve: the share not in coins goes to tokenized gold (PAXG) instead of stablecoin, if chosen
+      const gold = coins.find((c) => c.sym === 'PAXG');
+      if (gold && o.reserve && o.reserve !== 'stable' && gold.close[i] > 0 && (o.reserve === 'gold' || trend4(gold.close, i) >= 0.5)) {
+        const left = 1 - Object.values(w).reduce((a, b) => a + b, 0);
+        if (left > 1e-6) w.PAXG = left;
+      }
       cur = w;
     }
     const row = new Array(syms.length).fill(0); for (const [s, x] of Object.entries(cur)) row[col.get(s)!] = x;
