@@ -278,3 +278,13 @@ bez Supertrend i RSI — 82,9 / −27,3 / 1,83 / 1,54; bez wszystkich trzech —
 Odrzucone: wolniejsze zamienniki (Supertrend 100/6, RSI 180, SMA 365) — 78,8%; głosy neutralne (strefy martwe) — 79,7%, DD −28,9%;
 alty bez weta LTPI (ważność TPI ∝ udział w rynku) — 84,3%, ale DD −33,6%; lump sum reszty gotówki SDCA przy LTPI → + (ryzyko < 50%) —
 85,1%, ale DD −35,1%. SDCA na ETH/SOL nietestowalne bez modelu wyceny dla tych coinów (model wyceny jest specyficzny dla BTC).
+
+## Kontrola rzetelności (run57.py) — UWAGA: zysk z warstw RSPS (2.24) jest w dużej mierze efektem wiedzy z przyszłości
+Stała lista dużych (ETH, SOL, XRP, SUI) została wybrana w 2026 r., gdy wiadomo już, że SOL i SUI mocno urosły. Test bez tej wiedzy —
+„duże” = 4 najpłynniejsze alty znane w danym dniu: portfel 2020→ CAGR 64,4%, DD −39,2%, IS 1,57, OOS 1,29 (2024→ 50,3%).
+Ta sama konfiguracja bez warstw (jedna pula top 10, LTPI spójne): CAGR 87,0%, DD −26,5%, IS 1,93, OOS 1,42 (2024→ 61,1%).
+Warstwy ze stałą listą: 84,4%, −27,3%, 1,84, 1,57 (2024→ 70,0%). Wniosek: przewagi stałej listy nie da się uczciwie wykazać
+backtestem — wynik 2.24 jest zawyżony. Lista dużych zostaje tylko jako wybór użytkownika, nie jako ulepszenie potwierdzone danymi.
+Inne źródła optymizmu: okna 7/21/42 wybrano częściowo patrząc na 2024→ (gdyby wybierać tylko po 2020–23, wygrałoby 14/28/56 z OOS
+1,22 < 1,28 bazy), więc 2024→ nie jest już czystym testem poza próbą; RSPS pomija coiny, które upadły; $TOTAL to własny indeks
+z 45 aktywów Coin Metrics, nie oficjalny TOTAL z TradingView. Zmiana LTPI (2.25) poprawiła też okres 2020–23, więc jest wiarygodniejsza.
