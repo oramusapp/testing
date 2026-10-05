@@ -61,3 +61,12 @@ describe('SDCA safety', () => {
     expect(b.btc).toBeLessThan(a.btc);
   });
 });
+
+import { ratios } from './quant';
+describe('risk-adjusted ratios', () => {
+  it('omega > 1 and positive Sharpe/Sortino for a rising series with dips', () => {
+    const c = Array.from({ length: 400 }, (_, i) => 100 * Math.exp(0.002 * i) * (1 + 0.02 * Math.sin(i)));
+    const r = ratios(c);
+    expect(r.omega).toBeGreaterThan(1); expect(r.sharpe).toBeGreaterThan(0); expect(r.sortino).toBeGreaterThan(r.sharpe);
+  });
+});

@@ -1,5 +1,14 @@
 export const CHANGELOG = [
   {
+    v: '1.9.0', date: '2026-10-05',
+    items: [
+      'TPI: odczyt w trzech wymiarach (stan, tempo zmian, siła = zgodność) ze wskazówkami, liczba zmian na rok dla każdego składnika i test istotności na całej historii',
+      'SDCA: arkusz wyceny z-score (konwencja TRW, równe wagi, osobno horyzont średni) z możliwością użycia jako wskaźnik ręczny; kalkulator tempa akumulacji',
+      'SDCA: wycena z w konwencji TRW na karcie dzisiejszej akcji',
+      'RSPS: jakość aktywów (Omega, Sortino, Sharpe z 365 dni); Sygnały: Sortino i Omega portfela'
+    ]
+  },
+  {
     v: '1.8.0', date: '2026-10-05',
     items: [
       'SDCA: bezpiecznik LTPI — przy ujemnym LTPI i ryzyku wyceny ≥ 70% sprzedaż 2% BTC dziennie do stablecoina, odkup po powrocie LTPI na plus',

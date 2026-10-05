@@ -55,6 +55,9 @@ export function computeAuto(dates: string[], prices: number[], compositeRisk: nu
   const W = 1500, off = prices.length - Math.min(W, prices.length);
   const mtpi = computeTpi(prices, MTPI_SPEC, W);
   const ltpiTpi = computeTpi(prices, LTPI_SPEC, W);
+  // significance needs the whole history (the 1500-day window leaves only ~3 years after warm-up)
+  mtpi.sig = computeTpi(prices, MTPI_SPEC, prices.length).sig;
+  ltpiTpi.sig = computeTpi(prices, LTPI_SPEC, prices.length).sig;
   const ltpiAt = (k: number) => ltpiSource === 'ensemble'
     ? (ltpiTpi.stateSeries[k - off] ?? 0)
     : (prices[k] > sma(prices.slice(k - 199, k + 1), 200).at(-1)! ? 1 : -1);

@@ -64,6 +64,8 @@ export function stats(snaps: Snapshot[], flows: Flow[]) {
     currentDD: idx[idx.length - 1] / peak - 1,
     vol: sd * Math.sqrt(365),
     sharpe: sd > 0 && days >= 30 ? (mean * 365) / (sd * Math.sqrt(365)) : null,
+    sortino: (() => { const dn = Math.sqrt(rs.reduce((s, x) => s + Math.min(x.r, 0) ** 2, 0) / Math.max(days, 1)); return dn > 0 && days >= 30 ? (mean * 365) / (dn * Math.sqrt(365)) : null; })(),
+    omega: (() => { const g = rs.reduce((s, x) => s + Math.max(x.r, 0), 0), l = rs.reduce((s, x) => s - Math.min(x.r, 0), 0); return l > 0 && days >= 30 ? g / l : null; })(),
     days, idx,
     netFlows: flows.filter((f) => !first || f.time > first.time).reduce((s, f) => s + f.amount, 0)
   };

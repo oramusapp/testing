@@ -7,6 +7,7 @@ import { usePersisted } from '../lib/db';
 import { INDICATORS, composite, RAIL_TAUS } from '../lib/sdcaModel';
 import { BANDS, DEFAULT_CURVE, SAFETY, backtest, curveRate, riskZone, safetyStep } from '../lib/quant';
 import { computeTpi, LTPI_SPEC, ltpiStateSeries } from '../lib/tpi';
+import { ValuationCard, AccumulationCalc } from '../components/Valuation';
 import { TpiCard } from '../components/Tpi';
 import { usd as usdFull, usdShort, pct, signed, fmtDate, uid } from '../lib/format';
 
@@ -48,7 +49,7 @@ export default function Sdca() {
   const cfg = { ...SDCA_DEFAULTS, ...s };
 
   const comp = useMemo(() => (model ? composite(model, cfg.enabled, cfg.manualRisk) : null), [model, cfg.enabled, cfg.manualRisk]);
-  const ltpiRes = useMemo(() => (model ? computeTpi(model.prices, LTPI_SPEC) : null), [model]);
+  const ltpiRes = useMemo(() => (model ? computeTpi(model.prices, LTPI_SPEC, model.prices.length) : null), [model]);
   const [tpiCfg0] = usePersisted<{ ltpiSource: 'ensemble' | 'sma200' }>('signals.tpi', { ltpiSource: 'ensemble' });
   const tpiCfg = { ltpiSource: tpiCfg0.ltpiSource ?? 'ensemble' };
   const startIdx = useMemo(() => {
@@ -128,6 +129,7 @@ export default function Sdca() {
         <div className="dim mt8" style={{ fontSize: 14 }}>{actionSub}</div>
         <div className="hr" />
         <Row className="compact" label="Composite Risk dziś" value={pct(riskToday)} />
+        <Row className="compact" label="Wycena z (konwencja TRW)" value={<span style={{ color: zToday >= 1.5 ? 'var(--green)' : zToday <= -1.5 ? 'var(--red)' : undefined }}>{signed(zToday)}σ <span className="dim">· + = tanio</span></span>} />
         <Row className="compact" label="Krzywa dziś" value={signed(rate) + '%/dzień'} />
         <Row className="compact" label="Bezpiecznik LTPI" value={<span className={safetyOn ? 'red' : 'dim'}>{!cfg.safety ? 'wyłączony' : safetyOn ? 'aktywny — sprzedaż' : ltpiValue > 0 ? 'nieaktywny · LTPI +' : `czuwa (ryzyko ≥ ${SAFETY.riskMin}% i LTPI < 0)`}</span>} />
         <Row className="compact" label="Cena BTC" value={usd(price)} />
@@ -245,6 +247,10 @@ export default function Sdca() {
           </div>
         ))}
       </Card>
+
+      <div className="section-title">Arkusz wyceny i tempo akumulacji</div>
+      <ValuationCard onUse={(r) => upd({ manualRisk: r, enabled: { ...cfg.enabled, manual: true } })} />
+      <AccumulationCalc cash={cfg.cash} />
 
       <div className="section-title">Poziomy pasm (na żywo)</div>
       <Card className="tight">
