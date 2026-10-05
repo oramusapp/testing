@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from '../components/ui';
 import { usePersisted } from './db';
-import { klines, lastClosedDay } from './market';
+import { klines, klinesAny, lastClosedDay } from './market';
 import { annVol, capWeights, ratios, linfit } from './quant';
 import { leverageGate, PILLARS, isFresh } from './pyramid';
 import { usePyramid } from './pyramidStore';
@@ -12,13 +12,20 @@ import { useBtc } from './btcStore';
 import { composite, freshManual } from './sdcaModel';
 
 // Large-cap, non-meme candidates (Binance <SYMBOL>USDT). The scanner keeps the 10 most liquid.
-export const DEFAULT_TOKENS = ['ETH', 'BNB', 'XRP', 'SOL', 'ADA', 'TRX', 'LINK', 'AVAX', 'DOT', 'LTC', 'BCH', 'XLM', 'ATOM', 'NEAR', 'UNI', 'AAVE', 'ETC', 'ICP',
+export const DEFAULT_TOKENS = ['ETH', 'HYPE', 'BNB', 'XRP', 'SOL', 'ADA', 'TRX', 'LINK', 'AVAX', 'DOT', 'LTC', 'BCH', 'XLM', 'ATOM', 'NEAR', 'UNI', 'AAVE', 'ETC', 'ICP',
   'FIL', 'POL', 'ALGO', 'XTZ', 'VET', 'HBAR', 'APT', 'SUI', 'TON', 'ARB', 'OP', 'INJ', 'MANA'];
 export const MEME = ['DOGE', 'SHIB', 'PEPE', 'WIF', 'BONK', 'FLOKI', 'TRUMP', 'MEME', 'BOME', 'POPCAT'];
 
 // Parameters chosen on 2020–2023 data, tested out of sample 2024-01…2026-10 on Binance data (research/run9–13.py).
-export interface RspsSettings { tokens: string[]; universeSize: number; topN: number; cap: number; capital: number; }
-export const RSPS_DEF: RspsSettings = { tokens: DEFAULT_TOKENS, universeSize: 10, topN: 3, cap: 50, capital: 10000 };
+/** reserve: where the RSPS share that is not in coins sits — stablecoin, tokenized gold (PAXG) or PAXG only while gold trends up. */
+export type Reserve = 'stable' | 'gold' | 'goldTrend' | 'hierarchy';
+export interface RspsSettings { tokens: string[]; universeSize: number; topN: number; cap: number; capital: number; reserve?: Reserve; }
+export const RSPS_DEF: RspsSettings = { tokens: DEFAULT_TOKENS, universeSize: 10, topN: 3, cap: 50, capital: 10000, reserve: 'hierarchy' };
+export const GOLD = 'PAXG';
+/** "Strong gold" for the reserve hierarchy: own 4-SMA trend ≥ 0.5 (and, if GOLD_VS_BTC, stronger than BTC on the PAXG/BTC ratio). */
+export const GOLD_VS_BTC = 'mom' as 'none' | 'ratio' | 'mom';   // research/run50.py: trend alone pushed BTC out and lowered returns
+export const goldIsStrong = (g: { trend: number; ratioUp?: boolean; ratioMom?: boolean }) =>
+  g.trend >= 0.5 && (GOLD_VS_BTC === 'none' || (GOLD_VS_BTC === 'ratio' ? !!g.ratioUp : !!g.ratioMom));
 export const LOOKBACKS = [30, 60, 90];          // relative-strength ensemble
 export const BREADTH_ENTER = 0.7, BREADTH_EXIT = 0.6;   // gate hysteresis
 // Split with the highest Sharpe (1.52, tie 40/50%) and the better Calmar of the two (research/run8.py).
@@ -27,8 +34,8 @@ export const SPLIT_SDCA = 60;
 // 2020→: CAGR 51.0% → 54.2%, max drawdown −25.0% → −29.7%, Sharpe 2024→ 1.10 → 1.05.
 export const SPLIT_TILT = 40;
 export const splitTarget = (tilt: boolean, totalLtpi: number | undefined) => (tilt && (totalLtpi ?? 0) > 0 ? SPLIT_TILT : SPLIT_SDCA);
-export interface ScanRow { sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; sharpe?: number; sortino?: number; omega?: number; corrBtc?: number; }
-export interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; gateOpen: boolean; gateSince?: string; }
+export interface ScanRow { sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; bench?: boolean; sharpe?: number; sortino?: number; omega?: number; corrBtc?: number; }
+export interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; gateOpen: boolean; gateSince?: string; gold?: { price: number; trend: number; ratioUp?: boolean; ratioMom?: boolean } }
 interface LogEntry { time: number; regime: string; lev?: number; }
 
 export type RegimeId = 'defense' | 'rsps' | 'closed';
@@ -53,6 +60,9 @@ export function useRsps() {
     const c = { ...SDCA_DEFAULTS, ...sdcaCfg };
     return composite(btcModel, c.enabled, freshManual(c)).risk.at(-1) ?? NaN;
   }, [btcModel, sdcaCfg]);
+  // one SDCA/RSPS split for the whole app: 60/40, or 40/60 while LTPI on $TOTAL is positive and the tilt is on
+  const [tilt, setTilt] = usePersisted<boolean>('portfolio.tilt', true);
+  const split = splitTarget(tilt, pyr.auto?.ltpi);
   const [parking, setParking] = usePersisted<{ choice: Parking; ack?: string }>('rsps.parking', { choice: 'btc' });
   const [s0, setS] = usePersisted<RspsSettings>('rsps.settings', RSPS_DEF);
   const s = { ...RSPS_DEF, ...s0 };
@@ -97,7 +107,7 @@ export function useRsps() {
       const rows: ScanRow[] = [];
       await Promise.all(s.tokens.filter((t) => !MEME.includes(t)).map(async (sym) => {
         try {
-          const k = closed(await klines(sym + 'USDT', 400));
+          const k = closed(await klinesAny(sym, 400));
           const c = k.map((x) => x.c);
           if (c.length < 150) throw new Error('za krótka historia');
           const ratio = k.filter((x) => btcMap.has(x.t)).map((x) => x.c / btcMap.get(x.t)!);
@@ -126,7 +136,20 @@ export function useRsps() {
       const wasOpen = !!scan?.gateOpen;
       const gateOpen = Number.isFinite(br) && (wasOpen ? br >= BREADTH_EXIT : br >= BREADTH_ENTER);
       const gateSince = scan && scan.gateOpen === gateOpen && scan.gateSince ? scan.gateSince : lastClosedDay();
-      setScan({ time: Date.now(), closeDate: lastClosedDay(), rows, breadth: br, btcTrend: trendOf(btc.map((x) => x.c)), gateOpen, gateSince });
+      // BTC as the reference row: RSPS ranks alts by strength against BTC (BTC = 0); BTC itself is held via the
+      // unpicked part and the BTC × trend parking, so it is part of the RSPS allocation even though it is not a candidate
+      const bc = btc.map((x) => x.c);
+      if (bc.length > 150) rows.unshift({ sym: 'BTC', price: bc.at(-1)!, ret: (bc.at(-1)! / bc[bc.length - 31] - 1) * 100, vol: annVol(bc, 30) * 100, liq: 0, ratioUp: false, trend: trendOf(bc), score: 0, inUniverse: true, bench: true, ...ratios(bc, 365), corrBtc: 1 });
+      let gold: Scan['gold'];
+      try {
+        const gkl = closed(await klines(GOLD + 'USDT', 400)); const gk = gkl.map((x) => x.c);
+        if (gk.length > 200) {
+          const lr = gkl.filter((x) => btcMap.has(x.t)).map((x) => Math.log(x.c / btcMap.get(x.t)!));
+          const n = lr.length - 1, m50 = lr.slice(-51, -1).reduce((a, b) => a + b, 0) / 50;
+          gold = { price: gk.at(-1)!, trend: trendOf(gk), ratioUp: lr[n] > m50, ratioMom: n > 90 && ([30, 60, 90].reduce((a, L) => a + lr[n] - lr[n - L], 0) / 3) > 0 };
+        }
+      } catch { /* gold optional */ }
+      setScan({ time: Date.now(), closeDate: lastClosedDay(), rows, breadth: br, btcTrend: trendOf(bc), gateOpen, gateSince, gold });
       if (!silent) toast('Skan zakończony');
     } catch (e) {
       if (!silent) toast('Brak połączenia z Binance: ' + (e as Error).message);
@@ -134,7 +157,7 @@ export function useRsps() {
   }
 
   const picks = useMemo(() => {
-    const uni = (scan?.rows ?? []).filter((r) => r.inUniverse && Number.isFinite(r.score));
+    const uni = (scan?.rows ?? []).filter((r) => r.inUniverse && !r.bench && Number.isFinite(r.score));
     const sel = uni.filter((r) => r.score > 0 && r.trend >= 0.5).sort((x, y) => y.score - x.score).slice(0, s.topN);
     const w = capWeights(sel.map((r) => r.score / (r.vol / 100)), s.cap / 100).map((x) => Math.min(x, s.cap / 100));
     const shorts = uni.filter((r) => r.score < 0 && r.trend <= 0.25).sort((x, y) => x.score - y.score).slice(0, 3);
@@ -153,6 +176,19 @@ export function useRsps() {
     if (rest > 0.001 && btcTrend > 0 && parkBtc) sleeve.push({ sym: 'BTC', w: rest * btcTrend, note: 'reszta × trend BTC' });
   } else if (regime === 'closed' && btcTrend > 0 && (parking.choice === 'btc' || (parking.choice === 'hybrid' && Number.isFinite(sdcaRisk) && sdcaRisk < HYBRID_RISK_MAX)))
     sleeve.push({ sym: 'BTC', w: btcTrend, note: `trend ${btcTrend.toFixed(2)}${parking.choice === 'hybrid' ? ` · ryzyko ${sdcaRisk.toFixed(0)}% < ${HYBRID_RISK_MAX}%` : ''}` });
+  // reserve in tokenized gold instead of stablecoin (research/run49.py)
+  const reserve = s.reserve ?? 'stable';
+  const goldStrong = !!scan?.gold && goldIsStrong(scan.gold);
+  if (reserve === 'hierarchy' && goldStrong) {
+    // hierarchy (research/run50.py): strong gold takes the reserve first (instead of BTC × trend), then BTC, then stablecoin
+    const picked = regime === 'rsps' ? picks.sel.reduce((x, p) => x + p.w, 0) : 0;
+    for (let k = sleeve.length - 1; k >= 0; k--) if (sleeve[k].sym === 'BTC') sleeve.splice(k, 1);
+    if (1 - picked > 0.001) sleeve.push({ sym: GOLD, w: 1 - picked, note: 'złoto silne → przed BTC' });
+  } else {
+    const goldOn = !!scan?.gold && (reserve === 'gold' || (reserve === 'goldTrend' && scan.gold.trend >= 0.5));
+    const stableShare = 1 - sleeve.reduce((x, p) => x + p.w, 0);
+    if (goldOn && stableShare > 0.001) sleeve.push({ sym: GOLD, w: stableShare, note: reserve === 'goldTrend' ? `złoto w trendzie (${scan!.gold!.trend.toFixed(2)})` : 'złoto zamiast stablecoina' });
+  }
   // a decision is pending whenever the gate closed since the user last confirmed where to park
   const parkingPending = regime === 'closed' && scanFresh && parking.ack !== (scan?.gateSince ?? '');
   const confirmParking = (choice: Parking) => setParking({ choice, ack: scan?.gateSince ?? lastClosedDay() });
@@ -161,11 +197,12 @@ export function useRsps() {
   const shortProposal = !!a && a.mtpi.state < 0 && a.mtpi.roc5 < 0 && picks.shorts.length > 0 && scanFresh;
   const prices: Record<string, number> = {};
   (scan?.rows ?? []).forEach((r) => { if (Number.isFinite(r.price)) prices[r.sym] = r.price; });
+  if (scan?.gold) prices[GOLD] = scan.gold.price;
   const vols: Record<string, number> = {};
   (scan?.rows ?? []).forEach((r) => { if (Number.isFinite(r.vol)) vols[r.sym] = r.vol / 100; });
   if (a) vols.BTC = a.vol30;
 
-  return { pyr, s, upd, scan, scanFresh, busy, runScan, breadth, btcTrend, ltpi, regime, gate, picks, sleeve, shortProposal, signalReady, manualMissing,
+  return { pyr, s, upd, scan, scanFresh, busy, runScan, breadth, btcTrend, ltpi, regime, gate, picks, sleeve, shortProposal, signalReady, manualMissing, split, tilt, setTilt,
     parking, parkingPending, confirmParking, log, prices, vols, sdcaRisk };
 }
 

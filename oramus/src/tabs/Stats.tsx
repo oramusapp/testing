@@ -34,9 +34,9 @@ export default function Stats({ nav }: { nav?: React.ReactNode }) {
       {!byData && (
         <Card>
           <div className="flex" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label className="dim" style={{ fontSize: 14 }}>Średnia μ <input className="input" style={{ width: 90 }} inputMode="decimal" value={st.mu} onChange={(e) => setSt({ ...st, mu: e.target.value })} /></label>
+            <label className="dim" style={{ fontSize: 14 }}>Średnia μ <input className="input" style={{ width: 90 }} inputMode="text" value={st.mu} onChange={(e) => setSt({ ...st, mu: e.target.value })} /></label>
             <label className="dim" style={{ fontSize: 14 }}>Odchylenie σ <input className="input" style={{ width: 90 }} inputMode="decimal" value={st.sd} onChange={(e) => setSt({ ...st, sd: e.target.value })} /></label>
-            <label className="dim" style={{ fontSize: 14 }}>Punkt x <input className="input" style={{ width: 90 }} inputMode="decimal" value={st.x} onChange={(e) => setSt({ ...st, x: e.target.value })} /></label>
+            <label className="dim" style={{ fontSize: 14 }}>Punkt x <input className="input" style={{ width: 90 }} inputMode="text" value={st.x} onChange={(e) => setSt({ ...st, x: e.target.value })} /></label>
           </div>
           <div className="note-text mt8">Przykład z lekcji: czas dostawy pizzy μ = 30 min, σ = 5. Dla x = 17 wychodzi z = −2,6, czyli szansa na dostawę w mniej niż 17 minut to 0,47%.</div>
         </Card>
@@ -46,7 +46,7 @@ export default function Stats({ nav }: { nav?: React.ReactNode }) {
         <textarea className="input mt8" style={{ width: '100%', minHeight: 84, fontFamily: 'inherit' }} value={st.data} onChange={(e) => setSt({ ...st, data: e.target.value })} placeholder="Wartości oddzielone spacją, nową linią lub średnikiem" />
         <div className="flex mt8" style={{ gap: 8, alignItems: 'center' }}>
           <span className="dim" style={{ fontSize: 14 }}>Punkt x</span>
-          <input className="input" style={{ width: 110 }} inputMode="decimal" value={st.x} onChange={(e) => setSt({ ...st, x: e.target.value })} />
+          <input className="input" style={{ width: 110 }} inputMode="text" value={st.x} onChange={(e) => setSt({ ...st, x: e.target.value })} />
         </div>
       </Card>}
       {Number.isFinite(mu) && sigma > 0 && <Bell mu={mu} sigma={sigma} x={x} />}
@@ -67,9 +67,9 @@ export default function Stats({ nav }: { nav?: React.ReactNode }) {
         <div className="hr" />
         <div className="flex" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span className="dim" style={{ fontSize: 14 }}>Przedział od</span>
-          <input className="input" style={{ width: 80 }} inputMode="decimal" placeholder={num(mu - sigma, 1)} value={st.a} onChange={(e) => setSt({ ...st, a: e.target.value })} />
+          <input className="input" style={{ width: 80 }} inputMode="text" placeholder={num(mu - sigma, 1)} value={st.a} onChange={(e) => setSt({ ...st, a: e.target.value })} />
           <span className="dim" style={{ fontSize: 14 }}>do</span>
-          <input className="input" style={{ width: 80 }} inputMode="decimal" placeholder={num(mu + sigma, 1)} value={st.b} onChange={(e) => setSt({ ...st, b: e.target.value })} />
+          <input className="input" style={{ width: 80 }} inputMode="text" placeholder={num(mu + sigma, 1)} value={st.b} onChange={(e) => setSt({ ...st, b: e.target.value })} />
         </div>
         <div className="row compact"><span>Szansa na wartość w przedziale</span><span className="num" style={{ fontWeight: 600 }}>{num(pAB * 100, 2)}%</span></div>
         <div className="note-text mt8">Reguła 68–95–99,7: w rozkładzie normalnym 68% danych mieści się w ±1σ od średniej, 95% w ±2σ, 99,7% w ±3σ. z między −1 a +1 to wartość typowa. Model normalny pasuje tylko do danych jednomodalnych i symetrycznych; ceny trendujące (niestacjonarne) najpierw trzeba przekształcić.</div>
@@ -311,7 +311,7 @@ function Kelly() {
       <Card>
         <div className="eyebrow" style={{ margin: 0 }}>Aktywo (roczny dryf i zmienność log-zwrotów)</div>
         <div className="flex mt8" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <label className="dim" style={{ fontSize: 13 }}>μ %/rok <input className="input" style={{ width: 70 }} inputMode="decimal" value={k.mu} onChange={(e) => setK({ ...k, mu: e.target.value })} /></label>
+          <label className="dim" style={{ fontSize: 13 }}>μ %/rok <input className="input" style={{ width: 70 }} inputMode="text" value={k.mu} onChange={(e) => setK({ ...k, mu: e.target.value })} /></label>
           <label className="dim" style={{ fontSize: 13 }}>σ %/rok <input className="input" style={{ width: 70 }} inputMode="decimal" value={k.sd} onChange={(e) => setK({ ...k, sd: e.target.value })} /></label>
         </div>
         <div className="flex mt8" style={{ gap: 6 }}><button className="btn small" disabled={!model} onClick={() => fromBtc(365)}>BTC · 1 rok</button><button className="btn small" disabled={!model} onClick={() => fromBtc(4 * 365)}>BTC · 4 lata</button></div>

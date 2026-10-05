@@ -7,7 +7,7 @@ import { freshToday } from '../lib/market';
 import { askNotify, notifyPermission } from '../lib/notify';
 import { usePersisted } from '../lib/db';
 import { INDICATORS, composite, freshManual, RAIL_TAUS } from '../lib/sdcaModel';
-import { ATH_BACKTEST, ATH_SELL, BANDS, DEFAULT_CURVE, SAFETY, SLOW_BUY_OPTIONS, athSellSeries, slowBuyRate, curveRate, riskZone, safetyStep } from '../lib/quant';
+import { ATH_BACKTEST, ATH_SELL, MIN_BUY_PCT, BANDS, DEFAULT_CURVE, SAFETY, SLOW_BUY_OPTIONS, athSellSeries, slowBuyRate, curveRate, riskZone, safetyStep } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
 import { ValuationCard, AccumulationCalc } from '../components/Valuation';
 import { ConeCard } from '../components/Cone';
@@ -90,7 +90,10 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
   const slowed = rate !== rateCurve;
 
   let actionTitle = 'HOLD — brak transakcji', actionSub = `Krzywa ≈ 0% przy dzisiejszym ryzyku`, actionTone = 'dim';
-  if (rate > 0.001) {
+  if (rate > 0.001 && rate <= MIN_BUY_PCT) {
+    actionTitle = `HOLD (${rate.toFixed(2).replace('.', ',')}% gotówki)`;
+    actionSub = `Zakup dopiero przy > ${MIN_BUY_PCT}% rezerwy dziennie` + (slowed ? ` · LTPI ujemne: krzywa ${rateCurve.toFixed(2)}% × ${String(cfg.slowBuy).replace('.', ',')}` : '');
+  } else if (rate > 0.001) {
     actionTitle = cfg.cash > 0 ? `KUP ${usd(cfg.cash * rate / 100)}` : `KUP ${rate.toFixed(2)}% gotówki`;
     actionSub = (cfg.cash > 0 ? `≈ ${(cfg.cash * rate / 100 / price).toFixed(6)} BTC · ${rate.toFixed(2)}% rezerwy` : 'Wpisz rezerwę gotówki, aby zobaczyć kwotę') + (slowed ? ` · LTPI ujemne: krzywa ${rateCurve.toFixed(2)}% × ${String(cfg.slowBuy).replace('.', ',')}` : '');
     actionTone = 'green';

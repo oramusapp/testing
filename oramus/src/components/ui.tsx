@@ -65,6 +65,12 @@ export function Fold({ id, title, hint, children, defaultOpen = false }: { id: s
   );
 }
 
+/** iOS number keyboards have no minus key: flips the sign of a typed number ("1,5" ⇄ "-1,5"). */
+export const flipSign = (t: string) => { const s = t.trim(); return s.startsWith('-') || s.startsWith('−') ? s.slice(1) : s === '' ? '-' : '-' + s; };
+export const SignBtn = ({ onClick }: { onClick: () => void }) => (
+  <button type="button" className="btn small" aria-label="Zmień znak" style={{ minWidth: 38, padding: '6px 8px' }} onMouseDown={(e) => e.preventDefault()} onClick={onClick}>±</button>
+);
+
 export const Card = ({ children, className = '', title }: { children: ReactNode; className?: string; title?: ReactNode }) => (
   <div className={'card ' + className}>{title && <div className="eyebrow">{title}</div>}{children}</div>
 );

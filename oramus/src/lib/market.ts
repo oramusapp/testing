@@ -41,6 +41,32 @@ export async function klines(symbol: string, days = 400, startTime?: number): Pr
   throw last ?? new Error('Brak danych');
 }
 
+/** Daily candles from Hyperliquid's public info API (coin name without the quote, e.g. HYPE). q = base volume × close. */
+export async function hyperliquidKlines(coin: string, startTime: number): Promise<{ t: number; c: number; q: number }[]> {
+  const ctl = new AbortController(); const id = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const r = await fetch('https://api.hyperliquid.xyz/info', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
+      body: JSON.stringify({ type: 'candleSnapshot', req: { coin, interval: '1d', startTime, endTime: Date.now() } }) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const j = await r.json() as { t: number; c: string; v: string }[];
+    return j.map((k) => ({ t: k.t, c: parseFloat(k.c), q: parseFloat(k.v) * parseFloat(k.c) })).filter((k) => k.c > 0);
+  } finally { clearTimeout(id); }
+}
+
+/** Coins whose Binance spot history is too short: earlier days come from Hyperliquid (Binance days take priority). */
+export const HL_FALLBACK = ['HYPE'];
+export async function klinesAny(sym: string, days = 400, startTime?: number): Promise<{ t: number; c: number; q: number }[]> {
+  const from = startTime ?? Date.now() - days * DAY;
+  let bin: { t: number; c: number; q: number }[] = [];
+  try { bin = await klines(sym + 'USDT', days, startTime); } catch (e) { if (!HL_FALLBACK.includes(sym)) throw e; }
+  if (!HL_FALLBACK.includes(sym) || (bin.length && bin[0].t <= from + 2 * DAY)) return bin;
+  try {
+    const hl = await hyperliquidKlines(sym, from);
+    const have = new Set(bin.map((k) => k.t));
+    return [...hl.filter((k) => !have.has(k.t) && (!bin.length || k.t < bin[0].t)), ...bin].sort((a, b) => a.t - b.t);
+  } catch { return bin; }
+}
+
 export async function ticker(symbols: string[]) {
   for (const host of BINANCE) {
     try {

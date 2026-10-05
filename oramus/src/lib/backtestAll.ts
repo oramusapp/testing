@@ -2,7 +2,7 @@
 // live signals and the research scripts: decisions at the daily close, traded the next day, 0.15% cost per side.
 // RSPS uses today's candidate list (survivorship bias: coins that died are missing), so its result is optimistic.
 import { capWeights, mean, std } from './quant';
-import { klines } from './market';
+import { klinesAny } from './market';
 
 export const COST = 0.0015;
 export const PERIODS = [
@@ -58,7 +58,7 @@ export async function loadCoins(dates: string[], syms: string[], onProgress?: (m
   await Promise.all(syms.map(async (sym) => {
     const close = new Array(dates.length).fill(NaN), quote = new Array(dates.length).fill(NaN);
     try {
-      const k = await klines(sym + 'USDT', 0, start);
+      const k = await klinesAny(sym, 0, start);
       for (const x of k) { const i = pos.get(new Date(x.t).toISOString().slice(0, 10)); if (i != null) { close[i] = x.c; quote[i] = x.q; } }
       out.push({ sym, close, quote });
     } catch { /* coin not on Binance: skipped */ }
@@ -81,7 +81,7 @@ export function rsScore(ratio: number[], coinVol: number): number {
   return mean([30, 60, 90].map((L) => Math.log(ratio[n] / ratio[n - L]) / coinVol));
 }
 
-export interface RspsOpts { universe: number; topN: number; cap: number; parking: 'stable' | 'btc' | 'hybrid'; hybridMax: number; every?: number }
+export interface RspsOpts { universe: number; topN: number; cap: number; parking: 'stable' | 'btc' | 'hybrid'; hybridMax: number; every?: number; reserve?: 'stable' | 'gold' | 'goldTrend' | 'hierarchy' }
 
 /** Weekly relative-strength rotation with the live rules: point-in-time liquidity universe, VAMS of the coin/BTC ratio
  *  (30/60/90), breadth gate 70%/60%, own trend ≥ 0.5, LTPI < 0 → all stablecoin, parking per choice when the gate is closed. */
@@ -93,7 +93,7 @@ export function rspsRun(dates: string[], btc: number[], coins: CoinSeries[], ltp
   for (let i = 0; i < n; i++) {
     if (i >= start && (i - start) % every === 0) {
       const bt = trend4(btc, i);
-      const rows = coins.filter((c) => finiteFrom(c.close, i, 91)).map((c) => {
+      const rows = coins.filter((c) => c.sym !== 'PAXG' && finiteFrom(c.close, i, 91)).map((c) => {
         const ratio: number[] = []; for (let k = i - 90; k <= i; k++) ratio.push(c.close[k] / btc[k]);
         const r50 = mean(ratio.slice(-51, -1));
         let q = 0; for (let k = i - 29; k <= i; k++) q += c.quote[k] || 0;
@@ -113,6 +113,18 @@ export function rspsRun(dates: string[], btc: number[], coins: CoinSeries[], ltp
         const rest = 1 - cw.reduce((a, b) => a + b, 0);
         if (rest > 1e-6 && bt > 0 && parkBtc) w.BTC = rest * bt;
       } else if (bt > 0 && parkBtc) w.BTC = bt;
+      // reserve: the share not in coins goes to tokenized gold (PAXG) instead of stablecoin, if chosen
+      const gold = coins.find((c) => c.sym === 'PAXG');
+      const gMom = gold && i > 90 && gold.close[i - 90] > 0 ? [30, 60, 90].reduce((a, L) => a + Math.log((gold.close[i] / btc[i]) / (gold.close[i - L] / btc[i - L])), 0) / 3 : NaN;
+      if (gold && o.reserve === 'hierarchy' && gold.close[i] > 0 && trend4(gold.close, i) >= 0.5 && gMom > 0) {
+        // hierarchy: gold strong (own trend and PAXG/BTC momentum) takes the whole reserve before BTC × trend
+        delete w.BTC;
+        const left = 1 - Object.values(w).reduce((a, b) => a + b, 0);
+        if (left > 1e-6) w.PAXG = left;
+      } else if (gold && o.reserve && o.reserve !== 'stable' && o.reserve !== 'hierarchy' && gold.close[i] > 0 && (o.reserve === 'gold' || trend4(gold.close, i) >= 0.5)) {
+        const left = 1 - Object.values(w).reduce((a, b) => a + b, 0);
+        if (left > 1e-6) w.PAXG = left;
+      }
       cur = w;
     }
     const row = new Array(syms.length).fill(0); for (const [s, x] of Object.entries(cur)) row[col.get(s)!] = x;

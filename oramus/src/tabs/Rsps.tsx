@@ -1,13 +1,13 @@
 import { HYBRID_RISK_MAX } from '../lib/useRsps';
 import { useState } from 'react';
-import { Screen, Card, Row, NumInput, Sheet, toast, Fold } from '../components/ui';
+import { Screen, Card, Row, NumInput, Sheet, toast, Fold, Seg } from '../components/ui';
 import { IcInfo, IcRefresh, IcShield, IcLayers, IcX, IcPlus } from '../components/icons';
 import { PyramidCard } from '../components/Pyramid';
 import { SentimentCard } from '../components/Sentiment';
 import { EventStudyCard } from '../components/EventStudy';
 import { usePersisted } from '../lib/db';
 import { LEV_MAX } from '../lib/pyramid';
-import { useRsps, DEFAULT_TOKENS, MEME, RSPS_DEF, SPLIT_SDCA } from '../lib/useRsps';
+import { useRsps, DEFAULT_TOKENS, MEME, RSPS_DEF, SPLIT_SDCA, SPLIT_TILT, type Reserve } from '../lib/useRsps';
 import { pct, signed, usd } from '../lib/format';
 
 export { DEFAULT_TOKENS, MEME, RSPS_DEF, SPLIT_SDCA } from '../lib/useRsps';
@@ -25,7 +25,8 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
   const [tokOpen, setTokOpen] = useState(false);
   const [levOpen, setLevOpen] = useState(false);
   const R = { ...REGIMES[regime], desc: regime === 'closed' ? (parking.choice === 'stable' ? 'Część RSPS w stablecoinach (Twój wybór).' : parking.choice === 'hybrid' ? (R0.sdcaRisk < HYBRID_RISK_MAX ? `Hybryda: BTC × trend (${btcTrend.toFixed(2)}), bo ryzyko wyceny ${R0.sdcaRisk.toFixed(0)}% < ${HYBRID_RISK_MAX}%.` : `Hybryda: stablecoin, bo ryzyko wyceny ${R0.sdcaRisk.toFixed(0)}% ≥ ${HYBRID_RISK_MAX}%.`) : `Część RSPS w BTC skalowanym trendem (${btcTrend.toFixed(2)}).`) : REGIMES[regime].desc };
-  const rspsCap = s.capital * (1 - SPLIT_SDCA / 100), sdcaCap = s.capital * SPLIT_SDCA / 100;
+  const split = R0.split;   // same split as in Portfel (tilt 40/60 while LTPI on $TOTAL is positive)
+  const rspsCap = s.capital * (1 - split / 100), sdcaCap = s.capital * split / 100;
 
   return (
     <Screen nav={nav} title="RSPS" subtitle="Inception SDCA ⊃ RSPS · piramida analizy · ścisła dźwignia"
@@ -90,9 +91,9 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       <div className="section-title">Alokacja</div>
       <Card>
         <div className="between mb12"><span className="dim">Kapitał całkowity</span><NumInput className="inline-input" value={s.capital} onChange={(v) => upd({ capital: v ?? 0 })} suffix="$" /></div>
-        <Row className="compact" label={<b>SDCA ({SPLIT_SDCA}%)</b>} value={<span>{usd(sdcaCap, 0)} <span className="dim">wg podzakładki SDCA</span></span>} />
-        <Row className="compact" label={<b>RSPS ({100 - SPLIT_SDCA}%)</b>} value={usd(rspsCap, 0)} />
-        <div className="note-text mb12">Podział bazowy 60/40; przy LTPI z $TOTAL dodatnim cel 40/60 (przechył w Portfelu). Rebalans przy odchyleniu ±10 p.p.</div>
+        <Row className="compact" label={<b>SDCA ({split}%)</b>} value={<span>{usd(sdcaCap, 0)} <span className="dim">wg podzakładki SDCA</span></span>} />
+        <Row className="compact" label={<b>RSPS ({100 - split}%)</b>} value={usd(rspsCap, 0)} />
+        <div className="note-text mb12">{R0.tilt ? `Podział bazowy ${SPLIT_SDCA}/${100 - SPLIT_SDCA}; przy LTPI z $TOTAL dodatnim ${SPLIT_TILT}/${100 - SPLIT_TILT} (teraz ${split}/${100 - split}).` : `Podział stały ${SPLIT_SDCA}/${100 - SPLIT_SDCA} (przechył wyłączony w Portfelu).`} Ten sam cel co w Portfelu; rebalans przy odchyleniu ±10 p.p.</div>
         <div className="mt12" />
         {regime === 'defense' && <div className="note-text">LTPI ujemne: cała część RSPS w stablecoinach.</div>}
         {regime === 'closed' && (parking.choice === 'stable' || (parking.choice === 'hybrid' && !(R0.sdcaRisk < HYBRID_RISK_MAX))) && <div className="note-text">Bramka zamknięta: część RSPS w stablecoinach.</div>}
@@ -106,6 +107,12 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
         {regime === 'rsps' && sleeve.reduce((p, x) => p + x.w, 0) < 0.999 && <div className="note-text">Reszta części RSPS w stablecoinach.</div>}
       </Card>
 
+      <Card className="tight">
+        <div className="row"><div className="grow"><div>Rezerwa RSPS</div><div className="faint" style={{ fontSize: 12 }}>Gdzie leży część RSPS, która nie jest w coinach</div></div></div>
+        <div style={{ padding: '0 14px 10px' }}><Seg value={s.reserve ?? 'hierarchy'} onChange={(v: Reserve) => upd({ reserve: v })} options={[{ v: 'hierarchy', l: 'Złoto→BTC→stable' }, { v: 'stable', l: 'BTC→stable' }, { v: 'goldTrend', l: 'BTC→złoto' }]} /></div>
+        <div className="note-text" style={{ padding: '0 14px 12px' }}>PAXG = tokenizowane złoto (1 token = 1 uncja, Binance PAXGUSDT). Domyślnie hierarchia: gdy złoto jest silne — w trendzie (4 średnie ≥ 0,5) i silniejsze od BTC (momentum relacji PAXG/BTC z 30/60/90 dni &gt; 0) — rezerwa idzie w złoto; inaczej w BTC × trend (gdy LTPI z BTC dodatnie); inaczej stablecoin. Backtest od 2020, portfel z przechyłem (research/run50.py): BTC→stable — CAGR 65,5%, obsunięcie −29,3%, Sharpe 2024→ 1,00; BTC→złoto — 68,2%, −28,1%, 1,13; złoto→BTC→stable — 71,4%, −26,7%, 1,25 (sam RSPS 2020–23: 1,55 vs 1,59). Sam trend złota bez porównania z BTC wypychał BTC i obniżał zwrot (51%). Złoto mocno rosło w 2024–2026; PAXG ma dane od 08.2020.{scan?.gold ? ` Dziś złoto: trend ${scan.gold.trend.toFixed(2)}, ${scan.gold.ratioMom ? 'silniejsze' : 'słabsze'} od BTC.` : ''}</div>
+      </Card>
+
       <div className="section-title">Skaner (top {s.universeSize} wg płynności, bez memów)</div>
       <Card className="tight">
         <div className="row"><span>Lista kandydatów</span><button className="text-btn" onClick={() => setTokOpen(true)}>{s.tokens.length} · Edytuj</button></div>
@@ -117,12 +124,12 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
                 <thead><tr><th style={{ paddingLeft: 16 }}>Token</th><th>Ratio</th><th>Siła</th><th>Trend</th><th>30d</th><th>Vol</th><th style={{ paddingRight: 16 }}>Waga</th></tr></thead>
                 <tbody>
                   {scan.rows.map((r) => {
-                    const w = regime === 'rsps' ? picks.sel.find((x) => x.sym === r.sym)?.w : undefined;
+                    const w = r.bench ? sleeve.find((x) => x.sym === 'BTC')?.w : regime === 'rsps' ? picks.sel.find((x) => x.sym === r.sym)?.w : undefined;
                     return (
                       <tr key={r.sym} style={{ opacity: r.inUniverse ? 1 : 0.45, background: w ? 'var(--accent-soft)' : undefined }}>
                         <td style={{ paddingLeft: 16 }}><b>{r.sym}</b>{r.error && <div className="red" style={{ fontSize: 11 }}>{r.error}</div>}</td>
-                        <td className={r.ratioUp ? 'green' : 'red'}>{r.error ? '' : r.ratioUp ? '▲' : '▼'}</td>
-                        <td>{signed(r.score)}</td><td>{r.error ? '' : r.trend.toFixed(2)}</td>
+                        <td className={r.bench ? 'dim' : r.ratioUp ? 'green' : 'red'}>{r.error || r.bench ? (r.bench ? '—' : '') : r.ratioUp ? '▲' : '▼'}</td>
+                        <td>{r.bench ? <span className="dim">wzorzec</span> : signed(r.score)}</td><td>{r.error ? '' : r.trend.toFixed(2)}</td>
                         <td className={r.ret >= 0 ? 'green' : 'red'}>{pct(r.ret, 0, true)}</td><td className="dim">{pct(r.vol, 0)}</td>
                         <td style={{ paddingRight: 16 }} className="accent">{w ? pct(w * 100, 0) : ''}</td>
                       </tr>
@@ -176,7 +183,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       <TokenSheet open={tokOpen} onClose={() => setTokOpen(false)} tokens={s.tokens} onChange={(t) => upd({ tokens: t })} />
       <Sheet open={info} onClose={() => setInfo(false)} title="Jak działa RSPS">
         <div className="note-text" style={{ fontSize: 14.5 }}>
-          <p><b className="accent">Podział kapitału.</b> SDCA {SPLIT_SDCA}% (zakładka SDCA, krzywa bez zmian) + RSPS {100 - SPLIT_SDCA}%. Rebalans raz w roku. Dźwignia i shorty nie są częścią alokacji, pojawiają się tylko jako propozycje w sygnale.</p>
+          <p><b className="accent">Podział kapitału.</b> SDCA {split}% (zakładka SDCA) + RSPS {100 - split}% — ten sam cel co w Portfelu ({SPLIT_SDCA}/{100 - SPLIT_SDCA}, przy przechyle {SPLIT_TILT}/{100 - SPLIT_TILT}, gdy LTPI z $TOTAL dodatnie). Rebalans przy odchyleniu ±10 p.p. Dźwignia i shorty nie są częścią alokacji, pojawiają się tylko jako propozycje w sygnale.</p>
           <p><b className="accent">RSPS.</b> Codziennie, spośród {s.universeSize} najpłynniejszych dużych tokenów (bez memów), wybiera do {s.topN} najsilniejszych względem BTC (średnia momentum ratio z 30/60/90 dni podzielona przez zmienność). Włącza się, gdy ≥ 70% tokenów ma ratio do BTC nad 50-dniową średnią, i wyłącza dopiero poniżej 60%; trend BTC ≥ 0,5 i LTPI ≥ 0. W przeciwnym razie część RSPS trzyma BTC proporcjonalnie do trendu.</p>
           <p><b className="accent">Piramida.</b> Siedem rodzajów analizy w kolejności ważności, wagi metodą ROC (Barron i Barrett 1996). Systematyzacja, on-chain, istotność statystyczna i sentyment aktualizują się automatycznie po zamknięciu świecy 00:00 UTC; ekonomia fundamentalna, makro i analiza techniczna są ręczne i ważne 7 dni.</p>
           <p><b className="accent">Aktualizacja.</b> iOS nie pozwala aplikacjom webowym działać w tle, więc przeliczenie następuje przy pierwszym otwarciu aplikacji po 00:00 UTC (albo automatycznie, jeśli jest wtedy otwarta).</p>

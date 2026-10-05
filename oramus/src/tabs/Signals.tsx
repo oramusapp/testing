@@ -7,11 +7,11 @@ import { stats, monthlyReport, monthOf, type Snapshot, type Flow, type MonthlyRe
 import { shareFile } from '../components/ui';
 import { useBtc } from '../lib/btcStore';
 import { composite, freshManual } from '../lib/sdcaModel';
-import { athSellSeries, backtest, curveRate, safetyStep, slowBuyRate } from '../lib/quant';
+import { athSellSeries, backtest, curveRate, minBuyRate, safetyStep, slowBuyRate } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
 import { PaperCard } from '../components/Paper';
 import type { PaperInputs } from '../lib/paper';
-import { useRsps, splitTarget, SPLIT_SDCA, SPLIT_TILT } from '../lib/useRsps';
+import { useRsps, SPLIT_SDCA, SPLIT_TILT } from '../lib/useRsps';
 import { LEV_MAX } from '../lib/pyramid';
 import { SDCA_DEFAULTS, type SdcaSettings, manualLtpiActive, type LtpiState } from './Sdca';
 import { usd, pct } from '../lib/format';
@@ -31,8 +31,8 @@ interface Order { id: string; sleeve: 'SDCA' | 'RSPS' | 'Rebalans'; side: 'buy' 
 export default function Signals() {
   const { model } = useBtc();
   const R = useRsps();
-  const [tilt, setTilt] = usePersisted<boolean>('portfolio.tilt', true);
-  const splitSdca = splitTarget(tilt, R.pyr.auto?.ltpi);
+  const { tilt, setTilt } = R;
+  const splitSdca = R.split;   // shared with the RSPS tab
   const [sd] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
   const [pf, setPf] = usePersisted<Portfolio>('portfolio', { holdings: null, history: [] });
   const [snaps, setSnaps] = usePersisted<Snapshot[]>('portfolio.snapshots', []);
@@ -59,7 +59,7 @@ export default function Signals() {
     const slow = ltpiSeries && (cfg.slowBuy ?? 1) < 1 ? { ltpi: ltpiSeries, mult: cfg.slowBuy! } : undefined;
     const bt = backtest(model.prices, comp.risk, cfg.curve, start, 10000, cfg.safety ? ltpiSeries : undefined, cfg.athSell ? ath.frac : undefined, slow);
     const price = model.prices[last];
-    return { price, risk: comp.risk[last], rate: (slow ? slowBuyRate(curveRate(cfg.curve, comp.risk[last]), slow.ltpi[last] ?? 0, slow.mult) : curveRate(cfg.curve, comp.risk[last])) / 100, slowed: !!slow && (slow.ltpi[last] ?? 0) < 0, modelBtcShare: (bt.btc * price) / bt.value, date: model.dates[last], athFrac: ath.frac[last] ?? 0, athK: ath.k[last] ?? 0 };
+    return { price, risk: comp.risk[last], rate: minBuyRate(slow ? slowBuyRate(curveRate(cfg.curve, comp.risk[last]), slow.ltpi[last] ?? 0, slow.mult) : curveRate(cfg.curve, comp.risk[last])) / 100, slowed: !!slow && (slow.ltpi[last] ?? 0) < 0, modelBtcShare: (bt.btc * price) / bt.value, date: model.dates[last], athFrac: ath.frac[last] ?? 0, athK: ath.k[last] ?? 0 };
   }, [model, cfg.enabled, cfg.manualRisk, cfg.curve, cfg.startDate, ltpiSeries, cfg.athSell, cfg.safety, cfg.slowBuy]);
 
   // live testing input: today's closed-candle signals (RSPS only when the scan is fresh and the signal is released)

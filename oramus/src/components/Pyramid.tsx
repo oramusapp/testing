@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Seg, Sheet, Switch, toast } from './ui';
+import { Card, Seg, Sheet, Switch, toast, SignBtn, flipSign } from './ui';
 import { PILLARS, weights, isFresh, zLabel, type PillarId } from '../lib/pyramid';
 import { freshToday } from '../lib/market';
 import { normCdf } from '../lib/quant';
@@ -66,8 +66,8 @@ export function PyramidCard({ p }: { p: P }) {
 function SigmaInput({ value, onChange }: { value: number | null; onChange: (v: number | null) => void }) {
   const [txt, setTxt] = useState(value == null ? '' : String(value));
   useEffect(() => { setTxt(value == null ? '' : String(value)); }, [value]);
-  const commit = () => {
-    const t = txt.replace(',', '.').replace('−', '-').trim();
+  const commit = (raw = txt) => {
+    const t = raw.replace(',', '.').replace('−', '-').trim();
     if (t === '') return onChange(null);
     const n = parseFloat(t);
     if (Number.isFinite(n)) { const c = Math.max(-3, Math.min(3, Math.round(n * 100) / 100)); setTxt(String(c)); onChange(c); }
@@ -76,7 +76,8 @@ function SigmaInput({ value, onChange }: { value: number | null; onChange: (v: n
   return (
     <span className="flex" style={{ gap: 4 }}>
       <input className="input" style={{ width: 96, textAlign: 'center' }} inputMode="decimal" placeholder="np. -1,75" value={txt}
-        onChange={(e) => setTxt(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+        onChange={(e) => setTxt(e.target.value)} onBlur={() => commit()} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+      <SignBtn onClick={() => { const t = flipSign(txt); setTxt(t); if (t !== '-') commit(t); }} />
       <span className="dim">σ</span>
     </span>
   );
