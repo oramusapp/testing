@@ -18,10 +18,14 @@ export const MEME = ['DOGE', 'SHIB', 'PEPE', 'WIF', 'BONK', 'FLOKI', 'TRUMP', 'M
 
 // Parameters chosen on 2020–2023 data, tested out of sample 2024-01…2026-10 on Binance data (research/run9–13.py).
 /** reserve: where the RSPS share that is not in coins sits — stablecoin, tokenized gold (PAXG) or PAXG only while gold trends up. */
-export type Reserve = 'stable' | 'gold' | 'goldTrend';
+export type Reserve = 'stable' | 'gold' | 'goldTrend' | 'hierarchy';
 export interface RspsSettings { tokens: string[]; universeSize: number; topN: number; cap: number; capital: number; reserve?: Reserve; }
-export const RSPS_DEF: RspsSettings = { tokens: DEFAULT_TOKENS, universeSize: 10, topN: 3, cap: 50, capital: 10000, reserve: 'stable' };
+export const RSPS_DEF: RspsSettings = { tokens: DEFAULT_TOKENS, universeSize: 10, topN: 3, cap: 50, capital: 10000, reserve: 'hierarchy' };
 export const GOLD = 'PAXG';
+/** "Strong gold" for the reserve hierarchy: own 4-SMA trend ≥ 0.5 (and, if GOLD_VS_BTC, stronger than BTC on the PAXG/BTC ratio). */
+export const GOLD_VS_BTC = 'mom' as 'none' | 'ratio' | 'mom';   // research/run50.py: trend alone pushed BTC out and lowered returns
+export const goldIsStrong = (g: { trend: number; ratioUp?: boolean; ratioMom?: boolean }) =>
+  g.trend >= 0.5 && (GOLD_VS_BTC === 'none' || (GOLD_VS_BTC === 'ratio' ? !!g.ratioUp : !!g.ratioMom));
 export const LOOKBACKS = [30, 60, 90];          // relative-strength ensemble
 export const BREADTH_ENTER = 0.7, BREADTH_EXIT = 0.6;   // gate hysteresis
 // Split with the highest Sharpe (1.52, tie 40/50%) and the better Calmar of the two (research/run8.py).
@@ -31,7 +35,7 @@ export const SPLIT_SDCA = 60;
 export const SPLIT_TILT = 40;
 export const splitTarget = (tilt: boolean, totalLtpi: number | undefined) => (tilt && (totalLtpi ?? 0) > 0 ? SPLIT_TILT : SPLIT_SDCA);
 export interface ScanRow { sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; bench?: boolean; sharpe?: number; sortino?: number; omega?: number; corrBtc?: number; }
-export interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; gateOpen: boolean; gateSince?: string; gold?: { price: number; trend: number } }
+export interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; gateOpen: boolean; gateSince?: string; gold?: { price: number; trend: number; ratioUp?: boolean; ratioMom?: boolean } }
 interface LogEntry { time: number; regime: string; lev?: number; }
 
 export type RegimeId = 'defense' | 'rsps' | 'closed';
@@ -134,7 +138,14 @@ export function useRsps() {
       const bc = btc.map((x) => x.c);
       if (bc.length > 150) rows.unshift({ sym: 'BTC', price: bc.at(-1)!, ret: (bc.at(-1)! / bc[bc.length - 31] - 1) * 100, vol: annVol(bc, 30) * 100, liq: 0, ratioUp: false, trend: trendOf(bc), score: 0, inUniverse: true, bench: true, ...ratios(bc, 365), corrBtc: 1 });
       let gold: Scan['gold'];
-      try { const gk = closed(await klines(GOLD + 'USDT', 400)).map((x) => x.c); if (gk.length > 200) gold = { price: gk.at(-1)!, trend: trendOf(gk) }; } catch { /* gold optional */ }
+      try {
+        const gkl = closed(await klines(GOLD + 'USDT', 400)); const gk = gkl.map((x) => x.c);
+        if (gk.length > 200) {
+          const lr = gkl.filter((x) => btcMap.has(x.t)).map((x) => Math.log(x.c / btcMap.get(x.t)!));
+          const n = lr.length - 1, m50 = lr.slice(-51, -1).reduce((a, b) => a + b, 0) / 50;
+          gold = { price: gk.at(-1)!, trend: trendOf(gk), ratioUp: lr[n] > m50, ratioMom: n > 90 && ([30, 60, 90].reduce((a, L) => a + lr[n] - lr[n - L], 0) / 3) > 0 };
+        }
+      } catch { /* gold optional */ }
       setScan({ time: Date.now(), closeDate: lastClosedDay(), rows, breadth: br, btcTrend: trendOf(bc), gateOpen, gateSince, gold });
       if (!silent) toast('Skan zakończony');
     } catch (e) {
@@ -164,9 +175,17 @@ export function useRsps() {
     sleeve.push({ sym: 'BTC', w: btcTrend, note: `trend ${btcTrend.toFixed(2)}${parking.choice === 'hybrid' ? ` · ryzyko ${sdcaRisk.toFixed(0)}% < ${HYBRID_RISK_MAX}%` : ''}` });
   // reserve in tokenized gold instead of stablecoin (research/run49.py)
   const reserve = s.reserve ?? 'stable';
-  const goldOn = !!scan?.gold && (reserve === 'gold' || (reserve === 'goldTrend' && scan.gold.trend >= 0.5));
-  const stableShare = 1 - sleeve.reduce((x, p) => x + p.w, 0);
-  if (goldOn && stableShare > 0.001) sleeve.push({ sym: GOLD, w: stableShare, note: reserve === 'goldTrend' ? `złoto w trendzie (${scan!.gold!.trend.toFixed(2)})` : 'złoto zamiast stablecoina' });
+  const goldStrong = !!scan?.gold && goldIsStrong(scan.gold);
+  if (reserve === 'hierarchy' && goldStrong) {
+    // hierarchy (research/run50.py): strong gold takes the reserve first (instead of BTC × trend), then BTC, then stablecoin
+    const picked = regime === 'rsps' ? picks.sel.reduce((x, p) => x + p.w, 0) : 0;
+    for (let k = sleeve.length - 1; k >= 0; k--) if (sleeve[k].sym === 'BTC') sleeve.splice(k, 1);
+    if (1 - picked > 0.001) sleeve.push({ sym: GOLD, w: 1 - picked, note: 'złoto silne → przed BTC' });
+  } else {
+    const goldOn = !!scan?.gold && (reserve === 'gold' || (reserve === 'goldTrend' && scan.gold.trend >= 0.5));
+    const stableShare = 1 - sleeve.reduce((x, p) => x + p.w, 0);
+    if (goldOn && stableShare > 0.001) sleeve.push({ sym: GOLD, w: stableShare, note: reserve === 'goldTrend' ? `złoto w trendzie (${scan!.gold!.trend.toFixed(2)})` : 'złoto zamiast stablecoina' });
+  }
   // a decision is pending whenever the gate closed since the user last confirmed where to park
   const parkingPending = regime === 'closed' && scanFresh && parking.ack !== (scan?.gateSince ?? '');
   const confirmParking = (choice: Parking) => setParking({ choice, ack: scan?.gateSince ?? lastClosedDay() });

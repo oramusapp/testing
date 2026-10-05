@@ -7,7 +7,7 @@ import { SentimentCard } from '../components/Sentiment';
 import { EventStudyCard } from '../components/EventStudy';
 import { usePersisted } from '../lib/db';
 import { LEV_MAX } from '../lib/pyramid';
-import { useRsps, DEFAULT_TOKENS, MEME, RSPS_DEF, SPLIT_SDCA } from '../lib/useRsps';
+import { useRsps, DEFAULT_TOKENS, MEME, RSPS_DEF, SPLIT_SDCA, type Reserve } from '../lib/useRsps';
 import { pct, signed, usd } from '../lib/format';
 
 export { DEFAULT_TOKENS, MEME, RSPS_DEF, SPLIT_SDCA } from '../lib/useRsps';
@@ -108,8 +108,8 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
 
       <Card className="tight">
         <div className="row"><div className="grow"><div>Rezerwa RSPS</div><div className="faint" style={{ fontSize: 12 }}>Gdzie leży część RSPS, która nie jest w coinach</div></div></div>
-        <div style={{ padding: '0 14px 10px' }}><Seg value={s.reserve ?? 'stable'} onChange={(v: 'stable' | 'gold' | 'goldTrend') => upd({ reserve: v })} options={[{ v: 'stable', l: 'Stablecoin' }, { v: 'goldTrend', l: 'PAXG w trendzie' }, { v: 'gold', l: 'PAXG zawsze' }]} /></div>
-        <div className="note-text" style={{ padding: '0 14px 12px' }}>PAXG = tokenizowane złoto (1 token = 1 uncja, Binance PAXGUSDT). „W trendzie”: złoto tylko, gdy jego trend z 4 średnich ≥ 0,5, inaczej stablecoin. Backtest od 2020, portfel z przechyłem (research/run49.py): stablecoin — CAGR 65,5%, obsunięcie −29,3%, Sharpe 2024→ 1,00; PAXG w trendzie — 68,0%, −29,4%, 1,13; PAXG zawsze — 69,3%, −31,2%, 1,13. Złoto mocno rosło w latach 2024–2026, więc część przewagi to ta hossa; PAXG ma dane od 08.2020.{scan?.gold ? ` Dziś złoto: trend ${scan.gold.trend.toFixed(2)}.` : ''}</div>
+        <div style={{ padding: '0 14px 10px' }}><Seg value={s.reserve ?? 'hierarchy'} onChange={(v: Reserve) => upd({ reserve: v })} options={[{ v: 'hierarchy', l: 'Złoto→BTC→stable' }, { v: 'stable', l: 'BTC→stable' }, { v: 'goldTrend', l: 'BTC→złoto' }]} /></div>
+        <div className="note-text" style={{ padding: '0 14px 12px' }}>PAXG = tokenizowane złoto (1 token = 1 uncja, Binance PAXGUSDT). Domyślnie hierarchia: gdy złoto jest silne — w trendzie (4 średnie ≥ 0,5) i silniejsze od BTC (momentum relacji PAXG/BTC z 30/60/90 dni &gt; 0) — rezerwa idzie w złoto; inaczej w BTC × trend (gdy LTPI z BTC dodatnie); inaczej stablecoin. Backtest od 2020, portfel z przechyłem (research/run50.py): BTC→stable — CAGR 65,5%, obsunięcie −29,3%, Sharpe 2024→ 1,00; BTC→złoto — 68,2%, −28,1%, 1,13; złoto→BTC→stable — 71,4%, −26,7%, 1,25 (sam RSPS 2020–23: 1,55 vs 1,59). Sam trend złota bez porównania z BTC wypychał BTC i obniżał zwrot (51%). Złoto mocno rosło w 2024–2026; PAXG ma dane od 08.2020.{scan?.gold ? ` Dziś złoto: trend ${scan.gold.trend.toFixed(2)}, ${scan.gold.ratioMom ? 'silniejsze' : 'słabsze'} od BTC.` : ''}</div>
       </Card>
 
       <div className="section-title">Skaner (top {s.universeSize} wg płynności, bez memów)</div>

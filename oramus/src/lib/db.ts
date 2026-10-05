@@ -7,7 +7,7 @@ import { useEffect, useState, useCallback } from 'react';
 const kv = createStore('oramus', 'kv');
 const files = createStore('oramus-files', 'files');
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 const cache = new Map<string, unknown>();
 const listeners = new Map<string, Set<(v: unknown) => void>>();
 
@@ -62,6 +62,11 @@ const MIGRATIONS: Record<number, () => Promise<void>> = {
   6: async () => {
     const st = cache.get('rsps.settings') as { tokens?: string[] } | undefined;
     if (st?.tokens && !st.tokens.includes('HYPE')) await save('rsps.settings', { ...st, tokens: [...st.tokens, 'HYPE'] });
+  },
+  // 2.20.0: RSPS reserve hierarchy gold → BTC → stablecoin (user choice after research/run50)
+  7: async () => {
+    const st = cache.get('rsps.settings') as Record<string, unknown> | undefined;
+    if (st) await save('rsps.settings', { ...st, reserve: 'hierarchy' });
   }
 };
 

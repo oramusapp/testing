@@ -224,3 +224,10 @@ parking BTC×trend); średnio 52% RSPS w stablecoinie 2020→. Portfel z przechy
 PAXG gdy złoto w trendzie (4 średnie ≥ 0,5) — 68,0%, −29,4%, 1,13; PAXG zawsze — 69,3%, −31,2%, 1,13; PAXG tylko przy LTPI<0 — 68,7%, −31,6%, 1,08.
 Sam RSPS: IS 1,59 → 1,52–1,58 (lekko niżej), OOS 0,87 → 1,05–1,13. PAXG sam od 09.2020: CAGR 12,9%, DD −28,1% — przewaga OOS w dużej
 części z hossy złota 2024–2026. Silnik aplikacji (fixture): CAGR RSPS 87,2 → 93,1%, OOS 0,88 → 1,13, DD bez zmian.
+
+## Hierarchia rezerwy RSPS: złoto → BTC → stablecoin (run50.py) — domyślna od 2.20.0
+Część RSPS poza altami: złoto (PAXG), gdy silne; inaczej BTC × trend (LTPI BTC > 0); inaczej stablecoin. Portfel z przechyłem, 2020→:
+obecnie (BTC→stable) — CAGR 65,5%, DD −29,3%, OOS 1,00, RSPS IS 1,59; BTC→złoto w trendzie — 68,2%, −28,1%, 1,13, IS 1,52;
+złoto w trendzie → BTC → stable — 51,2%, −26,0%, 1,22, IS 1,07 (złoto wypycha BTC); złoto silne = trend i PAXG/BTC > średnia 50 d —
+72,8%, −29,0%, 1,37, IS 1,49; złoto silne = trend i momentum PAXG/BTC 30/60/90 d > 0 (wybrane) — 71,4%, −26,7%, 1,25, IS 1,55.
+Średni udział w RSPS (wybrany wariant): złoto 28%, BTC 30%. Silnik aplikacji (fixture): CAGR RSPS 87,2 → 99,3%, IS 1,88 → 1,84, OOS 0,88 → 1,27.

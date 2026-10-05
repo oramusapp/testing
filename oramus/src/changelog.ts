@@ -1,4 +1,5 @@
 export const CHANGELOG = [
+  { v: '2.20.0', date: '2026-10-05', items: ['RSPS: rezerwa w hierarchii złoto → BTC → stablecoin (domyślnie) — złoto, gdy jest w trendzie i silniejsze od BTC (momentum PAXG/BTC); inaczej BTC × trend; inaczej stablecoin (backtest z przechyłem: CAGR 65,5 → 71,4%, obsunięcie −29,3 → −26,7%)'] },
   { v: '2.19.0', date: '2026-10-05', items: ['RSPS: rezerwa w tokenizowanym złocie (PAXG) zamiast stablecoina — zawsze albo tylko gdy złoto jest w trendzie; także w zleceniach, live testingu i backteście'] },
   { v: '2.18.1', date: '2026-10-05', items: ['Przycisk ± przy odczytach w σ (Piramida, uzupełnienia, arkusz wyceny) — klawiatura iPhone nie ma minusa; w kalkulatorach pola mogące być ujemne mają pełną klawiaturę'] },
   { v: '2.18.0', date: '2026-10-05', items: ['RSPS: Hyperliquid (HYPE) wśród kandydatów; historia sprzed notowania na Binance (24.09.2026) pobierana z Hyperliquid'] },

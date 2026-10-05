@@ -81,7 +81,7 @@ export function rsScore(ratio: number[], coinVol: number): number {
   return mean([30, 60, 90].map((L) => Math.log(ratio[n] / ratio[n - L]) / coinVol));
 }
 
-export interface RspsOpts { universe: number; topN: number; cap: number; parking: 'stable' | 'btc' | 'hybrid'; hybridMax: number; every?: number; reserve?: 'stable' | 'gold' | 'goldTrend' }
+export interface RspsOpts { universe: number; topN: number; cap: number; parking: 'stable' | 'btc' | 'hybrid'; hybridMax: number; every?: number; reserve?: 'stable' | 'gold' | 'goldTrend' | 'hierarchy' }
 
 /** Weekly relative-strength rotation with the live rules: point-in-time liquidity universe, VAMS of the coin/BTC ratio
  *  (30/60/90), breadth gate 70%/60%, own trend ≥ 0.5, LTPI < 0 → all stablecoin, parking per choice when the gate is closed. */
@@ -115,7 +115,13 @@ export function rspsRun(dates: string[], btc: number[], coins: CoinSeries[], ltp
       } else if (bt > 0 && parkBtc) w.BTC = bt;
       // reserve: the share not in coins goes to tokenized gold (PAXG) instead of stablecoin, if chosen
       const gold = coins.find((c) => c.sym === 'PAXG');
-      if (gold && o.reserve && o.reserve !== 'stable' && gold.close[i] > 0 && (o.reserve === 'gold' || trend4(gold.close, i) >= 0.5)) {
+      const gMom = gold && i > 90 && gold.close[i - 90] > 0 ? [30, 60, 90].reduce((a, L) => a + Math.log((gold.close[i] / btc[i]) / (gold.close[i - L] / btc[i - L])), 0) / 3 : NaN;
+      if (gold && o.reserve === 'hierarchy' && gold.close[i] > 0 && trend4(gold.close, i) >= 0.5 && gMom > 0) {
+        // hierarchy: gold strong (own trend and PAXG/BTC momentum) takes the whole reserve before BTC × trend
+        delete w.BTC;
+        const left = 1 - Object.values(w).reduce((a, b) => a + b, 0);
+        if (left > 1e-6) w.PAXG = left;
+      } else if (gold && o.reserve && o.reserve !== 'stable' && o.reserve !== 'hierarchy' && gold.close[i] > 0 && (o.reserve === 'gold' || trend4(gold.close, i) >= 0.5)) {
         const left = 1 - Object.values(w).reduce((a, b) => a + b, 0);
         if (left > 1e-6) w.PAXG = left;
       }

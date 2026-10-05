@@ -67,11 +67,11 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
     try {
       const i0 = Math.max(0, model.dates.findIndex((d) => d >= '2019-01-01'));
       const dates = model.dates.slice(i0), btc = model.prices.slice(i0);
-      const coins = await loadCoins(dates, [...rs.tokens.filter((t) => !MEME.includes(t)), ...((rs.reserve ?? 'stable') !== 'stable' ? ['PAXG'] : [])], (m) => setBusy(m));
+      const coins = await loadCoins(dates, [...rs.tokens.filter((t) => !MEME.includes(t)), ...((rs.reserve ?? 'hierarchy') !== 'stable' ? ['PAXG'] : [])], (m) => setBusy(m));
       setBusy('Liczenie…');
       const st = Math.max(0, dates.findIndex((d) => d >= effStart));
       const run = rspsRun(dates, btc, coins, base.ltpiBtc.slice(i0), base.comp.risk.slice(i0), st,
-        { universe: rs.universeSize, topN: rs.topN, cap: rs.cap / 100, parking: parking.choice, hybridMax: HYBRID_RISK_MAX, every: 1, reserve: rs.reserve ?? 'stable' });
+        { universe: rs.universeSize, topN: rs.topN, cap: rs.cap / 100, parking: parking.choice, hybridMax: HYBRID_RISK_MAX, every: 1, reserve: rs.reserve ?? 'hierarchy' });
       const lite = { dates: run.dates, ret: run.ret, expo: run.expo };
       rspsCache = { key: rspsKey, run: lite }; setSaved({ key: rspsKey, run: lite });
       toast(`RSPS: ${coins.length} tokenów z Binance`);
