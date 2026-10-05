@@ -6,6 +6,7 @@ import type { LtpiState } from './Sdca';
 import { signed } from '../lib/format';
 import { useBtc } from '../lib/btcStore';
 import { varianceRatio } from '../lib/quant';
+import { SeasonalityCard } from '../components/Seasonality';
 
 /** LTPI / MTPI: trend-following signals (not valuation). */
 export default function Trend({ nav }: { nav?: React.ReactNode }) {
@@ -57,6 +58,8 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
       {a && <TpiCard title="MTPI · średnioterminowy (10 wskaźników)" res={a.mtpi}
         note={tpi.mtpiSizing === 'ensemble' ? 'Steruje skalowaniem BTC w części RSPS (MTPI przeliczony na 0…1).' : 'Informacyjnie: skalowanie BTC używa 4 średnich (wariant z backtestu).'} />}
       {!a && <Card><div className="dim">Ładowanie danych BTC…</div></Card>}
+
+      <SeasonalityCard />
 
       <div className="section-title">Ustawienia</div>
       <Card className="tight">

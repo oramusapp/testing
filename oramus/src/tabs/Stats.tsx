@@ -72,7 +72,9 @@ export default function Stats({ nav }: { nav?: React.ReactNode }) {
         <div className="row compact"><span>Szansa na wartość w przedziale</span><span className="num" style={{ fontWeight: 600 }}>{num(pAB * 100, 2)}%</span></div>
         <div className="note-text mt8">Reguła 68–95–99,7: w rozkładzie normalnym 68% danych mieści się w ±1σ od średniej, 95% w ±2σ, 99,7% w ±3σ. z między −1 a +1 to wartość typowa. Model normalny pasuje tylko do danych jednomodalnych i symetrycznych; ceny trendujące (niestacjonarne) najpierw trzeba przekształcić.</div>
       </Card>
+      {byData && n >= 5 && <Hist xs={xs} mu={mu} sigma={sigma} />}
       {byData && n >= 5 && <ZTime xs={xs} mu={mu} sigma={sigma} />}
+      {byData && n >= 8 && <Decomp xs={xs} />}
       {byData && n >= 5 && <QQ xs={xs} mu={mu} sigma={sigma} />}
       {n > 0 && n <= 40 && (
         <Card className="tight">
@@ -216,6 +218,65 @@ function ZTime({ xs, mu, sigma }: { xs: number[]; mu: number; sigma: number }) {
         <path d={z.map((v, i) => `${i ? 'L' : 'M'}${sx(i).toFixed(1)} ${sy(v).toFixed(1)}`).join('')} fill="none" stroke="var(--text)" strokeWidth={1.4} />
       </svg>
       <div className="note-text">Odczyty poza ±2σ zdarzają się w rozkładzie normalnym w ok. 4,6% przypadków, poza ±3σ w 0,3%. Jeśli widzisz je dużo częściej, rozkład ma grube ogony albo zmienność się zmieniła (wtedy liczy się z-score w oknie kroczącym).</div>
+    </Card>
+  );
+}
+
+/** Histogram with mean, median and mode; skewness tells which side the long tail is on. */
+function Hist({ xs, mu, sigma }: { xs: number[]; mu: number; sigma: number }) {
+  const v = [...xs].sort((a, b) => a - b), n = v.length;
+  const med = n % 2 ? v[(n - 1) / 2] : (v[n / 2 - 1] + v[n / 2]) / 2;
+  const k = Math.max(5, Math.min(20, Math.round(Math.sqrt(n))));
+  const lo = v[0], hi = v[n - 1], w = (hi - lo) / k || 1;
+  const bins = new Array(k).fill(0); v.forEach((x) => bins[Math.min(k - 1, Math.floor((x - lo) / w))]++);
+  const mi = bins.indexOf(Math.max(...bins)), mode = lo + (mi + 0.5) * w;
+  const skew = v.reduce((a, x) => a + ((x - mu) / sigma) ** 3, 0) / n;
+  const W = 320, H = 150, L = 8, R = 8, T = 18, B = 22, max = Math.max(...bins);
+  const sx = (x: number) => L + ((x - lo) / (hi - lo || 1)) * (W - L - R);
+  const marks: [number, string, string][] = [[mu, 'var(--accent)', 'średnia'], [med, 'var(--green)', 'mediana'], [mode, 'var(--red)', 'dominanta']];
+  return (
+    <Card>
+      <div className="eyebrow" style={{ margin: 0 }}>Histogram</div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block', marginTop: 8 }} role="img" aria-label="Histogram">
+        {bins.map((c, i) => <rect key={i} x={sx(lo + i * w) + 1} width={Math.max(1, sx(lo + (i + 1) * w) - sx(lo + i * w) - 2)} y={H - B - (c / max) * (H - T - B)} height={(c / max) * (H - T - B)} fill="var(--surface-3)" stroke="var(--line)" />)}
+        {marks.map(([x, c], i) => <line key={i} x1={sx(x)} x2={sx(x)} y1={T - 4} y2={H - B} stroke={c} strokeWidth={2} strokeDasharray="4 3" />)}
+        <text x={L} y={H - 6} fontSize={9} fill="var(--faint)">{num(lo)}</text><text x={W - R} y={H - 6} fontSize={9} textAnchor="end" fill="var(--faint)">{num(hi)}</text>
+      </svg>
+      <div className="flex" style={{ gap: 12, flexWrap: 'wrap', fontSize: 13 }}>
+        {marks.map(([x, c, l]) => <span key={l}><span style={{ color: c }}>▍</span> {l} {num(x)}</span>)}
+      </div>
+      <div className="row compact"><span>Skośność</span><span className="num">{num(skew)} · {Math.abs(skew) < 0.5 ? 'prawie symetryczny' : skew > 0 ? 'prawostronnie skośny (długi ogon w prawo)' : 'lewostronnie skośny (długi ogon w lewo)'}</span></div>
+      <div className="note-text">Przy rozkładzie symetrycznym średnia, mediana i dominanta się pokrywają. Przy skośności prawostronnej średnia jest na prawo od mediany (ogon wyższych wartości), przy lewostronnej na lewo. Skośny histogram może sygnalizować szereg niestacjonarny (trendujący); dwa szczyty sugerują pomieszane dane do sprawdzenia.</div>
+    </Card>
+  );
+}
+
+/** Classical decomposition: trend = centred moving average over one period, seasonal = mean deviation by phase, random = rest. */
+function Decomp({ xs }: { xs: number[] }) {
+  const [per, setPer] = useState('4');
+  const P = Math.max(2, Math.min(Math.floor(xs.length / 2), parseInt(per) || 4)), n = xs.length;
+  const trend = xs.map((_, i) => { const h = Math.floor(P / 2); if (i - h < 0 || i + h >= n) return NaN;
+    if (P % 2) return xs.slice(i - h, i + h + 1).reduce((a, b) => a + b, 0) / P;
+    return (xs.slice(i - h, i + h).reduce((a, b) => a + b, 0) + xs.slice(i - h + 1, i + h + 1).reduce((a, b) => a + b, 0)) / (2 * P); });
+  const det = xs.map((v, i) => v - trend[i]);
+  const ph = Array.from({ length: P }, (_, k) => { const a = det.filter((d, i) => i % P === k && Number.isFinite(d)); return a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0; });
+  const adj = ph.reduce((a, b) => a + b, 0) / P; const seas = xs.map((_, i) => ph[i % P] - adj);
+  const rnd = xs.map((v, i) => v - trend[i] - seas[i]);
+  const rows: [string, number[]][] = [['dane', xs], ['trend', trend], ['sezonowość', seas], ['losowe', rnd]];
+  const W = 320, h = 60;
+  const path = (a: number[]) => { const f = a.filter(Number.isFinite); const lo = Math.min(...f), hi = Math.max(...f);
+    return a.map((v, i) => Number.isFinite(v) ? `${'M'}${(8 + (i / (n - 1)) * (W - 16)).toFixed(1)} ${(6 + (1 - (v - lo) / (hi - lo || 1)) * (h - 12)).toFixed(1)}` : '').filter(Boolean).map((sg, i) => (i ? sg.replace('M', 'L') : sg)).join(''); };
+  return (
+    <Card>
+      <div className="between"><div className="eyebrow" style={{ margin: 0 }}>Dekompozycja szeregu</div>
+        <label className="dim" style={{ fontSize: 13 }}>okres <input className="input" style={{ width: 56 }} inputMode="numeric" value={per} onChange={(e) => setPer(e.target.value)} /></label></div>
+      {rows.map(([l, a]) => (
+        <div key={l} className="mt8">
+          <div className="faint" style={{ fontSize: 11.5 }}>{l}</div>
+          <svg viewBox={`0 0 ${W} ${h}`} style={{ width: '100%', height: 'auto', display: 'block' }}><path d={path(a)} fill="none" stroke={l === 'dane' ? 'var(--text)' : 'var(--accent)'} strokeWidth={1.4} /></svg>
+        </div>
+      ))}
+      <div className="note-text mt8">Szereg = trend + sezonowość + składnik losowy (model addytywny; dla wzrostu procentowego najpierw zlogarytmuj dane). Trend to średnia krocząca z jednego okresu, sezonowość to średnie odchylenie dla każdej fazy okresu, reszta to szum. Szereg stacjonarny ma tylko sezonowość i szum, cena (niestacjonarna) ma też trend.</div>
     </Card>
   );
 }

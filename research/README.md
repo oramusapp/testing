@@ -90,3 +90,8 @@ Regresja kwantylowa log ceny na wielomianie w log czasu, refit co rok tylko na p
 stopień 1 (prawo potęgowe): najmniejszy błąd mediany w kolejnym roku (0,247), ale portfel OOS DD −39,7% (nie uznał 2024–25 za drogie);
 stopień 2 (obecny): błąd 0,259, portfel OOS Sharpe 1,04, DD −27,3% — najlepszy; stopień 3: błąd 0,324, gorzej wszędzie (przeuczony);
 średnia stopni 1 i 2: OOS DD −37,8%. Zostaje stopień 2.
+
+## Sezonowość BTC (run29.py, slajd o dekompozycji)
+Średnie dzienne log-zwroty wg miesiąca: korelacja 2013–19 vs 2020–26 = 0,19; Kruskal-Wallis p = 0,14 i 0,44 (brak różnic).
+Dni tygodnia: korelacja 0,31, p = 0,79 i 0,17. Filtr „miesiące dodatnie w 2013–19” od 2020: Sharpe 0,84 vs 0,92 (B&H).
+Tylko październik dodatni w obu okresach (t 2,4 i 3,0) — możliwy przypadek przy 12 testach. Nie wdrożone do sygnałów.
