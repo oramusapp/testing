@@ -5,6 +5,7 @@ import { normCdf } from '../lib/quant';
 
 // Aggregate valuation sheet, as taught in the valuation lessons: every indicator gets a z-score
 // (+ = high value / cheap, − = expensive), all equally weighted to cancel estimation error,
+// at most two indicators per data site, so one site going down or misreporting does not skew the sheet;
 // long-term indicators kept apart from faster (sentiment-like) ones so time horizons do not mix.
 type Horizon = 'long' | 'medium';
 interface ValItem { id: string; name: string; kind: 'on-chain' | 'technical' | 'aggregate'; horizon: Horizon; hint: string; label: string; url: string; }
@@ -12,12 +13,12 @@ const BMP = (slug: string) => `https://www.bitcoinmagazinepro.com/charts/${slug}
 export const VAL_ITEMS: ValItem[] = [
   { id: 'mvrvz', name: 'MVRV Z-Score', kind: 'on-chain', horizon: 'long', hint: 'Zielona strefa przy dnie cyklu = około +2; czerwona strefa szczytu = około −2.', label: 'Bitcoin Magazine Pro', url: BMP('mvrv-zscore') },
   { id: 'nupl', name: 'NUPL (niezrealizowany zysk netto)', kind: 'on-chain', horizon: 'long', hint: 'Kapitulacja (poniżej 0) = plus; euforia (powyżej 0,75) = minus. Mierzy presję sprzedaży z zysków.', label: 'Checkonchain', url: 'https://charts.checkonchain.com/' },
-  { id: 'rhodl', name: 'RHODL Ratio', kind: 'on-chain', horizon: 'long', hint: 'Dolna część pasma historycznego = plus, górna = minus.', label: 'Bitcoin Magazine Pro', url: BMP('rhodl-ratio') },
+  { id: 'rhodl', name: 'RHODL Ratio', kind: 'on-chain', horizon: 'long', hint: 'Dolna część pasma historycznego = plus, górna = minus.', label: 'Glassnode Studio', url: 'https://studio.glassnode.com/charts/indicators.RhodlRatio?a=BTC' },
   { id: 'reserve', name: 'Reserve Risk', kind: 'on-chain', horizon: 'long', hint: 'Niska wartość (silne przekonanie posiadaczy, niska cena) = plus.', label: 'Bitcoin Magazine Pro', url: BMP('reserve-risk') },
   { id: 'realized', name: 'Cena zrealizowana / CVDD', kind: 'on-chain', horizon: 'long', hint: 'Cena blisko lub poniżej ceny zrealizowanej/CVDD = plus; wysoko ponad nią = minus.', label: 'Checkonchain', url: 'https://charts.checkonchain.com/' },
-  { id: '2yma', name: 'Mnożnik 2-letniej średniej', kind: 'technical', horizon: 'long', hint: 'Cena poniżej 2Y MA = plus; przy linii ×5 = minus. Techniczny, więc nie przeważaj.', label: 'Bitcoin Magazine Pro', url: BMP('bitcoin-investor-tool') },
+  { id: '2yma', name: 'Mnożnik 2-letniej średniej', kind: 'technical', horizon: 'long', hint: 'Cena poniżej 2Y MA = plus; przy linii ×5 = minus. Techniczny, więc nie przeważaj.', label: 'Blockchain.com', url: 'https://www.blockchain.com/explorer/charts/2y-moving-average' },
   { id: 'cbbi', name: 'CBBI (agregat)', kind: 'aggregate', horizon: 'long', hint: 'Niski CBBI (< 20) = plus, wysoki (> 80) = minus. Sprawdź, czy składniki są dobrze skalibrowane.', label: 'CBBI', url: 'https://colintalkscrypto.com/cbbi/' },
-  { id: 'puell', name: 'Puell Multiple', kind: 'on-chain', horizon: 'medium', hint: 'Szybszy, bliższy sentymentowi; liczony osobno, żeby nie mieszać horyzontów.', label: 'Bitcoin Magazine Pro', url: BMP('puell-multiple') }
+  { id: 'puell', name: 'Puell Multiple', kind: 'on-chain', horizon: 'medium', hint: 'Szybszy, bliższy sentymentowi; liczony osobno, żeby nie mieszać horyzontów.', label: 'Glassnode Studio', url: 'https://studio.glassnode.com/charts/indicators.PuellMultiple?a=BTC' }
 ];
 interface ValState { z: Record<string, number | null>; updated: number | null; }
 

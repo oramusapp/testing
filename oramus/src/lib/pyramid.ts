@@ -35,7 +35,7 @@ export const PILLARS: PillarDef[] = [
       { q: 'Stopy procentowe: oczekiwania rynku', measure: 'Oczekiwana zmiana stóp na 3 posiedzenia względem zmian z 5 lat; obniżki = plus', plus: 'rynek oczekuje obniżek stóp (większych niż typowo)', minus: 'rynek oczekuje podwyżek lub mniejszych obniżek', label: 'CME FedWatch', url: 'https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html' },
       { q: 'Dolar (DXY)', measure: 'Pozycja w Bollinger Bands (50, 2σ); górna wstęga ≈ +2σ = negatywne dla krypto', plus: 'DXY przy górnej wstędze, silny dolar (aplikacja liczy to na minus)', minus: 'DXY przy dolnej wstędze, słaby dolar (aplikacja liczy to na plus)', label: 'TradingView · DXY', url: TV('TVC:DXY'), invert: true },
       { q: 'Rentowność 10-letnich obligacji USA (US10Y)', measure: 'Pozycja względem kanału regresji liniowej (TradingView: Linear Regression Channel, ±1σ/±2σ) na 1W; wyżej = gorzej dla ryzyka', plus: 'rentowność przy górnej granicy kanału, drogi pieniądz (aplikacja liczy to na minus)', minus: 'rentowność przy dolnej granicy kanału (aplikacja liczy to na plus)', label: 'TradingView · US10Y', url: TV('TVC:US10Y'), invert: true },
-      { q: 'Akcje (S&P 500)', measure: 'Pozycja w Bollinger Bands (50, 2σ)', plus: 'S&P 500 powyżej środkowej linii / przy górnej wstędze (apetyt na ryzyko)', minus: 'poniżej środkowej linii / przy dolnej wstędze', label: 'TradingView · SPX', url: TV('SP:SPX') }
+      { q: 'Akcje (S&P 500)', measure: 'Pozycja w Bollinger Bands (50, 2σ)', plus: 'S&P 500 powyżej środkowej linii / przy górnej wstędze (apetyt na ryzyko)', minus: 'poniżej środkowej linii / przy dolnej wstędze', label: 'Yahoo Finance · S&P 500', url: 'https://finance.yahoo.com/quote/%5EGSPC/' }
     ] },
   { id: 'onchain', rank: 4, name: 'Dane on-chain', short: 'On-chain', auto: true, source: 'Auto: z-score MVRV (Coin Metrics) po odtrendowaniu; tanio = plus',
     verify: [{ label: 'Coin Metrics · MVRV', url: 'https://charts.coinmetrics.io/crypto-data/' }] },
@@ -51,10 +51,10 @@ export const PILLARS: PillarDef[] = [
     ] },
   { id: 'ta', rank: 7, name: 'Uznaniowa analiza techniczna', short: 'Analiza techniczna', auto: false, source: 'Ręcznie · skala σ · najniższa waga. Test BTC 2018→ (research/run32.py): formacje świecowe bez istotnej przewagi (|t| < 1,4), struktura szczytów i dołków gorsza od trendu z 4 średnich (Sharpe 2024→ 0,09–0,62 vs 0,89). Traktuj jako uzupełnienie, nie sygnał',
     rubric: [
-      { q: 'BTC na interwale tygodniowym', measure: 'Pozycja w Bollinger Bands (20, 2σ) na świecach 1W', plus: 'BTC powyżej środkowej linii, przy górnej wstędze (trend wzrostowy)', minus: 'poniżej środkowej linii, przy dolnej wstędze', label: 'TradingView · BTCUSDT 1W', url: TV('BINANCE:BTCUSDT') },
+      { q: 'BTC na interwale tygodniowym', measure: 'Pozycja w Bollinger Bands (20, 2σ) na świecach 1W', plus: 'BTC powyżej środkowej linii, przy górnej wstędze (trend wzrostowy)', minus: 'poniżej środkowej linii, przy dolnej wstędze', label: 'Yahoo Finance · BTC-USD (interwał 1W)', url: 'https://finance.yahoo.com/quote/BTC-USD/' },
       { q: 'Kapitalizacja całego rynku (TOTAL)', measure: 'Pozycja w Bollinger Bands (50, 2σ) na świecach 1D', plus: 'TOTAL powyżej środkowej linii, przy górnej wstędze', minus: 'poniżej środkowej linii, przy dolnej wstędze', label: 'TradingView · TOTAL', url: TV('CRYPTOCAP:TOTAL') },
-      { q: 'Wolumen BTC', measure: 'Wolumen względem średniej 20 dni w σ, ze znakiem kierunku ceny', plus: 'wolumen powyżej średniej przy rosnącej cenie', minus: 'wolumen powyżej średniej przy spadającej cenie', label: 'TradingView · BTCUSDT', url: TV('BINANCE:BTCUSDT') },
-      { q: 'Struktura rynku (szczyty i dołki)', measure: 'Ocena jakościowa: siła struktury w skali σ', plus: 'wyższe szczyty i wyższe dołki', minus: 'niższe szczyty i niższe dołki', label: 'TradingView · BTCUSDT', url: TV('BINANCE:BTCUSDT'), qualitative: true }
+      { q: 'Wolumen BTC', measure: 'Wolumen względem średniej 20 dni w σ, ze znakiem kierunku ceny', plus: 'wolumen powyżej średniej przy rosnącej cenie', minus: 'wolumen powyżej średniej przy spadającej cenie', label: 'CoinMarketCap · Bitcoin', url: 'https://coinmarketcap.com/currencies/bitcoin/' },
+      { q: 'Struktura rynku (szczyty i dołki)', measure: 'Ocena jakościowa: siła struktury w skali σ', plus: 'wyższe szczyty i wyższe dołki', minus: 'niższe szczyty i niższe dołki', label: 'CoinGecko · Bitcoin', url: 'https://www.coingecko.com/en/coins/bitcoin', qualitative: true }
     ] }
 ];
 
