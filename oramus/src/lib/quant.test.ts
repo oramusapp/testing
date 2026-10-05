@@ -96,3 +96,11 @@ describe('linear fit', () => {
     expect(linfit([1, 2, 3], [3, 2, 1]).r).toBeCloseTo(-1);
   });
 });
+
+import { spearman, probit } from './quant';
+describe('spearman and probit', () => {
+  it('spearman = 1 for a monotonic curve, probit inverts Φ', () => {
+    expect(spearman([1, 2, 3, 4, 5], [1, 8, 27, 64, 125])).toBeCloseTo(1);
+    expect(probit(0.975)).toBeCloseTo(1.96, 2); expect(probit(0.5)).toBeCloseTo(0, 6);
+  });
+});

@@ -476,3 +476,23 @@ export function fgForward(hist: [string, number][], dates: string[], prices: num
   });
   return { n: pts.length, mean: mAll, buckets, fit: linfit(pts.map((p) => p.fg), pts.map((p) => p.r)) };
 }
+
+/** Spearman rank correlation (robust to outliers and monotonic non-linear relations). */
+export function spearman(x: number[], y: number[]): number {
+  const n = Math.min(x.length, y.length);
+  const rank = (a: number[]) => { const o = a.map((v, i) => [v, i] as const).sort((p, q) => p[0] - q[0]); const r = new Array(a.length); let i = 0;
+    while (i < o.length) { let j = i; while (j + 1 < o.length && o[j + 1][0] === o[i][0]) j++; for (let k = i; k <= j; k++) r[o[k][1]] = (i + j) / 2 + 1; i = j + 1; } return r as number[]; };
+  return linfit(rank(x.slice(0, n)), rank(y.slice(0, n))).r;
+}
+/** Inverse of the standard normal CDF (Acklam's approximation). */
+export function probit(p: number): number {
+  const a = [-39.6968302866538, 220.946098424521, -275.928510446969, 138.357751867269, -30.6647980661472, 2.50662827745924];
+  const b = [-54.4760987982241, 161.585836858041, -155.698979859887, 66.8013118877197, -13.2806815528857];
+  const c = [-0.00778489400243029, -0.322396458041136, -2.40075827716184, -2.54973253934373, 4.37466414146497, 2.93816398269878];
+  const d = [0.00778469570904146, 0.32246712907004, 2.445134137143, 3.75440866190742];
+  const q = Math.min(Math.max(p, 1e-12), 1 - 1e-12);
+  if (q < 0.02425) { const t = Math.sqrt(-2 * Math.log(q)); return (((((c[0] * t + c[1]) * t + c[2]) * t + c[3]) * t + c[4]) * t + c[5]) / ((((d[0] * t + d[1]) * t + d[2]) * t + d[3]) * t + 1); }
+  if (q > 1 - 0.02425) return -probit(1 - q);
+  const t = q - 0.5, r = t * t;
+  return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * t / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+}

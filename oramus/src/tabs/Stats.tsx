@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Screen, Card, Seg } from '../components/ui';
 import { usePersisted } from '../lib/db';
-import { normCdf, linfit } from '../lib/quant';
+import { normCdf, linfit, spearman, probit } from '../lib/quant';
 
 const num = (v: number, d = 2) => (Number.isFinite(v) ? v.toLocaleString('pl-PL', { maximumFractionDigits: d, minimumFractionDigits: 0 }) : '—');
 const parse = (t: string) => t.replace(/;/g, ' ').split(/[\s\n]+/).map((x) => parseFloat(x.replace(',', '.').replace('−', '-'))).filter(Number.isFinite);
@@ -9,7 +9,7 @@ const parse = (t: string) => t.replace(/;/g, ' ').split(/[\s\n]+/).map((x) => pa
 /** Standard deviation, z-score and normal-table probability, step by step as in the statistics lessons. */
 export default function Stats({ nav }: { nav?: React.ReactNode }) {
   const [st0, setSt] = usePersisted<{ data: string; x: string; mode?: 'data' | 'params' | 'corr'; cx?: string; cy?: string; mu?: string; sd?: string; a?: string; b?: string }>('tools.stats', { data: '56 65 74 75 76 77 77 87 88', x: '80' });
-  const st = { mode: 'data' as 'data' | 'params' | 'corr', mu: '30', sd: '5', a: '25', b: '35', cx: '540 600 700 760 820 860 900 950 1000 1060 1120 1300', cy: '8500 7800 9100 8200 9900 9800 10300 11100 11300 10700 8900 11300', ...st0 };
+  const st = { mode: 'data' as 'data' | 'params' | 'corr', mu: '30', sd: '5', a: '', b: '', cx: '540 600 700 760 820 860 900 950 1000 1060 1120 1300', cy: '8500 7800 9100 8200 9900 9800 10300 11100 11300 10700 8900 11300', ...st0 };
   const pf = (t: string) => parseFloat(t.replace(',', '.').replace('−', '-'));
   const xs = useMemo(() => parse(st.data), [st.data]);
   const byData = st.mode === 'data';
@@ -17,7 +17,7 @@ export default function Stats({ nav }: { nav?: React.ReactNode }) {
   const mu = byData ? (n ? xs.reduce((a, b) => a + b, 0) / n : NaN) : pf(st.mu);
   const ss = xs.reduce((a, b) => a + (b - mu) ** 2, 0);
   const sigma = byData ? (n ? Math.sqrt(ss / n) : NaN) : pf(st.sd);   // population σ (÷N), as in the lesson
-  const A = pf(st.a), B = pf(st.b);
+  const A = st.a.trim() === '' ? mu - sigma : pf(st.a), B = st.b.trim() === '' ? mu + sigma : pf(st.b);
   const pAB = normCdf((Math.max(A, B) - mu) / sigma) - normCdf((Math.min(A, B) - mu) / sigma);
   const s = n > 1 ? Math.sqrt(ss / (n - 1)) : NaN;      // sample s (÷N−1)
   const x = parseFloat(st.x.replace(',', '.').replace('−', '-'));
@@ -65,13 +65,14 @@ export default function Stats({ nav }: { nav?: React.ReactNode }) {
         <div className="hr" />
         <div className="flex" style={{ gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span className="dim" style={{ fontSize: 14 }}>Przedział od</span>
-          <input className="input" style={{ width: 80 }} inputMode="decimal" value={st.a} onChange={(e) => setSt({ ...st, a: e.target.value })} />
+          <input className="input" style={{ width: 80 }} inputMode="decimal" placeholder={num(mu - sigma, 1)} value={st.a} onChange={(e) => setSt({ ...st, a: e.target.value })} />
           <span className="dim" style={{ fontSize: 14 }}>do</span>
-          <input className="input" style={{ width: 80 }} inputMode="decimal" value={st.b} onChange={(e) => setSt({ ...st, b: e.target.value })} />
+          <input className="input" style={{ width: 80 }} inputMode="decimal" placeholder={num(mu + sigma, 1)} value={st.b} onChange={(e) => setSt({ ...st, b: e.target.value })} />
         </div>
         <div className="row compact"><span>Szansa na wartość w przedziale</span><span className="num" style={{ fontWeight: 600 }}>{num(pAB * 100, 2)}%</span></div>
         <div className="note-text mt8">Reguła 68–95–99,7: w rozkładzie normalnym 68% danych mieści się w ±1σ od średniej, 95% w ±2σ, 99,7% w ±3σ. z między −1 a +1 to wartość typowa. Model normalny pasuje tylko do danych jednomodalnych i symetrycznych; ceny trendujące (niestacjonarne) najpierw trzeba przekształcić.</div>
       </Card>
+      {byData && n >= 5 && <QQ xs={xs} mu={mu} sigma={sigma} />}
       {n > 0 && n <= 40 && (
         <Card className="tight">
           <div className="scroll-x">
@@ -93,6 +94,13 @@ const strength = (r: number) => { const a = Math.abs(r); const w = a >= 0.99 ? '
 function Corr({ x, y, set }: { x: string; y: string; set: (x: string, y: string) => void }) {
   const xs = parse(x), ys = parse(y), n = Math.min(xs.length, ys.length);
   const f = linfit(xs.slice(0, n), ys.slice(0, n));
+  const rho = spearman(xs, ys);
+  // outliers: residual from the fit beyond 2.5 standard deviations of the residuals
+  const res = xs.slice(0, n).map((v, i) => ys[i] - (f.a + f.b * v));
+  const rsd = Math.sqrt(res.reduce((a, v) => a + v * v, 0) / Math.max(n - 2, 1));
+  const out = res.map((v) => Math.abs(v) > 2.5 * rsd);
+  const keep = xs.slice(0, n).map((v, i) => [v, ys[i]] as const).filter((_, i) => !out[i]);
+  const f2 = out.some(Boolean) ? linfit(keep.map((k) => k[0]), keep.map((k) => k[1])) : null;
   const W = 320, H = 200, L = 40, R = 10, T = 10, B = 24;
   const [x0, x1] = [Math.min(...xs.slice(0, n)), Math.max(...xs.slice(0, n))], [y0, y1] = [Math.min(...ys.slice(0, n)), Math.max(...ys.slice(0, n))];
   const sx = (v: number) => L + ((v - x0) / (x1 - x0 || 1)) * (W - L - R), sy = (v: number) => H - B - ((v - y0) / (y1 - y0 || 1)) * (H - T - B);
@@ -109,15 +117,17 @@ function Corr({ x, y, set }: { x: string; y: string; set: (x: string, y: string)
         <Card>
           <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label="Wykres punktowy">
             <line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="var(--faint)" /><line x1={L} x2={L} y1={T} y2={H - B} stroke="var(--faint)" />
-            {xs.slice(0, n).map((v, i) => <circle key={i} cx={sx(v)} cy={sy(ys[i])} r={3.5} fill="var(--text)" opacity={0.75} />)}
+            {xs.slice(0, n).map((v, i) => <circle key={i} cx={sx(v)} cy={sy(ys[i])} r={out[i] ? 5 : 3.5} fill={out[i] ? 'none' : 'var(--text)'} stroke={out[i] ? 'var(--red)' : 'none'} strokeWidth={2} opacity={0.85} />)}
             {Number.isFinite(f.b) && <line x1={sx(x0)} y1={sy(f.a + f.b * x0)} x2={sx(x1)} y2={sy(f.a + f.b * x1)} stroke="var(--accent)" strokeWidth={2} />}
             <text x={L} y={H - 6} fontSize={9} fill="var(--faint)">{num(x0)}</text><text x={W - R} y={H - 6} fontSize={9} fill="var(--faint)" textAnchor="end">{num(x1)}</text>
             <text x={L - 4} y={H - B} fontSize={9} fill="var(--faint)" textAnchor="end">{num(y0)}</text><text x={L - 4} y={T + 8} fontSize={9} fill="var(--faint)" textAnchor="end">{num(y1)}</text>
           </svg>
           <div className="row compact"><span>Korelacja r</span><span className="num" style={{ fontWeight: 600 }}>{num(f.r, 3)} · {strength(f.r)}</span></div>
+          <div className="row compact"><span>Korelacja rangowa Spearmana ρ</span><span className="num">{num(rho, 3)}</span></div>
+          {f2 && <div className="row compact"><span>r bez odstających ({out.filter(Boolean).length})</span><span className="num">{num(f2.r, 3)}</span></div>}
           <div className="row compact"><span>R² (siła wyjaśniania, 0–1)</span><span className="num">{num(f.r2, 3)}</span></div>
           <div className="row compact"><span>Prosta regresji</span><span className="num">y = {num(f.a)} {f.b >= 0 ? '+' : '−'} {num(Math.abs(f.b), 4)}·x</span></div>
-          <div className="note-text mt8">Regresja wybiera prostą o najmniejszej sumie kwadratów odległości punktów od niej. r mierzy siłę i kierunek zależności liniowej (od −1 do +1), R² = r² mówi, jaką część zmienności y wyjaśnia x. Pojedyncze punkty odstające mocno zmieniają r. Krzywe zależności wymagają przekształcenia danych, a korelacja nie oznacza przyczynowości.</div>
+          <div className="note-text mt8">Regresja wybiera prostą o najmniejszej sumie kwadratów odległości punktów od niej. r mierzy siłę i kierunek zależności liniowej (od −1 do +1), R² = r² mówi, jaką część zmienności y wyjaśnia x. Punkty odstające (czerwone kółka, reszta &gt; 2,5σ) mocno zmieniają r; sprawdź, czy to błąd danych, czy szczególna sytuacja, zanim je pominiesz. r mierzy tylko zależność liniową: krzywa lub fala może mieć r = 0 mimo silnego związku, a duże r nie gwarantuje, że prosta pasuje. Spearman ρ porównuje rangi, więc wychwytuje zależności rosnące lub malejące także nieliniowe i jest mniej czuły na odstające. Korelacja nie oznacza przyczynowości.</div>
         </Card>
       )}
     </>
@@ -149,6 +159,27 @@ function Bell({ mu, sigma, x }: { mu: number; sigma: number; x: number }) {
         {zc != null && <line x1={zx(zc)} x2={zx(zc)} y1={T - 6} y2={zy(0)} stroke="var(--accent)" strokeWidth={2} />}
       </svg>
       <div className="note-text">Zacieniowane pole na lewo od x to odsetek wartości mniejszych od x.</div>
+    </Card>
+  );
+}
+
+/** Normal Q-Q plot: sorted data vs normal quantiles. Points on the line = data roughly normal. */
+function QQ({ xs, mu, sigma }: { xs: number[]; mu: number; sigma: number }) {
+  const v = [...xs].sort((a, b) => a - b), n = v.length;
+  const th = v.map((_, i) => mu + sigma * probit((i + 0.5) / n));
+  const lo = Math.min(v[0], th[0]), hi = Math.max(v[n - 1], th[n - 1]);
+  const W = 300, H = 220, M = 30, sc = (x: number) => M + ((x - lo) / (hi - lo || 1)) * (W - 2 * M), sy = (y: number) => H - M - ((y - lo) / (hi - lo || 1)) * (H - 2 * M);
+  return (
+    <Card>
+      <div className="eyebrow" style={{ margin: 0 }}>Wykres Q-Q względem rozkładu normalnego</div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block', marginTop: 8 }} role="img" aria-label="Wykres Q-Q">
+        <line x1={sc(lo)} y1={sy(lo)} x2={sc(hi)} y2={sy(hi)} stroke="var(--accent)" strokeWidth={1.5} />
+        <line x1={M} x2={W - M} y1={H - M} y2={H - M} stroke="var(--faint)" /><line x1={M} x2={M} y1={M} y2={H - M} stroke="var(--faint)" />
+        {v.map((y, i) => <circle key={i} cx={sc(th[i])} cy={sy(y)} r={3} fill="var(--text)" opacity={0.8} />)}
+        <text x={W / 2} y={H - 8} fontSize={9} textAnchor="middle" fill="var(--faint)">kwantyle rozkładu normalnego</text>
+        <text x={10} y={H / 2} fontSize={9} textAnchor="middle" fill="var(--faint)" transform={`rotate(-90 10 ${H / 2})`}>dane</text>
+      </svg>
+      <div className="note-text">Punkty blisko linii: dane mniej więcej normalne, więc z-score i procenty z tablicy są wiarygodne. Końce uciekające od linii oznaczają grube ogony (częstsze skrajne wartości niż w rozkładzie normalnym, typowe dla zwrotów krypto) albo skośność.</div>
     </Card>
   );
 }

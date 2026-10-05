@@ -78,3 +78,9 @@ arkusz wyceny z-score, kalkulator tempa akumulacji, Omega/Sortino/Sharpe.
 BTC 2020→: dźwignia 2× przy LTPI+, MTPI+ i trendzie zwiększała obsunięcie (−57…−86%) bez poprawy Sharpe → tylko odczyt.
 Kupowanie przy MTPI < 0 w reżimie powrotu do średniej (błąd ze slajdu) pogarszało OOS (0,87 → 0,72; 0,63 → 0,52).
 Reżim: ADF (90 d) wskazywał trend w 96% dni → słaby; iloraz wariancji 10/1 d (90 d) dzieli 25/75 → użyty w aplikacji.
+
+## Wycena: logarytm ceny względem podaży BTC (run27.py, slajd z kursu)
+S1 = OLS ln(cena) ~ podaż, S2 = dopasowanie do miesięcznych dołków (jak na slajdzie); fit co rok tylko na przeszłości.
+Jako 3. składnik wyceny SDCA: portfel 60/40 obsunięcie −27,3% → −25,2%, ale CAGR 72,8% → 68,8%, Sharpe OOS 1,04 → 1,00.
+Zamiast modelu ceny: wyraźnie gorzej. Prosta w podaży zakłada wykładniczy wzrost przy podaży zbliżającej się do 21 mln
+(model w 10.2026 nadal „średnio drogo” 66% vs 8% w modelu ceny) → nie wdrożone.

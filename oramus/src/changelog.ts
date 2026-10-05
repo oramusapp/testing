@@ -1,5 +1,12 @@
 export const CHANGELOG = [
   {
+    v: '2.3.0', date: '2026-10-05',
+    items: [
+      'Statystyka: korelacja rangowa Spearmana, wykrywanie punktów odstających i r bez nich',
+      'Statystyka: wykres Q-Q względem rozkładu normalnego (sprawdzenie, czy z-score i tablica z są wiarygodne)'
+    ]
+  },
+  {
     v: '2.2.0', date: '2026-10-05',
     items: [
       'RSPS: Sentyment — zwrot BTC po 20 dniach według przedziałów Fear & Greed, liczony na pełnej historii F&G',
