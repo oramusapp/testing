@@ -144,3 +144,15 @@ describe('onchain', () => {
     for (const k of ['mvrvz', 'nupl', 'realized', '2yma', 'puell']) expect(Number.isFinite(v.z[k])).toBe(true);
   });
 });
+
+import { structureScore, taAuto } from './autoSignals';
+describe('taAuto', () => {
+  it('scores an uptrend positive and a downtrend negative', () => {
+    const up = Array.from({ length: 400 }, (_, i) => 100 + i + 15 * Math.sin(i / 6));
+    const down = up.map((x) => 1000 - x);
+    expect(structureScore(up)).toBe(1);
+    expect(structureScore(down)).toBe(-1);
+    expect(taAuto(up).z).toBeGreaterThan(0);
+    expect(taAuto(down).z).toBeLessThan(0);
+  });
+});

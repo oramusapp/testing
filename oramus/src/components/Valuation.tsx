@@ -89,6 +89,10 @@ export function AccumulationCalc({ cash }: { cash: number }) {
   return (
     <Card>
       <div className="eyebrow" style={{ margin: 0 }}>Tempo akumulacji (kalkulator)</div>
+      <div className="flex mt8" style={{ gap: 6, flexWrap: 'wrap' }}>
+        <button className="btn small" onClick={() => setDays({ mean: 114, sd: 32 })}>Średnia bess · 114 ± 32</button>
+        <button className="btn small" onClick={() => setDays({ mean: 145, sd: 27 })}>Regresja faz · 145 ± 27</button>
+      </div>
       <div className="flex mt8" style={{ gap: 8, flexWrap: 'wrap' }}>
         <label className="dim" style={{ fontSize: 13 }}>Dni wartości: średnio <input className="input" style={{ width: 70 }} inputMode="numeric" value={days.mean} onChange={(e) => setDays({ ...days, mean: Math.max(1, +e.target.value || 1) })} /></label>
         <label className="dim" style={{ fontSize: 13 }}>odchylenie <input className="input" style={{ width: 70 }} inputMode="numeric" value={days.sd} onChange={(e) => setDays({ ...days, sd: Math.max(0, +e.target.value || 0) })} /></label>
@@ -96,7 +100,7 @@ export function AccumulationCalc({ cash }: { cash: number }) {
       <div className="mt8">
         {rows.map((r) => <div key={r.l} className="row compact"><span>{r.l} · {r.d} dni</span><span className="num">{(100 / r.d).toFixed(2).replace('.', ',')}%/dzień{cash > 0 ? ` · ${Math.round(cash / r.d).toLocaleString('pl-PL')} $` : ''}</span></div>)}
       </div>
-      <div className="note-text mt8">Domyślnie 114 ± 32 dni, czyli średnia długość okresów wysokiej wartości w poprzednich bessach według notatek z kursu. To tylko szacunek z kilku cykli. Zbyt wolne tempo jest bezpieczniejsze niż zbyt szybkie, bo resztę gotówki można dokupić przy powrocie dodatniego trendu. Decyzję podejmuje krzywa akumulacji; w backteście wolniejsze tempo od 2020 obniżyło CAGR, choć zmniejszyło obsunięcie.</div>
+      <div className="note-text mt8">Domyślnie 114 ± 32 dni, czyli średnia długość okresów wysokiej wartości w poprzednich bessach według notatek z kursu. Wariant „regresja faz” pochodzi ze slajdu: regresja liniowa długości 4 poprzednich faz (77, 147, 98, 135 dni; R² = 0,25) daje 145 dni dla fazy 5, z odchyleniem reszt 27 dni. To tylko szacunek z kilku cykli. Zbyt wolne tempo jest bezpieczniejsze niż zbyt szybkie, bo resztę gotówki można dokupić przy powrocie dodatniego trendu. Decyzję podejmuje krzywa akumulacji; w backteście wolniejsze tempo od 2020 obniżyło CAGR, choć zmniejszyło obsunięcie.</div>
     </Card>
   );
 }

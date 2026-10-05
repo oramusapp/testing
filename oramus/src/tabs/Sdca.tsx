@@ -10,7 +10,7 @@ import { ATH_BACKTEST, ATH_SELL, BANDS, DEFAULT_CURVE, SAFETY, SLOW_BUY_OPTIONS,
 import { ltpiStateSeries } from '../lib/tpi';
 import { ValuationCard, AccumulationCalc } from '../components/Valuation';
 import { ConeCard } from '../components/Cone';
-import { autoValuation } from '../lib/onchain';
+import { autoValuation, halvingClock, HALVING_TO_TOP } from '../lib/onchain';
 import { usd as usdFull, usdShort, pct, signed, fmtDate, uid } from '../lib/format';
 
 // whole dollars once amounts get large so stat tiles stay readable
@@ -286,6 +286,7 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
         <Row label="EQM Z-score" value={signed(model.z.price[last])} />
         <Row label="Composite Z-score" value={signed(zToday)} />
         <Row label="Bieżące pasmo" value={`${Math.round(band.from * 100)}–${Math.round(band.to * 100)}% · ${band.label}`} />
+        {(() => { const hc = halvingClock(model.dates[last]); return <Row label="Zegar halvingu" value={`${hc.daysSince} dni od ${fmtDate(hc.last)} · szczyty były ${Math.min(...HALVING_TO_TOP)}–${Math.max(...HALVING_TO_TOP)} dni po halvingu (3 cykle)`} />; })()}
       </Card>
 
       <div className="section-title">Wskaźniki</div>

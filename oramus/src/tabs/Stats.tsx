@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Screen, Card, Seg } from '../components/ui';
+import { useBtc } from '../lib/btcStore';
 import { usePersisted } from '../lib/db';
 import { normCdf, linfit, spearman, probit, polyfit } from '../lib/quant';
 
@@ -8,8 +9,8 @@ const parse = (t: string) => t.replace(/;/g, ' ').split(/[\s\n]+/).map((x) => pa
 
 /** Standard deviation, z-score and normal-table probability, step by step as in the statistics lessons. */
 export default function Stats({ nav }: { nav?: React.ReactNode }) {
-  const [st0, setSt] = usePersisted<{ data: string; x: string; mode?: 'data' | 'params' | 'corr'; cx?: string; cy?: string; mu?: string; sd?: string; a?: string; b?: string }>('tools.stats', { data: '56 65 74 75 76 77 77 87 88', x: '80' });
-  const st = { mode: 'data' as 'data' | 'params' | 'corr', mu: '30', sd: '5', a: '', b: '', cx: '540 600 700 760 820 860 900 950 1000 1060 1120 1300', cy: '8500 7800 9100 8200 9900 9800 10300 11100 11300 10700 8900 11300', ...st0 };
+  const [st0, setSt] = usePersisted<{ data: string; x: string; mode?: 'data' | 'params' | 'corr' | 'kelly'; cx?: string; cy?: string; mu?: string; sd?: string; a?: string; b?: string }>('tools.stats', { data: '56 65 74 75 76 77 77 87 88', x: '80' });
+  const st = { mode: 'data' as 'data' | 'params' | 'corr' | 'kelly', mu: '30', sd: '5', a: '', b: '', cx: '540 600 700 760 820 860 900 950 1000 1060 1120 1300', cy: '8500 7800 9100 8200 9900 9800 10300 11100 11300 10700 8900 11300', ...st0 };
   const pf = (t: string) => parseFloat(t.replace(',', '.').replace('−', '-'));
   const xs = useMemo(() => parse(st.data), [st.data]);
   const byData = st.mode === 'data';
@@ -25,10 +26,11 @@ export default function Stats({ nav }: { nav?: React.ReactNode }) {
   const below = normCdf(z);
   return (
     <Screen nav={nav} title="Statystyka" subtitle="Odchylenie standardowe · z-score · tablica rozkładu normalnego">
-      <Seg value={st.mode} onChange={(m) => setSt({ ...st, mode: m })} options={[{ v: 'data', l: 'Lista danych' }, { v: 'params', l: 'Znane μ i σ' }, { v: 'corr', l: 'Korelacja' }]} />
+      <Seg value={st.mode} onChange={(m) => setSt({ ...st, mode: m })} options={[{ v: 'data', l: 'Lista danych' }, { v: 'params', l: 'Znane μ i σ' }, { v: 'corr', l: 'Korelacja' }, { v: 'kelly', l: 'Kelly' }]} />
       <div className="mt12" />
+      {st.mode === 'kelly' && <Kelly />}
       {st.mode === 'corr' && <Corr x={st.cx} y={st.cy} set={(cx, cy) => setSt({ ...st, cx, cy })} />}
-      {st.mode !== 'corr' && <>
+      {st.mode !== 'corr' && st.mode !== 'kelly' && <>
       {!byData && (
         <Card>
           <div className="flex" style={{ gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -278,5 +280,44 @@ function Decomp({ xs }: { xs: number[] }) {
       ))}
       <div className="note-text mt8">Szereg = trend + sezonowość + składnik losowy (model addytywny; dla wzrostu procentowego najpierw zlogarytmuj dane). Trend to średnia krocząca z jednego okresu, sezonowość to średnie odchylenie dla każdej fazy okresu, reszta to szum. Szereg stacjonarny ma tylko sezonowość i szum, cena (niestacjonarna) ma też trend.</div>
     </Card>
+  );
+}
+
+/** Kelly criterion: the bet fraction that maximises long-run log growth. Discrete: f* = p − (1 − p) / b.
+ *  Continuous (asset returns): f* = μ / σ² (annual, log-return drift and variance). */
+function Kelly() {
+  const { model } = useBtc();
+  const [k, setK] = usePersisted<{ p: string; b: string; mu: string; sd: string }>('tools.kelly', { p: '55', b: '1.5', mu: '40', sd: '60' });
+  const num = (x: string) => parseFloat(x.replace(',', '.'));
+  const p = num(k.p) / 100, b = num(k.b), mu = num(k.mu) / 100, sd = num(k.sd) / 100;
+  const fd = p - (1 - p) / b, fc = mu / (sd * sd);
+  const fromBtc = (days: number) => {
+    if (!model) return;
+    const pr = model.prices.slice(-days - 1), r = pr.slice(1).map((x, i) => Math.log(x / pr[i]));
+    const m = r.reduce((a, c) => a + c, 0) / r.length, v = r.reduce((a, c) => a + (c - m) ** 2, 0) / (r.length - 1);
+    setK({ ...k, mu: (m * 365 * 100).toFixed(1), sd: (Math.sqrt(v * 365) * 100).toFixed(1) });
+  };
+  const f = (x: number) => (Number.isFinite(x) ? `${(x * 100).toFixed(0)}%` : '—');
+  return (
+    <>
+      <Card>
+        <div className="eyebrow" style={{ margin: 0 }}>Zakład dyskretny (wygrana / przegrana)</div>
+        <div className="flex mt8" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <label className="dim" style={{ fontSize: 13 }}>Szansa wygranej % <input className="input" style={{ width: 70 }} inputMode="decimal" value={k.p} onChange={(e) => setK({ ...k, p: e.target.value })} /></label>
+          <label className="dim" style={{ fontSize: 13 }}>Zysk / strata (b) <input className="input" style={{ width: 70 }} inputMode="decimal" value={k.b} onChange={(e) => setK({ ...k, b: e.target.value })} /></label>
+        </div>
+        <div className="mt8">Kelly f* = p − (1 − p)/b = <b>{f(fd)}</b> · połowa Kelly'ego {f(fd / 2)}</div>
+      </Card>
+      <Card>
+        <div className="eyebrow" style={{ margin: 0 }}>Aktywo (roczny dryf i zmienność log-zwrotów)</div>
+        <div className="flex mt8" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <label className="dim" style={{ fontSize: 13 }}>μ %/rok <input className="input" style={{ width: 70 }} inputMode="decimal" value={k.mu} onChange={(e) => setK({ ...k, mu: e.target.value })} /></label>
+          <label className="dim" style={{ fontSize: 13 }}>σ %/rok <input className="input" style={{ width: 70 }} inputMode="decimal" value={k.sd} onChange={(e) => setK({ ...k, sd: e.target.value })} /></label>
+        </div>
+        <div className="flex mt8" style={{ gap: 6 }}><button className="btn small" disabled={!model} onClick={() => fromBtc(365)}>BTC · 1 rok</button><button className="btn small" disabled={!model} onClick={() => fromBtc(4 * 365)}>BTC · 4 lata</button></div>
+        <div className="mt8">Kelly f* = μ / σ² = <b>{f(fc)}</b> · połowa {f(fc / 2)} · ćwierć {f(fc / 4)}</div>
+      </Card>
+      <div className="note-text">Kelly to udział kapitału, który maksymalizuje długoterminowy wzrost (logarytm majątku). Wynik powyżej 100% oznacza dźwignię — w tej strategii dźwignia pozostaje tylko propozycją przy ścisłych warunkach. μ i σ z przeszłości są obarczone dużym błędem, a przeszacowanie μ prowadzi do za dużej pozycji, dlatego w praktyce używa się połowy lub ćwierci Kelly'ego. W notatkach z kursu lekcja „Kelly” ma tylko tytuł; tutaj zastosowano standardowe wzory.</div>
+    </>
   );
 }

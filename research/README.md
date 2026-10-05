@@ -159,3 +159,10 @@ Nowe i wdrożone: sprzedaż przy ATH jako propozycja z powiadomieniem; tempo aku
 jako ręczna karta makro; automatyczne z-score MVRV Z, NUPL, cena zrealizowana, 2Y MA, Puell w arkuszu wyceny.
 Już obecne lub odrzucone wcześniej: macierz TPI × reżim, F&G w badaniu zdarzeń, rotacja bety, dźwignia, Omega/SUPT, sezonowość,
 analiza techniczna. Bez danych w sandboxie: cykl kredytowy (HY), opóźnienia płynności (CrossBorder), Realized Loss, CACRI (brak slajdu).
+
+## Automatyczny filar TA (run42.py) i breadth thrust (run43.py)
+TA = średnia: pozycja BTC w BB 1W(20) i 1D(50) w σ (±3) oraz struktura z punktów zwrotnych ±10 d (HH/HL +1, LH/LL −1, bez look-ahead).
+Spearman z zwrotem 90 d: 2014–19 0,28, 2020→ 0,07; filtr TA > 0: Sharpe 1,00 / 0,70 vs B&H 0,51 / 0,61 (4 średnie: 0,88 / 0,77).
+Słaby, dodatni → filar z najniższą wagą, liczony automatycznie (TOTAL i wolumen tylko w ręcznej korekcie).
+Breadth thrust krypto (≥ 90–100% top-10 na plus w 3–4 z 8 dni, 2019→, n = 54–84): |z| < 1 dla 7/30/90 d → odrzucone.
+Pełna lista pokrycia notatek: NOTES_COVERAGE.md.

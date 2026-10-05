@@ -12,6 +12,7 @@ export interface AutoSignals {
   zMom: number; zVal: number;
   /** pillar z-scores (σ), positive = favourable */
   system: number; onchain: number; stats: number;
+  ta: number; taParts: TaParts;
 }
 
 
@@ -36,6 +37,36 @@ function gateAt(p: number[], risk: number[], i: number, ltpiAt: (i: number) => n
   for (let k = i - 364; k <= i; k++) vols.push(volAt(p, k));
   const med = [...vols].sort((a, b) => a - b)[Math.floor(vols.length / 2)];
   return trendAt(p, i) >= 1 && adfAt(p, i) > ADF_CRIT['5%'] && ltpiAt(i) > 0 && risk[i] < 50 && volAt(p, i) < med;
+}
+
+export interface TaParts { bbWeekly: number; bbDaily: number; structure: number; }
+const clamp3 = (x: number) => Math.max(-3, Math.min(3, x));
+/** Position of the last close inside Bollinger Bands, in σ of the band's window: (close − SMA) / SD. */
+function bbPos(closes: number[], n: number) {
+  if (closes.length < n) return NaN;
+  const w = closes.slice(-n), m = mean(w), sd = std(w);
+  return sd > 0 ? (closes[closes.length - 1] - m) / sd : NaN;
+}
+/** Market structure from confirmed swing points (pivot = extreme within ±L days): higher highs and higher lows = +1,
+ *  lower highs and lower lows = −1, mixed = 0. Replaces the discretionary reading with a fixed rule. */
+export function structureScore(p: number[], L = 10) {
+  const highs: number[] = [], lows: number[] = [];
+  for (let k = L; k < p.length - L; k++) {
+    let hi = true, lo = true;
+    for (let j = k - L; j <= k + L; j++) { if (p[j] > p[k]) hi = false; if (p[j] < p[k]) lo = false; }
+    if (hi) highs.push(p[k]); if (lo) lows.push(p[k]);
+  }
+  if (highs.length < 2 || lows.length < 2) return 0;
+  const hh = highs[highs.length - 1] > highs[highs.length - 2], hl = lows[lows.length - 1] > lows[lows.length - 2];
+  return hh && hl ? 1 : !hh && !hl ? -1 : 0;
+}
+/** Automatic technical-analysis pillar: BTC weekly BB(20) position, daily BB(50) position and market structure. */
+export function taAuto(prices: number[]): { z: number; parts: TaParts } {
+  const weekly: number[] = [];
+  for (let k = prices.length - 1; k >= 0; k -= 7) weekly.unshift(prices[k]);
+  const parts = { bbWeekly: bbPos(weekly, 20), bbDaily: bbPos(prices, 50), structure: structureScore(prices.slice(-400)) };
+  const xs = [parts.bbWeekly, parts.bbDaily, parts.structure].filter(Number.isFinite).map(clamp3);
+  return { z: xs.length ? mean(xs) : NaN, parts };
 }
 
 /** z-score of the latest 90-day log return against the distribution of 90-day returns over the last 8 years. */
@@ -75,6 +106,7 @@ export function computeAuto(dates: string[], prices: number[], compositeRisk: nu
   let persistDays = 0;
   for (let k = i; k > i - 40 && k > 600; k--) { if (gateAt(prices, compositeRisk, k, ltpiAt)) persistDays++; else break; }
   const zMom = momentumZ(prices);
+  const ta = taAuto(prices.slice(0, i + 1));
   const zVal = compositeZ[i];
   return {
     date: dates[i], mtpi, ltpiTpi, ltpiSma, trendEnsemble, ltpi, sdcaRisk, mvrvRisk, adfStat, adfTrending, tStat90, vol30, volMedian365,
@@ -82,7 +114,8 @@ export function computeAuto(dates: string[], prices: number[], compositeRisk: nu
     zMom, zVal,
     system: Number.isFinite(zVal) ? mean([zMom, zVal]) : zMom,
     onchain: Number.isFinite(mvrvZ[i]) ? mvrvZ[i] : NaN,
-    stats: tStat90 * (adfTrending ? 1 : 0.5)
+    stats: tStat90 * (adfTrending ? 1 : 0.5),
+    ta: ta.z, taParts: ta.parts
   };
 }
 

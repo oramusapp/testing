@@ -13,7 +13,7 @@ export interface TpiSettings { ltpiSource: 'ensemble' | 'sma200'; mtpiSizing: 'm
 export const TPI_DEFAULTS: TpiSettings = { ltpiSource: 'ensemble', mtpiSizing: 'ma4' };
 
 export type ManualMap = Partial<Record<PillarId, { z: number; updated: number; note?: string; answers?: number[] }>>;
-export interface Overrides { onchain?: boolean; sentiment?: boolean; stats?: boolean; system?: boolean; }
+export interface Overrides { onchain?: boolean; sentiment?: boolean; stats?: boolean; system?: boolean; ta?: boolean; }
 export interface FG { value: number; label: string; time: number; fetched: number; mu?: number; sd?: number; n?: number; hist?: [string, number][]; }
 
 export function usePyramid() {
@@ -56,7 +56,7 @@ export function usePyramid() {
       stats: autoVal('stats', auto?.stats, auto ? `t(90d) ${auto.tStat90.toFixed(2)} · ADF ${auto.adfStat.toFixed(2)}` : ''),
       sentiment: (overrides.sentiment && manual.sentiment) ? { z: manual.sentiment.z, updated: manual.sentiment.updated, manual: true, detail: 'ręczna korekta' }
         : fg && fg.mu != null && fg.sd ? { z: sentimentZ(fg.value, fg.mu, fg.sd), updated: fg.time + 86400000 > now - 3 * 86400000 ? now : fg.time, detail: `F&G ${fg.value} · ${fg.label} · μ ${fg.mu.toFixed(0)}, σ ${fg.sd.toFixed(0)} (n=${fg.n})` } : { z: null, updated: null, detail: 'brak danych F&G' },
-      ta: man('ta')
+      ta: autoVal('ta', auto?.ta, auto ? `BB 1W ${auto.taParts.bbWeekly.toFixed(2)}σ · BB 1D(50) ${auto.taParts.bbDaily.toFixed(2)}σ · struktura ${auto.taParts.structure > 0 ? 'HH/HL' : auto.taParts.structure < 0 ? 'LH/LL' : 'mieszana'}` : '')
     };
   }, [auto, manual, overrides, fg]);
 

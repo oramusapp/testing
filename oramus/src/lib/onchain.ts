@@ -82,3 +82,12 @@ export function autoValuation(rows: [string, number, number | null][]): AutoValu
   }
   return { z, raw, date: dates[dates.length - 1] };
 }
+
+// Halving cycle clock (course slide: halving → cycle top took 778, 884 and 767 days; three cycles only).
+export const HALVING_TO_TOP = [778, 884, 767];
+export function halvingClock(date: string) {
+  const t = Date.parse(date + 'T00:00:00Z');
+  const past = HALVINGS.filter((h) => h <= date), next = HALVINGS.find((h) => h > date);
+  const last = past[past.length - 1];
+  return { last, next, daysSince: Math.round((t - Date.parse(last + 'T00:00:00Z')) / DAY), daysTo: next ? Math.round((Date.parse(next + 'T00:00:00Z') - t) / DAY) : NaN };
+}
