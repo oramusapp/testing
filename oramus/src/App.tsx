@@ -1,25 +1,30 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
-import { IcSdca, IcRsps, IcNotes, IcGrid, IcGear, IcSignal } from './components/icons';
+import { useEffect, useState } from 'react';
+import { IcSdca, IcGear, IcWallet, IcApps } from './components/icons';
 import { ToastHost } from './components/ui';
 import { usePersisted } from './lib/db';
 import Settings from './Settings';
-import Sdca from './tabs/Sdca';
-import Rsps from './tabs/Rsps';
-import Notes from './tabs/Notes';
+import Strategy from './tabs/Strategy';
 import Signals from './tabs/Signals';
-const Excel = lazy(() => import('./tabs/Excel'));
+import Other from './tabs/Other';
+import { save } from './lib/db';
 
-type Tab = 'sdca' | 'rsps' | 'signals' | 'notes' | 'excel';
+type Tab = 'strategy' | 'portfolio' | 'other';
 const TABS: { id: Tab; label: string; icon: typeof IcSdca }[] = [
-  { id: 'sdca', label: 'SDCA', icon: IcSdca },
-  { id: 'rsps', label: 'RSPS', icon: IcRsps },
-  { id: 'signals', label: 'Sygnały', icon: IcSignal },
-  { id: 'notes', label: 'Notatnik', icon: IcNotes },
-  { id: 'excel', label: 'Excel', icon: IcGrid }
+  { id: 'strategy', label: 'Strategia', icon: IcSdca },
+  { id: 'portfolio', label: 'Portfel', icon: IcWallet },
+  { id: 'other', label: 'Inne', icon: IcApps }
 ];
+// tab ids from versions ≤ 1.9 → new layout (sub-tab remembered)
+const LEGACY: Record<string, [Tab, string?, string?]> = {
+  sdca: ['strategy', 'ui.strategy', 'sdca'], rsps: ['strategy', 'ui.strategy', 'rsps'], signals: ['portfolio'],
+  notes: ['other', 'ui.other', 'notes'], excel: ['other', 'ui.other', 'excel']
+};
 
 export default function App({ updateReady, applyUpdate }: { updateReady: boolean; applyUpdate: () => void }) {
-  const [tab, setTab] = usePersisted<Tab>('ui.tab', 'sdca');
+  const [tab0, setTab] = usePersisted<string>('ui.tab', 'strategy');
+  const legacy = LEGACY[tab0];
+  const tab: Tab = legacy ? legacy[0] : (TABS.some((t) => t.id === tab0) ? tab0 as Tab : 'strategy');
+  useEffect(() => { if (legacy) { if (legacy[1]) void save(legacy[1], legacy[2]); setTab(legacy[0]); } }, [tab0]); // eslint-disable-line react-hooks/exhaustive-deps
   const [theme] = usePersisted<'dark' | 'light' | 'auto'>('ui.theme', 'dark');
   const [settings, setSettings] = useState(false);
   const [visited, setVisited] = useState<Set<Tab>>(new Set([tab]));
@@ -41,11 +46,9 @@ export default function App({ updateReady, applyUpdate }: { updateReady: boolean
 
   return (
     <div className="app">
-      {pane('sdca', <Sdca />)}
-      {pane('rsps', <Rsps />)}
-      {pane('signals', <Signals />)}
-      {pane('notes', <Notes />)}
-      {pane('excel', <Suspense fallback={<div className="screen"><div className="empty">Ładowanie…</div></div>}><Excel /></Suspense>)}
+      {pane('strategy', <Strategy />)}
+      {pane('portfolio', <Signals />)}
+      {pane('other', <Other />)}
       <button className="icon-btn" aria-label="Ustawienia" onClick={() => setSettings(true)}
         style={{ position: 'fixed', zIndex: 21, left: 16, top: 'calc(var(--safe-top) + 10px)' }}><IcGear width={19} /></button>
       <nav className="tabbar">

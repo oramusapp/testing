@@ -1,5 +1,13 @@
 export const CHANGELOG = [
   {
+    v: '2.0.0', date: '2026-10-05',
+    items: [
+      'Nowy układ: Strategia (podzakładki SDCA, RSPS, LTPI · MTPI), Portfel (dawniej Sygnały), Inne (Notatnik i Excel)',
+      'LTPI i MTPI z ustawieniami i trybem ręcznym w jednej podzakładce; SDCA i RSPS pokazują skrót stanu',
+      'Wszystkie dane, notatki i arkusze zostają bez zmian'
+    ]
+  },
+  {
     v: '1.9.0', date: '2026-10-05',
     items: [
       'TPI: odczyt w trzech wymiarach (stan, tempo zmian, siła = zgodność) ze wskazówkami, liczba zmian na rok dla każdego składnika i test istotności na całej historii',

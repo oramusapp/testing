@@ -2,10 +2,7 @@ import { useState } from 'react';
 import { Screen, Card, Row, NumInput, Sheet, toast } from '../components/ui';
 import { IcInfo, IcRefresh, IcShield, IcLayers, IcX, IcPlus } from '../components/icons';
 import { PyramidCard } from '../components/Pyramid';
-import { TpiCard } from '../components/Tpi';
 import { usePersisted } from '../lib/db';
-import { TPI_DEFAULTS, type TpiSettings } from '../lib/pyramidStore';
-import { Seg } from '../components/ui';
 import { LEV_MAX } from '../lib/pyramid';
 import { useRsps, DEFAULT_TOKENS, MEME, RSPS_DEF, SPLIT_SDCA } from '../lib/useRsps';
 import { pct, signed, usd } from '../lib/format';
@@ -18,19 +15,17 @@ const REGIMES = {
   closed: { title: 'Bramka RSPS zamknięta', tone: 'dim', icon: IcShield, desc: '' }
 } as const;
 
-export default function Rsps() {
+export default function Rsps({ nav }: { nav?: React.ReactNode }) {
   const R0 = useRsps();
   const { pyr, s, upd, scan, scanFresh, busy, runScan, breadth, btcTrend, regime, gate, picks, sleeve, shortProposal, log, parking, parkingPending, confirmParking } = R0;
   const [info, setInfo] = useState(false);
   const [tokOpen, setTokOpen] = useState(false);
   const [levOpen, setLevOpen] = useState(false);
-  const [tpi0, setTpi] = usePersisted<TpiSettings>('signals.tpi', TPI_DEFAULTS);
-  const tpi = { ...TPI_DEFAULTS, ...tpi0 };
   const R = { ...REGIMES[regime], desc: regime === 'closed' ? (parking.choice === 'stable' ? 'Część RSPS w stablecoinach (Twój wybór).' : `Część RSPS w BTC skalowanym trendem (${btcTrend.toFixed(2)}).`) : REGIMES[regime].desc };
   const rspsCap = s.capital * (1 - SPLIT_SDCA / 100), sdcaCap = s.capital * SPLIT_SDCA / 100;
 
   return (
-    <Screen title="RSPS" subtitle="Inception SDCA ⊃ RSPS · piramida analizy · ścisła dźwignia"
+    <Screen nav={nav} title="RSPS" subtitle="Inception SDCA ⊃ RSPS · piramida analizy · ścisła dźwignia"
       actions={<>
         <button className="icon-btn" onClick={() => setInfo(true)}><IcInfo width={19} /></button>
         <button className="icon-btn" onClick={() => runScan()} disabled={busy}><IcRefresh width={19} style={busy ? { animation: 'spin 1s linear infinite' } : undefined} /></button>
@@ -83,23 +78,17 @@ export default function Rsps() {
 
       <PyramidCard p={pyr} />
 
-      <div className="section-title">Trend · MTPI i LTPI</div>
-      {pyr.auto && <TpiCard title="LTPI · długoterminowy (10 wskaźników)" res={pyr.auto.ltpiTpi} stateLabel
-        note={tpi.ltpiSource === 'ensemble' ? 'Steruje: LTPI < 0 → portfel RSPS w stablecoinach, warunek propozycji dźwigni.' : 'Informacyjnie — wybrane źródło LTPI to cena vs SMA 200.'} />}
-      {pyr.auto && <TpiCard title="MTPI · średnioterminowy (10 wskaźników)" res={pyr.auto.mtpi}
-        note={tpi.mtpiSizing === 'ensemble' ? 'Steruje skalowaniem BTC w portfelu RSPS (MTPI przeliczony na 0…1).' : 'Informacyjnie — skalowanie BTC używa 4 średnich (wariant z backtestu).'} />}
+      <div className="section-title">Trend</div>
       <Card className="tight">
-        <div className="row"><div className="grow"><div>Źródło LTPI</div><div className="faint" style={{ fontSize: 12 }}>Backtest: ensemble ≈ SMA 200 (Sharpe OOS 1,03 vs 1,03), mniejsze obsunięcie</div></div>
-          <Seg value={tpi.ltpiSource} onChange={(v) => setTpi({ ...tpi, ltpiSource: v })} options={[{ v: 'ensemble', l: '10 wsk. ★' }, { v: 'sma200', l: 'SMA 200' }]} /></div>
-        <div className="row"><div className="grow"><div>Skalowanie BTC</div><div className="faint" style={{ fontSize: 12 }}>Backtest: MTPI z 10 wsk. obniżał wynik OOS (Sharpe 0,82–0,95 vs 1,03)</div></div>
-          <Seg value={tpi.mtpiSizing} onChange={(v) => setTpi({ ...tpi, mtpiSizing: v })} options={[{ v: 'ma4', l: '4 średnie ★' }, { v: 'ensemble', l: 'MTPI' }]} /></div>
-        <div className="note-text" style={{ padding: '4px 16px 14px' }}>★ = wariant wybrany w backteście (research/run17–18.py).</div>
+        <div className="row"><span>LTPI</span><span className={R0.ltpi > 0 ? 'green' : 'red'} style={{ fontWeight: 600 }}>{R0.ltpi > 0 ? 'pozytywne' : 'negatywne'}</span></div>
+        <div className="row"><span>MTPI</span><span className="num">{pyr.auto ? signed(pyr.auto.mtpi.value) : '—'}</span></div>
+        <div className="note-text" style={{ padding: '0 16px 12px' }}>Szczegóły, składniki i ustawienia: podzakładka LTPI · MTPI.</div>
       </Card>
 
       <div className="section-title">Alokacja</div>
       <Card>
         <div className="between mb12"><span className="dim">Kapitał całkowity</span><NumInput className="inline-input" value={s.capital} onChange={(v) => upd({ capital: v ?? 0 })} suffix="$" /></div>
-        <Row className="compact" label={<b>SDCA ({SPLIT_SDCA}%)</b>} value={<span>{usd(sdcaCap, 0)} <span className="dim">wg zakładki SDCA</span></span>} />
+        <Row className="compact" label={<b>SDCA ({SPLIT_SDCA}%)</b>} value={<span>{usd(sdcaCap, 0)} <span className="dim">wg podzakładki SDCA</span></span>} />
         <Row className="compact" label={<b>RSPS ({100 - SPLIT_SDCA}%)</b>} value={usd(rspsCap, 0)} />
         <div className="note-text mb12">Podział z najwyższym Sharpe w backteście 2020–2026 (1,52), rebalans raz w roku.</div>
         <div className="mt12" />

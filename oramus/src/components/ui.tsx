@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
-export function Screen({ title, subtitle, actions, children, flush }: { title: string; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode; flush?: boolean }) {
+export function Screen({ title, subtitle, actions, children, flush, nav }: { title: string; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode; flush?: boolean; nav?: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -20,6 +20,7 @@ export function Screen({ title, subtitle, actions, children, flush }: { title: s
         <h1 className="large-title">{title}</h1>
         {subtitle && <div className="subtitle">{subtitle}</div>}
       </div>
+      {nav && <div className="subnav">{nav}</div>}
       {children}
       <Footer />
     </div>

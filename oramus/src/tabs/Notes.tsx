@@ -33,7 +33,7 @@ function group(ts: number) {
   return d.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
 }
 
-export default function Notes() {
+export default function Notes({ nav }: { nav?: React.ReactNode }) {
   const [notes, setNotes] = usePersisted<Note[]>('notes.items', []);
   const [folders, setFolders] = usePersisted<string[]>('notes.folders', []);
   const [folder, setFolder] = useState<string>(ALL);
@@ -76,7 +76,7 @@ export default function Notes() {
 
   return (
     <>
-      <Screen title={folder === ALL ? 'Notatki' : folder === DELETED ? 'Ostatnio usunięte' : folder}
+      <Screen nav={nav} title={folder === ALL ? 'Notatki' : folder === DELETED ? 'Ostatnio usunięte' : folder}
         actions={<button className="icon-btn" onClick={() => setFolderSheet(true)} aria-label="Foldery"><IcFolder width={19} /></button>}>
         <div className="search"><IcSearch width={17} /><input placeholder="Szukaj" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <div className="chips">

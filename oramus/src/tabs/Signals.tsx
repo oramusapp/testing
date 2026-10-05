@@ -179,7 +179,7 @@ export default function Signals() {
   if (!H) {
     const p = amount && amount > 0 ? plan(amount) : null;
     return (
-      <Screen title="Sygnały" subtitle="Rozpisanie kapitału, codzienne zlecenia i rotacja">
+      <Screen title="Portfel" subtitle="Rozpisanie kapitału, codzienne zlecenia i rotacja">
         <Card className="hero">
           <div className="eyebrow">Kwota na kryptowaluty</div>
           <NumInput value={amount} onChange={setAmount} placeholder="np. 10000" suffix="USD" />
@@ -193,7 +193,7 @@ export default function Signals() {
           setSnaps(sdcaState ? [{ date: sdcaState.date, time: Date.now(), total: sv + rv, sdca: sv, rsps: rv, stable: p.sdca[STABLE] + (p.rsps[STABLE] ?? 0), btcPrice: sdcaState.price }] : []);
           toast('Portfele utworzone — start śledzenia wyników');
         }}>Kupiłem według planu — utwórz oba portfele</button>}
-        {!R.scanFresh && <div className="warn-box mt12">Skan RSPS nieaktualny — otwórz zakładkę RSPS lub poczekaj na skan, aby plan RSPS był aktualny.</div>}
+        {!R.scanFresh && <div className="warn-box mt12">Skan RSPS nieaktualny — otwórz Strategia → RSPS lub poczekaj na skan, aby plan RSPS był aktualny.</div>}
       </Screen>
     );
   }
@@ -220,7 +220,7 @@ export default function Signals() {
   );
 
   return (
-    <Screen title="Sygnały" subtitle={`Codziennie po zamknięciu 00:00 UTC · dane ${sdcaState?.date ?? '—'}`}>
+    <Screen title="Portfel" subtitle={`Codziennie po zamknięciu 00:00 UTC · dane ${sdcaState?.date ?? '—'}`}>
       <Card className="hero">
         <div className="eyebrow">Kapitał na kryptowaluty</div>
         <div className="big-number">{usd(total, 0)}</div>
