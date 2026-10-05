@@ -318,3 +318,17 @@ Reguła z kursu: mały token może trafić do RSPS, gdy ma perpy na Hyperliquid 
 W aplikacji: lista użytkownika, kwalifikacja sprawdzana przy każdym skanie (Hyperliquid metaAndAssetCtxs, dayNtlVlm), min. 91 dni
 historii, wybór tylko wg siły i trendu (bez pierwszeństwa), limit 10% na token (nadwyżka → rezerwa), bez wpływu na top 10 płynności
 i szerokość rynku. Nie jest częścią backtestu: lista powstaje z bieżących propozycji, więc nie ma jej uczciwej historii point-in-time.
+
+## Runda z regułą ustaloną z góry (run60–run63) — bez zmian w strategii
+Reguła (przed testami): zmiana przechodzi, jeśli w 2020–23 Sharpe portfela rośnie ≥ 0,03, CAGR nie spada, DD nie gorsze o > 2 pp;
+2024→ tylko raportowane. Dodatkowo (run63) test na 21 kwartalnych datach startu 2018–2023 dla SDCA, liczony tylko do końca 2023.
+run60 (RSPS i podział, IS Sharpe vs baza 1,97): rotacja co 3 dni 1,99 (za mało, choć 2024→ 1,39 vs 1,32), co 7 dni 1,63; top 2 1,96;
+top 4 1,86; limit 34% 1,95, 70% 1,96; uniwersum 8 1,68, 12 1,90; trend ≥ 0,75 1,97; wagi 1/zmienność 1,95, równe 1,95;
+bramka 65/55 1,80, 75/65 1,97; podział 60/40 1,97 (niższy CAGR), 50/50 1,97, przechył 50/50→30/70 1,94 — żadna nie przeszła.
+run61–62 (SDCA, nowe filtry RSPS): przeszły w IS na portfelu: LTPI− × 0,5 (2,03), kupno × 1,5 (2,01), Probable Range × 3 (2,01);
+łączenie krokami — tylko LTPI− × 0,5. Filtry RSPS (bez przegrzanych 7 d > +40% — 1,74; dywersyfikacja korelacji — bez zmian) odrzucone.
+run63 (21 startów, do 2023): LTPI− × 0,5 — mediana CAGR 48,5 → 57,2%, ale DD gorsze przy 21/21 startach (najgorsze −40,9 → −53,5%),
+Sharpe lepszy 6/21 → ODRZUCONE (zostaje × 0,25). Kupno × 1,5: DD gorsze 21/21, Sharpe lepszy 6/21 → odrzucone. PR × 3: DD gorsze 21/21,
+Sharpe 11/21 → odrzucone. Kontrola wdrożonego PR × 2 (2.22) vs × 1: mediana CAGR 44,0 → 48,5%, mediana DD −32,7 → −33,2%, najgorsze
+−37,2 → −40,9%, Sharpe lepszy 11/21 — to wymiana zwrotu na ryzyko, nie darmowa poprawa; zostaje (mieści się w regule użytkownika
+„+zwrot za niewiele większe obsunięcie”), ale opisane uczciwie. Wynik uczciwy strategii bez zmian: 2.26 / 2.29.
