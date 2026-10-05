@@ -55,16 +55,27 @@ export async function hyperliquidKlines(coin: string, startTime: number): Promis
 
 /** Coins whose Binance spot history is too short: earlier days come from Hyperliquid (Binance days take priority). */
 export const HL_FALLBACK = ['HYPE'];
-export async function klinesAny(sym: string, days = 400, startTime?: number): Promise<{ t: number; c: number; q: number }[]> {
+export async function klinesAny(sym: string, days = 400, startTime?: number, hl = HL_FALLBACK.includes(sym)): Promise<{ t: number; c: number; q: number }[]> {
   const from = startTime ?? Date.now() - days * DAY;
   let bin: { t: number; c: number; q: number }[] = [];
-  try { bin = await klines(sym + 'USDT', days, startTime); } catch (e) { if (!HL_FALLBACK.includes(sym)) throw e; }
-  if (!HL_FALLBACK.includes(sym) || (bin.length && bin[0].t <= from + 2 * DAY)) return bin;
+  try { bin = await klines(sym + 'USDT', days, startTime); } catch (e) { if (!hl) throw e; }
+  if (!hl || (bin.length && bin[0].t <= from + 2 * DAY)) return bin;
   try {
     const hl = await hyperliquidKlines(sym, from);
     const have = new Set(bin.map((k) => k.t));
     return [...hl.filter((k) => !have.has(k.t) && (!bin.length || k.t < bin[0].t)), ...bin].sort((a, b) => a.t - b.t);
   } catch { return bin; }
+}
+
+/** Hyperliquid perps: listed coins with their 24 h notional volume (USD). Used for the small-token short-list rule. */
+export async function hlPerps(): Promise<Map<string, { vol: number; delisted: boolean }>> {
+  const ctl = new AbortController(); const id = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const r = await fetch('https://api.hyperliquid.xyz/info', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal, body: JSON.stringify({ type: 'metaAndAssetCtxs' }) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const [meta, ctxs] = await r.json() as [{ universe: { name: string; isDelisted?: boolean }[] }, { dayNtlVlm?: string }[]];
+    return new Map(meta.universe.map((u, i) => [u.name.toUpperCase(), { vol: parseFloat(ctxs[i]?.dayNtlVlm ?? '0') || 0, delisted: !!u.isDelisted }]));
+  } finally { clearTimeout(id); }
 }
 
 export async function ticker(symbols: string[]) {
@@ -187,6 +198,101 @@ export async function refreshTotalHistory(h: TotalHistory): Promise<TotalHistory
   const out: TotalHistory = { rows, updated: Date.now(), source: sources.join(' + ') || h.source, approxFrom };
   if (sources.length) await set('total', out, cacheStore);
   return out;
+}
+
+// ---------- $TOTAL from TradingView (CRYPTOCAP:TOTAL) ----------
+// TradingView has no public data API, so the official series comes from the user's own CSV export of the 1D chart
+// ("Export chart data", paid plans). After the last exported day the series is extended with the daily changes of the
+// built-in index until the next import (marked in the UI).
+export interface TvTotal { rows: [string, number][]; imported: number; file: string }
+export async function loadTvTotal(): Promise<TvTotal | null> { return (await get<TvTotal>('total.tv', cacheStore)) ?? null; }
+export async function saveTvTotal(t: TvTotal | null) { await set('total.tv', t, cacheStore); }
+/** Parses a TradingView CSV export: needs a time column (unix seconds or a date) and a close column; daily bars. */
+export function parseTvCsv(text: string): [string, number][] {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) throw new Error('pusty plik');
+  const head = lines[0].split(',').map((x) => x.trim().replace(/"/g, '').toLowerCase());
+  const ti = head.indexOf('time'), ci = head.indexOf('close');
+  if (ti < 0 || ci < 0) throw new Error('brak kolumn „time” i „close” — to nie jest eksport z TradingView');
+  const out = new Map<string, number>();
+  for (const l of lines.slice(1)) {
+    const c = l.split(','); const t = c[ti]?.replace(/"/g, '').trim(); const v = parseFloat(c[ci]);
+    if (!t || !(v > 0)) continue;
+    const d = /^\d+$/.test(t) ? new Date(+t * 1000) : new Date(t);
+    if (Number.isNaN(d.getTime())) continue;
+    out.set(d.toISOString().slice(0, 10), v);
+  }
+  const rows = [...out.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  if (rows.length < 300) throw new Error(`za mało świec dziennych (${rows.length}) — wyeksportuj wykres 1D z dłuższą historią`);
+  const gaps = rows.slice(1).filter((r, i) => Date.parse(r[0]) - Date.parse(rows[i][0]) > 3 * 86400000).length;
+  if (gaps > 5) throw new Error('to nie wygląda na interwał 1D (duże przerwy między świecami)');
+  return rows;
+}
+// ---------- daily snapshot of the official total market cap (free, keyless) ----------
+// No free source serves the full daily history, so after every 00:00 UTC close the app records the current value
+// (CoinGecko /global, fallbacks CoinMarketCap keyless, CoinPaprika, CoinLore). A snapshot taken h hours after the close
+// stands for that close; late ones (h > SNAP_ON_TIME_H) are kept but left out of the comparison with the index.
+export interface TotalSnap { date: string; value: number; at: number; lagH: number; source: string }
+export const SNAP_ON_TIME_H = 3;
+const SNAP_SOURCES: { name: string; url: string; pick: (j: any) => number }[] = [   // eslint-disable-line @typescript-eslint/no-explicit-any
+  { name: 'CoinGecko', url: 'https://api.coingecko.com/api/v3/global', pick: (j) => j?.data?.total_market_cap?.usd },
+  { name: 'CoinMarketCap', url: 'https://pro-api.coinmarketcap.com/public-api/v1/global-metrics/quotes/latest', pick: (j) => j?.data?.quote?.USD?.total_market_cap },
+  { name: 'CoinPaprika', url: 'https://api.coinpaprika.com/v1/global', pick: (j) => j?.market_cap_usd },
+  { name: 'CoinLore', url: 'https://api.coinlore.net/api/global/', pick: (j) => +j?.[0]?.total_mcap }
+];
+export async function loadTotalSnaps(): Promise<TotalSnap[]> { return (await get<TotalSnap[]>('total.snaps', cacheStore)) ?? []; }
+/** Records today's snapshot for the last closed day once (keeps the earliest one after the close). */
+export async function snapshotTotal(now = Date.now()): Promise<TotalSnap[]> {
+  const snaps = await loadTotalSnaps();
+  const date = lastClosedDay(now);
+  if (snaps.some((x) => x.date === date)) return snaps;
+  for (const src of SNAP_SOURCES) {
+    try {
+      const v = src.pick(await getJSON(src.url, 10000));
+      if (!(v > 1e11)) continue;   // sanity: total market cap is far above $100B
+      const closeT = Date.parse(date + 'T00:00:00Z') + DAY;
+      const out = [...snaps, { date, value: v, at: now, lagH: Math.round(((now - closeT) / 3600000) * 10) / 10, source: src.name }].slice(-3000);
+      await set('total.snaps', out, cacheStore);
+      return out;
+    } catch { /* next source */ }
+  }
+  return snaps;
+}
+/** Agreement between the official snapshots and the index used by the TPIs: daily log changes on consecutive on-time days
+ *  from the same source. */
+export function snapAgreement(snaps: TotalSnap[], index: TotalHistory | null) {
+  const im = new Map(index?.rows ?? []);
+  const ok = snaps.filter((x) => x.lagH <= SNAP_ON_TIME_H).sort((a, b) => (a.date < b.date ? -1 : 1));
+  const a: number[] = [], b: number[] = [];
+  for (let i = 1; i < ok.length; i++) {
+    const p = ok[i - 1], c = ok[i];
+    if (c.source !== p.source || Date.parse(c.date) - Date.parse(p.date) !== DAY) continue;
+    const i0 = im.get(p.date), i1 = im.get(c.date);
+    if (!i0 || !i1) continue;
+    a.push(Math.log(c.value / p.value)); b.push(Math.log(i1 / i0));
+  }
+  const n = a.length;
+  const mean = (x: number[]) => x.reduce((s, v) => s + v, 0) / x.length;
+  let corr = NaN, mad = NaN;
+  if (n >= 2) {
+    const ma = mean(a), mb = mean(b);
+    const cov = a.reduce((s, v, k) => s + (v - ma) * (b[k] - mb), 0), va = a.reduce((s, v) => s + (v - ma) ** 2, 0), vb = b.reduce((s, v) => s + (v - mb) ** 2, 0);
+    corr = va > 0 && vb > 0 ? cov / Math.sqrt(va * vb) : NaN;
+    mad = mean(a.map((v, k) => Math.abs(v - b[k])));
+  }
+  const last = ok.at(-1); const il = last ? im.get(last.date) : undefined;
+  return { n, corr, mad, onTime: ok.length, total: snaps.length, levelRatio: last && il ? last.value / il : NaN, last };
+}
+
+/** TradingView rows where they exist; before them and after them the built-in index, chain-linked to the TV level. */
+export function mergeTvTotal(own: TotalHistory | null, tv: TvTotal | null): TotalHistory | null {
+  if (!tv || !tv.rows.length) return own;
+  const om = new Map(own?.rows ?? []);
+  const first = tv.rows[0], last = tv.rows[tv.rows.length - 1];
+  const before = (own?.rows ?? []).filter(([d]) => d < first[0]);
+  const k0 = om.get(first[0]); const pre: [string, number][] = k0 ? before.map(([d, v]) => [d, v * (first[1] / k0)]) : [];
+  const k1 = om.get(last[0]); const post: [string, number][] = k1 ? (own?.rows ?? []).filter(([d]) => d > last[0]).map(([d, v]) => [d, v * (last[1] / k1)]) : [];
+  return { rows: [...pre, ...tv.rows, ...post], updated: own?.updated ?? 0, source: `TradingView CRYPTOCAP:TOTAL (import do ${last[0]})` + (post.length ? ` + własny indeks od ${post[0][0]}` : ''), approxFrom: post.length ? post[0][0] : undefined };
 }
 
 /** $TOTAL aligned to the BTC dates (carried forward; after its last day it follows BTC so the TPI is never blank). */

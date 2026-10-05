@@ -278,3 +278,57 @@ bez Supertrend i RSI — 82,9 / −27,3 / 1,83 / 1,54; bez wszystkich trzech —
 Odrzucone: wolniejsze zamienniki (Supertrend 100/6, RSI 180, SMA 365) — 78,8%; głosy neutralne (strefy martwe) — 79,7%, DD −28,9%;
 alty bez weta LTPI (ważność TPI ∝ udział w rynku) — 84,3%, ale DD −33,6%; lump sum reszty gotówki SDCA przy LTPI → + (ryzyko < 50%) —
 85,1%, ale DD −35,1%. SDCA na ETH/SOL nietestowalne bez modelu wyceny dla tych coinów (model wyceny jest specyficzny dla BTC).
+
+## Kontrola rzetelności (run57.py) — UWAGA: zysk z warstw RSPS (2.24) jest w dużej mierze efektem wiedzy z przyszłości
+Stała lista dużych (ETH, SOL, XRP, SUI) została wybrana w 2026 r., gdy wiadomo już, że SOL i SUI mocno urosły. Test bez tej wiedzy —
+„duże” = 4 najpłynniejsze alty znane w danym dniu: portfel 2020→ CAGR 64,4%, DD −39,2%, IS 1,57, OOS 1,29 (2024→ 50,3%).
+Ta sama konfiguracja bez warstw (jedna pula top 10, LTPI spójne): CAGR 87,0%, DD −26,5%, IS 1,93, OOS 1,42 (2024→ 61,1%).
+Warstwy ze stałą listą: 84,4%, −27,3%, 1,84, 1,57 (2024→ 70,0%). Wniosek: przewagi stałej listy nie da się uczciwie wykazać
+backtestem — wynik 2.24 jest zawyżony. Lista dużych zostaje tylko jako wybór użytkownika, nie jako ulepszenie potwierdzone danymi.
+Inne źródła optymizmu: okna 7/21/42 wybrano częściowo patrząc na 2024→ (gdyby wybierać tylko po 2020–23, wygrałoby 14/28/56 z OOS
+1,22 < 1,28 bazy), więc 2024→ nie jest już czystym testem poza próbą; RSPS pomija coiny, które upadły; $TOTAL to własny indeks
+z 45 aktywów Coin Metrics, nie oficjalny TOTAL z TradingView. Zmiana LTPI (2.25) poprawiła też okres 2020–23, więc jest wiarygodniejsza.
+
+## Uczciwy protokół (run58.py, run59.py) — 2.26.0
+Na prośbę użytkownika: każdy wariant point-in-time, wybór tylko na 2020–23, 2024→ raportowane, nie używane do wyboru.
+Warstwy z notatek point-in-time (duże = top 3/4/5 płynności, z priorytetem lub bez): IS 1,57–1,85 — wszystkie gorsze od jednej puli
+top 10 (IS 1,93) → wycofane. Stała lista użytkownika dodana do puli bez priorytetu (informacyjnie, wiedza z przyszłości): CAGR 85,2%
+vs 87,0%, ta sama DD — neutralna, więc w aplikacji zostaje jako wybór użytkownika (zawsze kandydaci), a backtest jej nie uwzględnia.
+Okna siły, wybór po IS (portfel IS / OOS / CAGR / DD): 30/60/90 — 1,86 / 1,35 / 78,4 / −26,1; 21/42/63 — 1,97 / 1,32 / 85,4;
+14/28/56 — 1,97 / 1,32 / 85,7 / −25,6 (wybrane: najwyższe IS, środek płaskiego obszaru 14–21); 14/30/60 — 1,96 / 1,34; 7/21/42 — 1,93 /
+1,42 / 87,0 (lepsze w 2024→, ale tego nie można było wiedzieć). Silnik aplikacji (fixture, stare LTPI, bez PAXG): IS 1,91 vs 1,92 dla
+7/21/42 — różnica w granicach szumu. Wynik uczciwy 2.26 (portfel 2020→): CAGR 85,7%, DD −25,6%, IS 1,97, 2024→ Sharpe 1,32, CAGR 55,0%.
+Wyniki 2.23–2.25 w tym README są zawyżone (wybory z wglądem w 2024→ lub z wiedzą z przyszłości o liście coinów).
+
+## $TOTAL z TradingView (2.27.0)
+Użytkownik wymaga oficjalnego CRYPTOCAP:TOTAL z TradingView (suma kapitalizacji top 125 coinów). TradingView nie ma publicznego API
+danych, a historyczny wykres globalnej kapitalizacji w CoinGecko jest tylko w płatnym planie — dlatego aplikacja przyjmuje eksport
+CSV z wykresu 1D (TradingView: „Export chart data”, plany płatne od Essential). Seria TradingView zastępuje własny indeks tam, gdzie
+jest; przed nią i po ostatnim imporcie własny indeks jest przypięty do poziomu TradingView. Backtesty w tym README nadal używają
+własnego indeksu (45 aktywów Coin Metrics) — po otrzymaniu pliku CSV trzeba je powtórzyć. $TOTAL wpływa na: przechył podziału
+SDCA/RSPS (LTPI $TOTAL), MTPI i propozycję shortu, zakładkę LTPI·MTPI oraz benchmark w backteście; SDCA i RSPS używają LTPI z BTC.
+
+## Codzienny zapis oficjalnej kapitalizacji (2.28.0)
+Darmowe źródła bez klucza dają tylko bieżącą wartość (CoinGecko /global, CoinMarketCap keyless, CoinPaprika, CoinLore), więc aplikacja
+zapisuje ją po każdym zamknięciu i porównuje dzienne zmiany z indeksem TPI (korelacja, średnia różnica) — kontrola, nie wejście TPI.
+TPI: import TradingView (jeśli jest) albo indeks Coin Metrics. Odczyt jest z chwili pobrania; zapisy > 3 h po 00:00 UTC są pomijane w porównaniu.
+
+## Short-lista małych tokenów (2.29.0)
+Reguła z kursu: mały token może trafić do RSPS, gdy ma perpy na Hyperliquid i ≥ ~10 mln $ wolumenu dziennie; maks. ~10% wagi.
+W aplikacji: lista użytkownika, kwalifikacja sprawdzana przy każdym skanie (Hyperliquid metaAndAssetCtxs, dayNtlVlm), min. 91 dni
+historii, wybór tylko wg siły i trendu (bez pierwszeństwa), limit 10% na token (nadwyżka → rezerwa), bez wpływu na top 10 płynności
+i szerokość rynku. Nie jest częścią backtestu: lista powstaje z bieżących propozycji, więc nie ma jej uczciwej historii point-in-time.
+
+## Runda z regułą ustaloną z góry (run60–run63) — bez zmian w strategii
+Reguła (przed testami): zmiana przechodzi, jeśli w 2020–23 Sharpe portfela rośnie ≥ 0,03, CAGR nie spada, DD nie gorsze o > 2 pp;
+2024→ tylko raportowane. Dodatkowo (run63) test na 21 kwartalnych datach startu 2018–2023 dla SDCA, liczony tylko do końca 2023.
+run60 (RSPS i podział, IS Sharpe vs baza 1,97): rotacja co 3 dni 1,99 (za mało, choć 2024→ 1,39 vs 1,32), co 7 dni 1,63; top 2 1,96;
+top 4 1,86; limit 34% 1,95, 70% 1,96; uniwersum 8 1,68, 12 1,90; trend ≥ 0,75 1,97; wagi 1/zmienność 1,95, równe 1,95;
+bramka 65/55 1,80, 75/65 1,97; podział 60/40 1,97 (niższy CAGR), 50/50 1,97, przechył 50/50→30/70 1,94 — żadna nie przeszła.
+run61–62 (SDCA, nowe filtry RSPS): przeszły w IS na portfelu: LTPI− × 0,5 (2,03), kupno × 1,5 (2,01), Probable Range × 3 (2,01);
+łączenie krokami — tylko LTPI− × 0,5. Filtry RSPS (bez przegrzanych 7 d > +40% — 1,74; dywersyfikacja korelacji — bez zmian) odrzucone.
+run63 (21 startów, do 2023): LTPI− × 0,5 — mediana CAGR 48,5 → 57,2%, ale DD gorsze przy 21/21 startach (najgorsze −40,9 → −53,5%),
+Sharpe lepszy 6/21 → ODRZUCONE (zostaje × 0,25). Kupno × 1,5: DD gorsze 21/21, Sharpe lepszy 6/21 → odrzucone. PR × 3: DD gorsze 21/21,
+Sharpe 11/21 → odrzucone. Kontrola wdrożonego PR × 2 (2.22) vs × 1: mediana CAGR 44,0 → 48,5%, mediana DD −32,7 → −33,2%, najgorsze
+−37,2 → −40,9%, Sharpe lepszy 11/21 — to wymiana zwrotu na ryzyko, nie darmowa poprawa; zostaje (mieści się w regule użytkownika
+„+zwrot za niewiele większe obsunięcie”), ale opisane uczciwie. Wynik uczciwy strategii bez zmian: 2.26 / 2.29.
