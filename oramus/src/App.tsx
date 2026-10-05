@@ -53,8 +53,8 @@ export default function App({ updateReady, applyUpdate }: { updateReady: boolean
       </nav>
       {updateReady && (
         <div className="update-banner">
-          <div className="grow"><b>Dostępna aktualizacja</b><div className="dim" style={{ fontSize: 13 }}>Twoje dane zostaną zachowane.</div></div>
-          <button className="btn primary small" onClick={applyUpdate}>Aktualizuj</button>
+          <div className="grow"><b>Dostępna aktualizacja</b><div className="dim" style={{ fontSize: 13 }}>Zainstaluje się sama przy ponownym otwarciu. Dane zostaną zachowane.</div></div>
+          <button className="btn primary small" onClick={applyUpdate}>Teraz</button>
         </div>
       )}
       <Settings open={settings} onClose={() => setSettings(false)} />
