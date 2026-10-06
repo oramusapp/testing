@@ -11,7 +11,7 @@ import { composite, freshManual } from '../lib/sdcaModel';
 import { athSellSeries, backtest, belowProbableRange, curveRate, minBuyRate, probableRangeRate, safetyStep, slowBuyRate } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
 import { PaperCard } from '../components/Paper';
-import type { PaperInputs } from '../lib/paper';
+import type { PaperInputs, PaperDay } from '../lib/paper';
 import { useRsps, SPLIT_SDCA, SPLIT_TILT } from '../lib/useRsps';
 import { LEV_MAX } from '../lib/pyramid';
 import { SDCA_DEFAULTS, type SdcaSettings, manualLtpiActive, type LtpiState } from './Sdca';
@@ -60,14 +60,19 @@ export default function Signals() {
     const slow = ltpiSeries && (cfg.slowBuy ?? 1) < 1 ? { ltpi: ltpiSeries, mult: cfg.slowBuy! } : undefined;
     const bt = backtest(model.prices, comp.risk, cfg.curve, start, 10000, cfg.safety ? ltpiSeries : undefined, cfg.athSell ? ath.frac : undefined, slow);
     const price = model.prices[last];
-    return { price, risk: comp.risk[last], rate: minBuyRate(probableRangeRate(slow ? slowBuyRate(curveRate(cfg.curve, comp.risk[last]), slow.ltpi[last] ?? 0, slow.mult) : curveRate(cfg.curve, comp.risk[last]), belowProbableRange(model.prices, last))) / 100, slowed: !!slow && (slow.ltpi[last] ?? 0) < 0, modelBtcShare: (bt.btc * price) / bt.value, date: model.dates[last], athFrac: ath.frac[last] ?? 0, athK: ath.k[last] ?? 0 };
+    // the last 120 closes as replay inputs for the live-testing portfolio (days the app was not opened)
+    const rateAt = (i: number) => minBuyRate(probableRangeRate(slow ? slowBuyRate(curveRate(cfg.curve, comp.risk[i]), slow.ltpi[i] ?? 0, slow.mult) : curveRate(cfg.curve, comp.risk[i]), belowProbableRange(model.prices, i))) / 100;
+    const hist: PaperDay[] = [];
+    for (let i = Math.max(1, last - 120); i < last; i++) hist.push({ date: model.dates[i], btcPrice: model.prices[i], sdcaRate: rateAt(i), risk: comp.risk[i], ltpi: ltpiSeries?.[i] ?? 0 });
+    return { hist, price, risk: comp.risk[last], rate: minBuyRate(probableRangeRate(slow ? slowBuyRate(curveRate(cfg.curve, comp.risk[last]), slow.ltpi[last] ?? 0, slow.mult) : curveRate(cfg.curve, comp.risk[last]), belowProbableRange(model.prices, last))) / 100, slowed: !!slow && (slow.ltpi[last] ?? 0) < 0, modelBtcShare: (bt.btc * price) / bt.value, date: model.dates[last], athFrac: ath.frac[last] ?? 0, athK: ath.k[last] ?? 0 };
   }, [model, cfg.enabled, cfg.manualRisk, cfg.curve, cfg.startDate, ltpiSeries, cfg.athSell, cfg.safety, cfg.slowBuy]);
 
-  // live testing input: today's closed-candle signals (RSPS only when the scan is fresh and the signal is released)
+  // live testing input: today's closed-candle signals. Autonomous: it follows the automatic strategy (RSPS whenever the scan
+  // is fresh — it does not wait for the manual inputs that gate the live order list) and replays missed closes for SDCA.
   const paperInputs: PaperInputs | null = sdcaState && (R.scanFresh || !R.busy) ? {
     date: sdcaState.date, btcPrice: sdcaState.price, prices: R.prices, sdcaRate: sdcaState.rate, risk: sdcaState.risk, ltpi: sdcaLtpi, safety: cfg.safety,
-    rspsTarget: R.scanFresh && R.signalReady ? (R.regime === 'defense' ? [] : R.sleeve.map((x) => ({ sym: x.sym, w: x.w }))) : null,
-    split: splitSdca / 100
+    rspsTarget: R.scanFresh ? (R.regime === 'defense' ? [] : R.sleeve.map((x) => ({ sym: x.sym, w: x.w }))) : null,
+    split: splitSdca / 100, missed: sdcaState.hist
   } : null;
   const prices: Record<string, number> = { ...R.prices, [STABLE]: 1 };
   if (sdcaState) prices.BTC = sdcaState.price;
