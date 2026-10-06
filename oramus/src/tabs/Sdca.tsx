@@ -6,6 +6,7 @@ import { useBtc, refresh } from '../lib/btcStore';
 import { freshToday } from '../lib/market';
 import { askNotify, notifyPermission } from '../lib/notify';
 import { usePersisted } from '../lib/db';
+import type { Flow } from '../lib/performance';
 import { INDICATORS, composite, freshManual, RAIL_TAUS } from '../lib/sdcaModel';
 import { ATH_BACKTEST, ATH_SELL, MIN_BUY_PCT, BANDS, DEFAULT_CURVE, SAFETY, SLOW_BUY_OPTIONS, athSellSeries, slowBuyRate, curveRate, belowProbableRange, probableRangeRate, PR_MULT, riskZone, safetyStep } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
@@ -57,6 +58,27 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
   const [athNotify, setAthNotify] = usePersisted<boolean>('notify.ath', true);
   const upd = (p: Partial<SdcaSettings>) => setS((o) => ({ ...SDCA_DEFAULTS, ...o, ...p }));
   const cfg = { ...SDCA_DEFAULTS, ...s };
+  // one SDCA reserve for the whole app: the SDCA portfolio (Portfel) when it exists, otherwise these fields
+  const [pf, setPf] = usePersisted<{ holdings: { sdca: { BTC: number; USDT: number }; rsps: Record<string, number> } | null; history: { time: number; text: string }[]; safetyOwed?: number }>('portfolio', { holdings: null, history: [] });
+  const [, setFlows] = usePersisted<Flow[]>('portfolio.flows', []);
+  const Hs = pf.holdings?.sdca;
+  const cash = Hs ? Hs.USDT : cfg.cash, btcHeld = Hs ? Hs.BTC : cfg.btcHeld;
+  const setCash = (v: number) => {
+    if (pf.holdings && Hs) {   // an edit here is a deposit / withdrawal of the SDCA portfolio, recorded so returns stay correct
+      const diff = v - Hs.USDT;
+      setPf({ ...pf, holdings: { ...pf.holdings, sdca: { ...Hs, USDT: v } } });
+      if (Math.abs(diff) > 0.005) setFlows((f) => [...f, { time: Date.now(), amount: diff, sdca: diff, rsps: 0, note: 'rezerwa SDCA (zakładka SDCA)' }]);
+    }
+    upd({ cash: v });
+  };
+  const setBtcHeld = (v: number) => {
+    if (pf.holdings && Hs) {
+      const diff = (v - Hs.BTC) * (model?.prices.at(-1) ?? 0);
+      setPf({ ...pf, holdings: { ...pf.holdings, sdca: { ...Hs, BTC: v } } });
+      if (Math.abs(diff) > 0.005) setFlows((f) => [...f, { time: Date.now(), amount: diff, sdca: diff, rsps: 0, note: 'BTC w SDCA (zakładka SDCA)' }]);
+    }
+    upd({ btcHeld: v });
+  };
 
   const comp = useMemo(() => (model ? composite(model, cfg.enabled, freshManual(cfg)) : null), [model, cfg.enabled, cfg.manualRisk]);
   const [tpiCfg0] = usePersisted<{ ltpiSource: 'ensemble' | 'sma200'; hyst?: number }>('signals.tpi', { ltpiSource: 'ensemble' });
@@ -97,21 +119,21 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
     actionTitle = `HOLD (${rate.toFixed(2).replace('.', ',')}% gotówki)`;
     actionSub = `Zakup dopiero przy > ${MIN_BUY_PCT}% rezerwy dziennie` + (slowed ? ` · LTPI ujemne: krzywa ${rateCurve.toFixed(2)}% × ${String(cfg.slowBuy).replace('.', ',')}` : '') + prNote;
   } else if (rate > 0.001) {
-    actionTitle = cfg.cash > 0 ? `KUP ${usd(cfg.cash * rate / 100)}` : `KUP ${rate.toFixed(2)}% gotówki`;
-    actionSub = (cfg.cash > 0 ? `≈ ${(cfg.cash * rate / 100 / price).toFixed(6)} BTC · ${rate.toFixed(2)}% rezerwy` : 'Wpisz rezerwę gotówki, aby zobaczyć kwotę') + (slowed ? ` · LTPI ujemne: krzywa ${rateCurve.toFixed(2)}% × ${String(cfg.slowBuy).replace('.', ',')}` : '') + prNote;
+    actionTitle = cash > 0 ? `KUP ${usd(cash * rate / 100)}` : `KUP ${rate.toFixed(2)}% gotówki`;
+    actionSub = (cash > 0 ? `≈ ${(cash * rate / 100 / price).toFixed(6)} BTC · ${rate.toFixed(2)}% rezerwy` : 'Wpisz rezerwę gotówki, aby zobaczyć kwotę') + (slowed ? ` · LTPI ujemne: krzywa ${rateCurve.toFixed(2)}% × ${String(cfg.slowBuy).replace('.', ',')}` : '') + prNote;
     actionTone = 'green';
   } else if (rate < -0.001) {
-    actionTitle = cfg.btcHeld > 0 ? `SPRZEDAJ ${(cfg.btcHeld * -rate / 100).toFixed(6)} BTC` : `SPRZEDAJ ${(-rate).toFixed(2)}% BTC`;
-    actionSub = cfg.btcHeld > 0 ? `≈ ${usd(cfg.btcHeld * -rate / 100 * price)}` : 'Wpisz posiadane BTC, aby zobaczyć ilość';
+    actionTitle = btcHeld > 0 ? `SPRZEDAJ ${(btcHeld * -rate / 100).toFixed(6)} BTC` : `SPRZEDAJ ${(-rate).toFixed(2)}% BTC`;
+    actionSub = btcHeld > 0 ? `≈ ${usd(btcHeld * -rate / 100 * price)}` : 'Wpisz posiadane BTC, aby zobaczyć ilość';
     actionTone = 'red';
   }
   // SDCA safety: LTPI < 0 while valuation risk ≥ 70% → sell 2% of BTC per day to stablecoin
   const safetyOn = cfg.safety && ltpiValue < 0 && riskToday >= SAFETY.riskMin;
   if (safetyOn) {
-    const st = safetyStep(riskToday, ltpiValue, (cfg.btcHeld || 1) * price, cfg.cash, 0);
+    const st = safetyStep(riskToday, ltpiValue, (btcHeld || 1) * price, cash, 0);
     const extra = st.kind === 'sell' ? st.usd / price : 0;
-    const curveSell = rate < -0.001 ? (cfg.btcHeld || 0) * -rate / 100 : 0;
-    actionTitle = cfg.btcHeld > 0 ? `SPRZEDAJ ${(curveSell + extra).toFixed(6)} BTC` : `SPRZEDAJ ${(SAFETY.sellRate * 100 + Math.max(0, -rate)).toFixed(2)}% BTC`;
+    const curveSell = rate < -0.001 ? (btcHeld || 0) * -rate / 100 : 0;
+    actionTitle = btcHeld > 0 ? `SPRZEDAJ ${(curveSell + extra).toFixed(6)} BTC` : `SPRZEDAJ ${(SAFETY.sellRate * 100 + Math.max(0, -rate)).toFixed(2)}% BTC`;
     actionSub = `Bezpiecznik: LTPI ujemne przy ryzyku ${riskToday.toFixed(1)}% ≥ ${SAFETY.riskMin}% → ${SAFETY.sellRate * 100}% BTC dziennie do stablecoina` + (rate < -0.001 ? ' (razem z krzywą)' : '');
     actionTone = 'red';
   }
@@ -149,11 +171,11 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
         <Row className="compact" label="Wycena z (TRW)" value={<span style={{ color: zToday >= 1.5 ? 'var(--green)' : zToday <= -1.5 ? 'var(--red)' : undefined }}>{signed(zToday)}σ <span className="dim">· + = tanio</span></span>} />
         <Row className="compact" label="Krzywa dziś" value={signed(rate) + '%/dzień' + (slowed ? ` (pełna ${signed(rateCurve)}%, LTPI −)` : '')} />
         <Row className="compact" label="Bezpiecznik LTPI (BTC)" value={<span className={safetyOn ? 'red' : 'dim'}>{!cfg.safety ? 'wyłączony' : safetyOn ? 'aktywny — sprzedaż' : ltpiValue > 0 ? 'nieaktywny · LTPI +' : `czuwa (ryzyko ≥ ${SAFETY.riskMin}% i LTPI < 0)`}</span>} />
-        {athOn && <div className="note-text mt8" style={{ borderLeft: '3px solid var(--amber)', paddingLeft: 10 }}><b>Propozycja · nowy szczyt (ATH):</b> sprzedaj {cfg.btcHeld > 0 ? `${(cfg.btcHeld * athFrac).toFixed(6)} BTC` : `${(athFrac * 100).toFixed(2)}% BTC`} ({athK + 1}. sprzedaż w cyklu, ryzyko {riskToday.toFixed(1)}%). {ATH_BACKTEST}</div>}
+        {athOn && <div className="note-text mt8" style={{ borderLeft: '3px solid var(--amber)', paddingLeft: 10 }}><b>Propozycja · nowy szczyt (ATH):</b> sprzedaj {btcHeld > 0 ? `${(btcHeld * athFrac).toFixed(6)} BTC` : `${(athFrac * 100).toFixed(2)}% BTC`} ({athK + 1}. sprzedaż w cyklu, ryzyko {riskToday.toFixed(1)}%). {ATH_BACKTEST}</div>}
         <Row className="compact" label="Cena BTC" value={usd(price)} />
         {pyrHist.length > 0 && Number.isFinite(pyrHist.at(-1)!.z) && <Row className="compact" label="Piramida analizy" value={<span style={{ color: pyrHist.at(-1)!.z >= 0.25 ? 'var(--green)' : pyrHist.at(-1)!.z <= -0.25 ? 'var(--red)' : 'var(--amber)' }}>{signed(pyrHist.at(-1)!.z)}σ <span className="dim">· P {Math.round(pyrHist.at(-1)!.p * 100)}% · pokrycie {Math.round(pyrHist.at(-1)!.coverage * 100)}%</span></span>} />}
-        <Row className="compact" label="Rezerwa gotówki" value={<NumInput className="inline-input" value={cfg.cash} onChange={(v) => upd({ cash: v ?? 0 })} suffix="$" />} />
-        <Row className="compact" label="Posiadane BTC" value={<NumInput className="inline-input" value={cfg.btcHeld} onChange={(v) => upd({ btcHeld: v ?? 0 })} />} />
+        <Row className="compact" label="Rezerwa gotówki" value={<NumInput className="inline-input" value={cash} onChange={(v) => setCash(v ?? 0)} suffix="$" />} />
+        <Row className="compact" label="Posiadane BTC" value={<NumInput className="inline-input" value={btcHeld} onChange={(v) => setBtcHeld(v ?? 0)} />} />
       </Card>
 
 
@@ -235,7 +257,7 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
       </Fold>
       <Fold id="sdca.valuation" title="Wycena on-chain i narzędzia" hint="Arkusz z-score (część liczona automatycznie), tempo akumulacji, stożek wyników">
       <ValuationCard auto={autoVal} onUse={(r) => upd({ manualRisk: r, manualUpdated: Date.now(), enabled: { ...cfg.enabled, manual: true } })} />
-      <AccumulationCalc cash={cfg.cash} />
+      <AccumulationCalc cash={cash} />
 
       <div className="section-title">Poziomy pasm (na żywo)</div>
       <Card className="tight">
@@ -298,7 +320,7 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
 
       </Fold>
 
-      <TradeSheet open={tradeOpen} onClose={() => setTradeOpen(false)} price={price} suggested={rate > 0 && cfg.cash > 0 ? cfg.cash * rate / 100 : 0}
+      <TradeSheet open={tradeOpen} onClose={() => setTradeOpen(false)} price={price} suggested={rate > 0 && cash > 0 ? cash * rate / 100 : 0}
         onAdd={(t) => { setTrades([t, ...trades].sort((a, b) => b.date.localeCompare(a.date))); toast('Zapisano transakcję'); }} />
 
       <Sheet open={info} onClose={() => setInfo(false)} title="Jak działa SDCA">
