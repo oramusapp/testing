@@ -351,3 +351,11 @@ odrzucone; T2 LTPI z BTC+ETH+$TOTAL — 2,00; T3 szybszy bezpiecznik SDCA 5%/10%
 (pieniądze tylko z RSPS do SDCA, zgodnie z notatkami) — Sharpe 2,07 i DD −22,0, ale CAGR 107,6 (niższy) → odrzucone regułą (2024→ 44,8%);
 T6 wyczerpanie MTPI → alty × 0,5 — 2,00. Nietestowane: agregacja wyceny przez z zamiast percentyli (wymaga przebudowy silnika badań),
 kierowanie nowych wpłat w małe coiny (brak modelu wpłat), tematy makro S&P/TLT/DXY (brak danych).
+
+## Czy SDCA tylko obniża zwrot i podnosi DD? (run66.py, ustawienia 2.33)
+Od 2020 (CAGR / maks. DD / Sharpe): SDCA sam 53,9 / −35,0 / 1,36; RSPS sam 100,7 / −38,9 / 1,60; stały 60/40 77,6 / −24,4 / 1,75;
+40/60 86,6 / −25,0 / 1,75; 20/80 94,8 / −30,0 / 1,67; obecny przechył 60/40→40/60 89,2 / −25,4 / 1,75; przechył 40/60→20/80 98,5 / −29,7 / 1,70.
+2024→: RSPS sam 67,0 / −34,8 / 1,36; obecny 53,7 / −24,8 / 1,31; 20/80 61,8 / −30,0 / 1,37. Od 2022: wszystkie ok. 40% CAGR, DD RSPS −37,4
+vs obecny −25,2. Okna 365 dni: strata w 10% okien (RSPS) vs 4% (obecny), mediana 48,5% vs 53,5%. Wniosek: SDCA obniża zwrot, ale
+obniża (nie podnosi) maks. obsunięcie i podnosi Sharpe; RSPS sam zawiera 758% z 2021 i błąd przeżywalności (dzisiejsza lista coinów),
+więc jego przewaga jest zawyżona. Większy udział RSPS to wymiana zwrotu na ryzyko — decyzja użytkownika.
