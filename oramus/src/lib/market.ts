@@ -54,9 +54,13 @@ export async function hyperliquidKlines(coin: string, startTime: number): Promis
 }
 
 /** Coins whose Binance spot history is too short: earlier days come from Hyperliquid (Binance days take priority). */
-export const HL_FALLBACK = ['HYPE'];
+// Hyperliquid history before (or instead of) a Binance listing. HL_ONLY: no Binance spot pair, or the Binance symbol is a
+// different / delisted asset (LIT = Litentry on Binance, XMR delisted 2024) — always Hyperliquid perps.
+export const HL_FALLBACK = ['HYPE', 'PUMP', 'XPL', 'WLFI', 'ASTER'];
+export const HL_ONLY = ['FARTCOIN', 'MON', 'LIT', 'AERO', 'XMR'];
 export async function klinesAny(sym: string, days = 400, startTime?: number, hl = HL_FALLBACK.includes(sym)): Promise<{ t: number; c: number; q: number }[]> {
   const from = startTime ?? Date.now() - days * DAY;
+  if (HL_ONLY.includes(sym)) return hyperliquidKlines(sym, from);
   let bin: { t: number; c: number; q: number }[] = [];
   try { bin = await klines(sym + 'USDT', days, startTime); } catch (e) { if (!hl) throw e; }
   if (!hl || (bin.length && bin[0].t <= from + 2 * DAY)) return bin;

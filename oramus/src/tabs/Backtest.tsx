@@ -58,7 +58,7 @@ export default function Backtest({ nav }: { nav?: React.ReactNode }) {
     };
   }, [model, base, s0, cfg.curve, cfg.safety, cfg.athSell, cfg.slowBuy]);
 
-  const rspsKey = model ? ['r2.27', model.dates.at(-1), effStart, rs.tokens.join(','), rs.universeSize, rs.topN, rs.cap, rs.reserve, parking.choice, cfg.enabled.mvrv, tpiCfg.ltpiSource, tpiCfg.hyst].join('|') : '';
+  const rspsKey = model ? ['r2.28', model.dates.at(-1), effStart, rs.tokens.join(','), rs.universeSize, rs.topN, rs.cap, rs.reserve, parking.choice, cfg.enabled.mvrv, tpiCfg.ltpiSource, tpiCfg.hyst].join('|') : '';
   const rspsRunRes = rspsCache?.key === rspsKey ? rspsCache.run : saved?.key === rspsKey ? saved.run : null;
 
   async function runRsps() {

@@ -115,7 +115,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
         <div className="note-text" style={{ padding: '0 14px 12px' }}>PAXG = tokenizowane złoto (1 token = 1 uncja, Binance PAXGUSDT). Domyślnie hierarchia: gdy złoto jest silne — w trendzie (4 średnie ≥ 0,5) i silniejsze od BTC (momentum relacji PAXG/BTC z 30/60/90 dni &gt; 0) — rezerwa idzie w złoto; inaczej w BTC × trend (gdy LTPI z BTC dodatnie); inaczej stablecoin. Backtest od 2020, portfel z przechyłem (research/run50.py): BTC→stable — CAGR 65,5%, obsunięcie −29,3%, Sharpe 2024→ 1,00; BTC→złoto — 68,2%, −28,1%, 1,13; złoto→BTC→stable — 71,4%, −26,7%, 1,25 (sam RSPS 2020–23: 1,55 vs 1,59). Sam trend złota bez porównania z BTC wypychał BTC i obniżał zwrot (51%). Złoto mocno rosło w 2024–2026; PAXG ma dane od 08.2020.{scan?.gold ? ` Dziś złoto: trend ${scan.gold.trend.toFixed(2)}, ${scan.gold.ratioMom ? 'silniejsze' : 'słabsze'} od BTC.` : ''}</div>
       </Card>
 
-      <div className="section-title">Skaner (top {s.universeSize} wg płynności, bez memów)</div>
+      <div className="section-title">Skaner (top {s.universeSize} wg płynności z listy RSPS z kursu)</div>
       <Card className="tight">
         <div className="row"><span>Lista kandydatów</span><button className="text-btn" onClick={() => setTokOpen(true)}>{s.tokens.length} · Edytuj</button></div>
         <div className="row"><div className="grow"><div>Short-lista małych tokenów</div><div className="faint" style={{ fontSize: 12 }}>perpy na Hyperliquid, ≥ 10 mln $ wolumenu dziennie, maks. 10% wagi</div></div><button className="text-btn" onClick={() => setSmallOpen(true)}>{(s.small ?? []).length} · Edytuj</button></div>
@@ -166,7 +166,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
         <Row label="Siła względem BTC" value="średnia 14/28/56 dni" />
         <Row label="Bramka szerokości" value="wejście ≥ 70%, wyjście < 60%" />
         <Row label="Pozycje / limit" value={`maks. ${s.topN} · ${s.cap}% na token`} />
-        <div className="note-text" style={{ padding: '4px 16px 14px' }}>Wybrane na danych 2020–2023, sprawdzone poza próbą 01.2024–10.2026 (Binance, 35 tokenów bez memów). Strategia jest wrażliwa na koszty: przy dziennym przeglądzie używaj zleceń z niską prowizją (≤ 0,1%).</div>
+        <div className="note-text" style={{ padding: '4px 16px 14px' }}>Lista kandydatów = lista tokenów RSPS z kursu (handel na Hyperliquid). Backtest od 2020 (research/run70.py) na danych Binance, a dla tokenów bez Binance na perpach Hyperliquid (bez fundingu). Strategia jest wrażliwa na koszty: przy dziennym przeglądzie używaj zleceń z niską prowizją (≤ 0,1%).</div>
       </Card>
 
       <div className="section-title">Historia reżimów</div>
@@ -188,7 +188,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
       <Sheet open={info} onClose={() => setInfo(false)} title="Jak działa RSPS">
         <div className="note-text" style={{ fontSize: 14.5 }}>
           <p><b className="accent">Podział kapitału.</b> SDCA {split}% (zakładka SDCA) + RSPS {100 - split}% — ten sam cel co w Portfelu ({SPLIT_SDCA}/{100 - SPLIT_SDCA}, przy przechyle {SPLIT_TILT}/{100 - SPLIT_TILT}, gdy LTPI z $TOTAL dodatnie). Rebalans przy odchyleniu ±10 p.p. Dźwignia i shorty nie są częścią alokacji, pojawiają się tylko jako propozycje w sygnale.</p>
-          <p><b className="accent">RSPS.</b> Codziennie, spośród {s.universeSize} najpłynniejszych dużych tokenów (bez memów), wybiera do {s.topN} najsilniejszych względem BTC (średnia momentum ratio z 14/28/56 dni podzielona przez zmienność). Włącza się, gdy ≥ 70% tokenów ma ratio do BTC nad 50-dniową średnią, i wyłącza dopiero poniżej 60%; trend BTC ≥ 0,5 i LTPI ≥ 0. W przeciwnym razie część RSPS trzyma BTC proporcjonalnie do trendu.</p>
+          <p><b className="accent">RSPS.</b> Codziennie, spośród {s.universeSize} najpłynniejszych tokenów z listy RSPS z kursu, wybiera do {s.topN} najsilniejszych względem BTC (średnia momentum ratio z 14/28/56 dni podzielona przez zmienność). Włącza się, gdy ≥ 70% tokenów ma ratio do BTC nad 50-dniową średnią, i wyłącza dopiero poniżej 60%; trend BTC ≥ 0,5 i LTPI ≥ 0. W przeciwnym razie część RSPS trzyma BTC proporcjonalnie do trendu.</p>
           <p><b className="accent">Piramida.</b> Siedem rodzajów analizy w kolejności ważności, wagi metodą ROC (Barron i Barrett 1996). Systematyzacja, on-chain, istotność statystyczna i sentyment aktualizują się automatycznie po zamknięciu świecy 00:00 UTC; ekonomia fundamentalna, makro i analiza techniczna są ręczne i ważne 7 dni.</p>
           <p><b className="accent">Aktualizacja.</b> iOS nie pozwala aplikacjom webowym działać w tle, więc przeliczenie następuje przy pierwszym otwarciu aplikacji po 00:00 UTC (albo automatycznie, jeśli jest wtedy otwarta).</p>
           <p className="faint">Wyniki z backtestu: research/ w repozytorium. Narzędzie analityczne, nie porada inwestycyjna.</p>

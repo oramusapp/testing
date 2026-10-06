@@ -376,3 +376,15 @@ badań. Usuwanie „słabych” coinów z listy na podstawie tej tabeli byłoby 
 Baza 2.33: IS Sharpe 2,02, CAGR 118,4, DD −25,4; 2024→ 1,31 / 53,7. Rotacja co 2 dni — 1,97, DD −31,4; zespół okien 7/14/21/28/42/56 —
 2,03 (+0,01, poniżej progu; 2024→ 1,35 / 56,1 — nie wolno brać pod uwagę); wymóg ratio nad średnią 50 d — 2,02 (bez zmian);
 szerokość jako odsetek coinów z dodatnią siłą — 1,83, DD −39,0. Żaden nie przeszedł.
+
+## Lista tokenów RSPS z kursu (run70.py) — wdrożona w 2.35.0
+Lista użytkownika (37 tokenów + CASH, handel na Hyperliquid). Dane: Binance; bez Binance (HYPE, FARTCOIN, MON, LIT — na Binance „LIT” to
+inny token, AERO) i wcześniejsze dni PUMP/XPL/WLFI/ASTER — perpy Hyperliquid (bez fundingu). Ten sam silnik i zasady (2.33), portfel od 2020
+(CAGR / DD / IS Sharpe / 2024→ Sharpe i CAGR): lista aplikacji — 91,2 / −25,9 / 2,08 / 1,33 / 55,4; ta sama lista tylko z coinami handlowalnymi
+na HL (≥ 10 mln $ dziennie: ETH, HYPE, XRP, SOL, ADA, AVAX, LTC, NEAR, UNI, AAVE, SUI, ARB) — 85,0 / −31,1 / 1,87 / 1,38 / 59,6; lista z kursu —
+85,9 / −31,7 / 1,92 / 1,42 / 61,8; bez memów — 82,0 / −26,7 / 1,94 / 1,29 / 51,9; suma list — 85,9 / −35,9 / 1,97 / 1,29 / 55,0.
+Połowa dotychczasowej listy nie ma na HL perpów lub wolumenu ≥ 10 mln $ (BNB 9, LINK 8,8, TRX, DOT, BCH, XLM, ATOM, ETC, ICP, FIL, POL, ALGO,
+HBAR, APT, OP, INJ < 10; XTZ, VET, TON, MANA brak), więc jej wynik był nieosiągalny przy handlu na HL. Wobec realnej bazy lista z kursu
+przechodzi regułę (Sharpe +0,05, CAGR nie niższy, DD −0,6 pp). Zastrzeżenie: lista powstała w 2026 r. (wiedza o tym, które tokeny przetrwały).
+Trafność (lista z kursu): największy wkład BNB +64%, ADA +48%, ETH +40%, XRP +39%, DOGE +26%, SOL +19%, LINK +15%, HYPE +12%; ujemny: SUI −9%,
+SHIB −9%, LTC −8%, DOT −6%, ENA −4%; nigdy niewybrane m.in. TAO, ONDO, PENDLE, AAVE, APT, CRV, nowe tokeny 2025.

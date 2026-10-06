@@ -11,9 +11,10 @@ import { SDCA_DEFAULTS, manualLtpiActive, type LtpiState, type SdcaSettings } fr
 import { useBtc } from './btcStore';
 import { composite, freshManual } from './sdcaModel';
 
-// Large-cap, non-meme candidates (Binance <SYMBOL>USDT). The scanner keeps the 10 most liquid.
-export const DEFAULT_TOKENS = ['ETH', 'HYPE', 'BNB', 'XRP', 'SOL', 'ADA', 'TRX', 'LINK', 'AVAX', 'DOT', 'LTC', 'BCH', 'XLM', 'ATOM', 'NEAR', 'UNI', 'AAVE', 'ETC', 'ICP',
-  'FIL', 'POL', 'ALGO', 'XTZ', 'VET', 'HBAR', 'APT', 'SUI', 'TON', 'ARB', 'OP', 'INJ', 'MANA'];
+// RSPS candidates = the course's RSPS token list (2.35.0; user's screenshot, execution on Hyperliquid). research/run70.py:
+// against the app's former list restricted to coins tradable on Hyperliquid (≥ $10M/day), portfolio 2020–23 Sharpe
+// 1.87 → 1.92, CAGR 85.0 → 85.9%, max DD −31.1 → −31.7%; 2024→ 1.38 → 1.42. The scanner keeps the 10 most liquid.
+export const DEFAULT_TOKENS = ['ETH', 'SOL', 'AVAX', 'BNB', 'LTC', 'DOGE', 'SUI', 'PEPE', 'CRV', 'LINK', 'XRP', 'APT', 'AAVE', 'WLD', 'TRX', 'SHIB', 'UNI', 'DOT', 'ADA', 'PENDLE', 'NEAR', 'ONDO', 'TAO', 'ENA', 'HYPE', 'FARTCOIN', 'PUMP', 'XPL', 'WLFI', 'ASTER', 'ZEC', 'MON', 'AERO', 'LIT', 'XMR'];
 /** Fixed coins (user's choice): always candidates, ranked by strength like every other coin, no priority. The rest are
  *  the most liquid tokens (point in time). Tiers from the notes (large vs small caps as groups) lowered the honest,
  *  point-in-time result (research/run57–58.py), so they are not used; adding these coins to the pool is neutral (run58). */
@@ -22,7 +23,8 @@ export const CORE = ['ETH', 'SOL', 'XRP', 'SUI', 'HYPE'];
  *  volume; it competes on strength like every candidate, with at most 10% of the RSPS part. Not in the backtest — there is
  *  no point-in-time history of such a hand-made list, so its effect cannot be measured honestly. */
 export const SMALL_MIN_VOL = 10e6, SMALL_CAP = 0.10;
-export const MEME = ['DOGE', 'SHIB', 'PEPE', 'WIF', 'BONK', 'FLOKI', 'TRUMP', 'MEME', 'BOME', 'POPCAT'];
+// memes outside the course list stay blocked; DOGE, SHIB, PEPE, FARTCOIN and PUMP are on the course list (run70: with them 2020–23 Sharpe 1.92 vs 1.94 without, CAGR 85.9 vs 82.0%)
+export const MEME = ['WIF', 'BONK', 'FLOKI', 'TRUMP', 'MEME', 'BOME', 'POPCAT'];
 
 // Parameters chosen on 2020–2023 data, tested out of sample 2024-01…2026-10 on Binance data (research/run9–13.py).
 /** reserve: where the RSPS share that is not in coins sits — stablecoin, tokenized gold (PAXG) or PAXG only while gold trends up. */
