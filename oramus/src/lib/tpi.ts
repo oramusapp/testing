@@ -125,6 +125,21 @@ export function hysteresis(tpi: S, h = HYSTERESIS): S {
   return out;
 }
 
+/** LTPI persistence (42 Macro: a regime change that reverses within days is a false alarm): a new LTPI state counts only
+ *  after it has held LTPI_PERSIST consecutive closes. research/run64.py: 3–10 days all better on 2020–23 (portfolio Sharpe
+ *  1.97 → 2.01–2.02); SDCA alone better Sharpe at 21/21 start dates 2018–23 with the same median drawdown; 2024→ about
+ *  equal (CAGR 55.0 → 53.7%). 5 = middle of that range. */
+export const LTPI_PERSIST = 5;
+export function persistState(s: S, n = LTPI_PERSIST): S {
+  if (!s.length) return [];
+  let cur = s[0], last = s[0], run = 0;
+  return s.map((x) => {
+    if (Math.sign(x) !== Math.sign(last)) { run = 1; last = x; } else run++;
+    if (Math.sign(x) !== Math.sign(cur) && run >= n) cur = x;
+    return cur;
+  });
+}
+
 export interface TpiSignificance { h: number; up: number; down: number; all: number; nUp: number; nDown: number; t: number; }
 export interface TpiResult {
   value: number; series: S; state: number; stateSeries: S;
@@ -151,7 +166,7 @@ export function computeTpi(prices: S, spec: TpiSpec[], window = 1500, h = HYSTER
   const p = prices.slice(-window);
   const votes = spec.map((s) => ({ name: s.name, v: s.fn(p) }));
   const series = p.map((_, i) => votes.reduce((a, x) => a + x.v[i], 0) / votes.length);
-  const stateSeries = hysteresis(series, h);
+  const stateSeries = spec === LTPI_SPEC ? persistState(hysteresis(series, h)) : hysteresis(series, h);
   const flips = (v: S) => { const a = v.slice(-730); let n = 0; for (let i = 1; i < a.length; i++) if (a[i] !== a[i - 1]) n++; return (n * 365) / Math.max(a.length - 1, 1); };
   const n = series.length;
   return {

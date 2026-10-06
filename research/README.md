@@ -332,3 +332,12 @@ Sharpe lepszy 6/21 → ODRZUCONE (zostaje × 0,25). Kupno × 1,5: DD gorsze 21/2
 Sharpe 11/21 → odrzucone. Kontrola wdrożonego PR × 2 (2.22) vs × 1: mediana CAGR 44,0 → 48,5%, mediana DD −32,7 → −33,2%, najgorsze
 −37,2 → −40,9%, Sharpe lepszy 11/21 — to wymiana zwrotu na ryzyko, nie darmowa poprawa; zostaje (mieści się w regule użytkownika
 „+zwrot za niewiele większe obsunięcie”), ale opisane uczciwie. Wynik uczciwy strategii bez zmian: 2.26 / 2.29.
+
+## Pomysły z raportu 42 Macro (metody, bez treści raportu) i filtr trwałości LTPI (run64.py) — 2.32.0
+Reguła jak w run60 + test 21 startów dla SDCA. R1 limit BTC w SDCA wg trendu × LTPI (KISS) — IS Sharpe 1,94, odrzucone; R1b tylko przy
+ryzyku ≥ 50 — bez zmian; R2 RSPS połowa zamiast wyjścia przy LTPI<0 — 2,00 (za mało, DD −25,9); R6 przechył tylko przy silnym impulsie
+$TOTAL — 2,01, ale CAGR niższy; R6b silny impuls − blokuje RSPS — 1,98. R4 trwałość zmiany stanu LTPI (BTC i $TOTAL): 3 d — 2,01;
+5 d — 2,02; 7 d — 2,01; 10 d — 2,01; 12 d — 1,97; 15 d — 1,94; 21 d — 2,04 przy DD −28,9 → stabilny obszar 3–10 dni, wybrane 5 d.
+2024→: CAGR 55,0 → 53,7%, Sharpe 1,32 → 1,31 (bez poprawy). SDCA, 21 startów 2018–2023 (do końca 2023): mediana CAGR 48,5 → 54,0%,
+mediana DD bez zmian (−33,2%), najgorsze −40,9 → −41,4%, Sharpe lepszy 21/21. Niewykonalne tu (brak danych w środowisku):
+weto płynności z dolara i rentowności (FRED), filtr zatłoczenia z funding rate, rynkowa macierz reżimów (SPX, DXY, VIX).

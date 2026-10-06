@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import data from '../data-btc.json';
 import fx from './tpi.fixture.json';
-import { MTPI_SPEC, LTPI_SPEC, hysteresis } from './tpi';
+import { MTPI_SPEC, LTPI_SPEC, hysteresis, persistState } from './tpi';
 
 const prices = (data as any).rows.map((r: any[]) => r[1] as number);
 
@@ -25,5 +25,9 @@ describe('TPI parity with research/tpi.py', () => {
   });
   it('default threshold 0 follows the sign (course notes)', () => {
     expect(hysteresis([0.1, 0.3, -0.1, 0, 0.15])).toEqual([1, 1, -1, -1, 1]);
+  });
+  it('LTPI persistence ignores flips shorter than n closes', () => {
+    expect(persistState([1, 1, -1, -1, 1, 1, 1], 3)).toEqual([1, 1, 1, 1, 1, 1, 1]);
+    expect(persistState([1, -1, -1, -1, -1], 3)).toEqual([1, 1, 1, -1, -1]);
   });
 });
