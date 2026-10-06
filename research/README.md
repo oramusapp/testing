@@ -359,3 +359,8 @@ Od 2020 (CAGR / maks. DD / Sharpe): SDCA sam 53,9 / −35,0 / 1,36; RSPS sam 100
 vs obecny −25,2. Okna 365 dni: strata w 10% okien (RSPS) vs 4% (obecny), mediana 48,5% vs 53,5%. Wniosek: SDCA obniża zwrot, ale
 obniża (nie podnosi) maks. obsunięcie i podnosi Sharpe; RSPS sam zawiera 758% z 2021 i błąd przeżywalności (dzisiejsza lista coinów),
 więc jego przewaga jest zawyżona. Większy udział RSPS to wymiana zwrotu na ryzyko — decyzja użytkownika.
+
+## Opcja „przechył 40/60 → 20/80” (run67.py) — niewdrożona
+Okna 365 d (n=71): wyższy zwrot w 61% okien, ale mediana 54% → 42%; okna 730 d (n=58): 53% okien, mediana 148% → 142%, najgorsze
++11% → 0%; DD zawsze gorsze (najgorsze −25,4 → −29,7%). Przewaga za cały okres głównie z 2021 (347% → 557%), gdzie RSPS jest najbardziej
+zawyżone błędem przeżywalności. Zostaje 60/40 → 40/60.
