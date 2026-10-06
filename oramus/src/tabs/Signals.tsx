@@ -136,8 +136,9 @@ export default function Signals() {
         const p = px(sym); if (!Number.isFinite(p)) continue;
         const have = (H.rsps[sym] ?? 0) * p, diff = (want[sym] ?? 0) - have;
         if (Math.abs(diff) < Math.max(MIN_TRADE_USD, MIN_TRADE_FRAC * rspsVal)) continue;
+        const ven = R.scan?.rows.find((x) => x.sym === sym)?.venues;
         orders.push({ id: 'rsps-' + sym, sleeve: 'RSPS', side: diff > 0 ? 'buy' : 'sell', sym, usd: Math.abs(diff), units: Math.abs(diff) / p,
-          why: want[sym] ? `cel ${pct((want[sym] / rspsVal) * 100, 0)} części RSPS` : R.regime === 'rsps' ? 'wypadł z wyboru' : 'bramka zamknięta / LTPI' });
+          why: (want[sym] ? `cel ${pct((want[sym] / rspsVal) * 100, 0)} części RSPS` : R.regime === 'rsps' ? 'wypadł z wyboru' : 'bramka zamknięta / LTPI') + (ven?.length ? ` · ${ven.join(' / ')}` : '') });
       }
     }
     if (H && total > 0 && Math.abs(sdcaShare - splitSdca / 100) > BAND) {

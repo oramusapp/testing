@@ -82,6 +82,21 @@ export async function hlPerps(): Promise<Map<string, { vol: number; delisted: bo
   } finally { clearTimeout(id); }
 }
 
+/** Bybit USDT markets (spot + linear perps) that are trading. Cached; when Bybit does not answer the last list is used for
+ *  up to 7 days, otherwise null (unknown). */
+export async function bybitListing(): Promise<Set<string> | null> {
+  const get1 = async (cat: string) => {
+    const j = await getJSON(`https://api.bybit.com/v5/market/instruments-info?category=${cat}&limit=1000`, 15000);
+    return ((j?.result?.list ?? []) as { baseCoin: string; quoteCoin: string; status: string }[]).filter((x) => x.quoteCoin === 'USDT' && x.status === 'Trading').map((x) => x.baseCoin.toUpperCase());
+  };
+  try {
+    const syms = [...new Set([...(await get1('spot')), ...(await get1('linear'))])];
+    if (syms.length > 50) { await set('bybit.list', { time: Date.now(), syms }, cacheStore); return new Set(syms); }
+  } catch { /* fall back to the cache */ }
+  const c = await get<{ time: number; syms: string[] }>('bybit.list', cacheStore);
+  return c && Date.now() - c.time < 7 * DAY ? new Set(c.syms) : null;
+}
+
 export async function ticker(symbols: string[]) {
   for (const host of BINANCE) {
     try {

@@ -388,3 +388,9 @@ HBAR, APT, OP, INJ < 10; XTZ, VET, TON, MANA brak), więc jej wynik był nieosi�
 przechodzi regułę (Sharpe +0,05, CAGR nie niższy, DD −0,6 pp). Zastrzeżenie: lista powstała w 2026 r. (wiedza o tym, które tokeny przetrwały).
 Trafność (lista z kursu): największy wkład BNB +64%, ADA +48%, ETH +40%, XRP +39%, DOGE +26%, SOL +19%, LINK +15%, HYPE +12%; ujemny: SUI −9%,
 SHIB −9%, LTC −8%, DOT −6%, ENA −4%; nigdy niewybrane m.in. TAO, ONDO, PENDLE, AAVE, APT, CRV, nowe tokeny 2025.
+
+## Lista kurs + dawna lista na Bybit (2.36.0, wybór użytkownika)
+Użytkownik handluje na Bybit i Hyperliquid: kandydaci = lista z kursu + dawna lista aplikacji, ta druga tylko gdy jest na Bybit (spot
+lub perpy USDT, sprawdzane w aplikacji — Bybit blokuje region środowiska badań, więc tu nie dało się tego zweryfikować). Backtest sumy
+list (run70, wszystkie dawne tokeny, bo historia notowań na Bybit nieznana): portfel CAGR 85,9%, DD −35,9%, IS 1,97, 2024→ 1,29 / 55,0%;
+sama lista z kursu: 85,9%, −31,7%, 1,92, 1,42 / 61,8%. Suma nie przechodzi reguły (DD gorsze o 4,2 pp) — wdrożona na wyraźne życzenie.

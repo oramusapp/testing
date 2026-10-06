@@ -7,7 +7,7 @@ import { useEffect, useState, useCallback } from 'react';
 const kv = createStore('oramus', 'kv');
 const files = createStore('oramus-files', 'files');
 
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 const cache = new Map<string, unknown>();
 const listeners = new Map<string, Set<(v: unknown) => void>>();
 
@@ -72,6 +72,11 @@ const MIGRATIONS: Record<number, () => Promise<void>> = {
   8: async () => {
     const st = cache.get('rsps.settings') as Record<string, unknown> | undefined;
     if (st) await save('rsps.settings', { ...st, tokens: ['ETH', 'SOL', 'AVAX', 'BNB', 'LTC', 'DOGE', 'SUI', 'PEPE', 'CRV', 'LINK', 'XRP', 'APT', 'AAVE', 'WLD', 'TRX', 'SHIB', 'UNI', 'DOT', 'ADA', 'PENDLE', 'NEAR', 'ONDO', 'TAO', 'ENA', 'HYPE', 'FARTCOIN', 'PUMP', 'XPL', 'WLFI', 'ASTER', 'ZEC', 'MON', 'AERO', 'LIT', 'XMR'] });
+  },
+  // 2.36.0: candidates = course list (Hyperliquid) + the former list (counted only while it trades on Bybit)
+  9: async () => {
+    const st = cache.get('rsps.settings') as { tokens?: string[] } | undefined;
+    if (st?.tokens) await save('rsps.settings', { ...st, tokens: [...new Set([...st.tokens, 'ETH', 'HYPE', 'BNB', 'XRP', 'SOL', 'ADA', 'TRX', 'LINK', 'AVAX', 'DOT', 'LTC', 'BCH', 'XLM', 'ATOM', 'NEAR', 'UNI', 'AAVE', 'ETC', 'ICP', 'FIL', 'POL', 'ALGO', 'XTZ', 'VET', 'HBAR', 'APT', 'SUI', 'TON', 'ARB', 'OP', 'INJ', 'MANA'])] });
   }
 };
 

@@ -115,7 +115,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
         <div className="note-text" style={{ padding: '0 14px 12px' }}>PAXG = tokenizowane złoto (1 token = 1 uncja, Binance PAXGUSDT). Domyślnie hierarchia: gdy złoto jest silne — w trendzie (4 średnie ≥ 0,5) i silniejsze od BTC (momentum relacji PAXG/BTC z 30/60/90 dni &gt; 0) — rezerwa idzie w złoto; inaczej w BTC × trend (gdy LTPI z BTC dodatnie); inaczej stablecoin. Backtest od 2020, portfel z przechyłem (research/run50.py): BTC→stable — CAGR 65,5%, obsunięcie −29,3%, Sharpe 2024→ 1,00; BTC→złoto — 68,2%, −28,1%, 1,13; złoto→BTC→stable — 71,4%, −26,7%, 1,25 (sam RSPS 2020–23: 1,55 vs 1,59). Sam trend złota bez porównania z BTC wypychał BTC i obniżał zwrot (51%). Złoto mocno rosło w 2024–2026; PAXG ma dane od 08.2020.{scan?.gold ? ` Dziś złoto: trend ${scan.gold.trend.toFixed(2)}, ${scan.gold.ratioMom ? 'silniejsze' : 'słabsze'} od BTC.` : ''}</div>
       </Card>
 
-      <div className="section-title">Skaner (top {s.universeSize} wg płynności z listy RSPS z kursu)</div>
+      <div className="section-title">Skaner (top {s.universeSize} wg płynności · kurs + Bybit)</div>
       <Card className="tight">
         <div className="row"><span>Lista kandydatów</span><button className="text-btn" onClick={() => setTokOpen(true)}>{s.tokens.length} · Edytuj</button></div>
         <div className="row"><div className="grow"><div>Short-lista małych tokenów</div><div className="faint" style={{ fontSize: 12 }}>perpy na Hyperliquid, ≥ 10 mln $ wolumenu dziennie, maks. 10% wagi</div></div><button className="text-btn" onClick={() => setSmallOpen(true)}>{(s.small ?? []).length} · Edytuj</button></div>
@@ -130,7 +130,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
                     const w = r.bench ? sleeve.find((x) => x.sym === 'BTC')?.w : regime === 'rsps' ? picks.sel.find((x) => x.sym === r.sym)?.w : undefined;
                     return (
                       <tr key={r.sym} style={{ opacity: r.inUniverse ? 1 : 0.45, background: w ? 'var(--accent-soft)' : undefined }}>
-                        <td style={{ paddingLeft: 16 }}><b>{r.sym}</b>{r.small && <span className="faint" style={{ fontSize: 11 }}> mały{r.hlVol ? ` · ${Math.round(r.hlVol / 1e6)} mln $` : ''}</span>}{r.core && <span className="faint" style={{ fontSize: 11 }}> stały</span>}{r.error && <div className="red" style={{ fontSize: 11 }}>{r.error}</div>}</td>
+                        <td style={{ paddingLeft: 16 }}><b>{r.sym}</b>{r.venues && r.venues.length > 0 && <div className="faint" style={{ fontSize: 10.5 }}>{r.venues.join(' · ')}</div>}{r.small && <span className="faint" style={{ fontSize: 11 }}> mały{r.hlVol ? ` · ${Math.round(r.hlVol / 1e6)} mln $` : ''}</span>}{r.core && <span className="faint" style={{ fontSize: 11 }}> stały</span>}{r.error && <div className="red" style={{ fontSize: 11 }}>{r.error}</div>}</td>
                         <td className={r.bench ? 'dim' : r.ratioUp ? 'green' : 'red'}>{r.error || r.bench ? (r.bench ? '—' : '') : r.ratioUp ? '▲' : '▼'}</td>
                         <td>{r.bench ? <span className="dim">wzorzec</span> : signed(r.score)}</td><td>{r.error ? '' : r.trend.toFixed(2)}</td>
                         <td className={r.ret >= 0 ? 'green' : 'red'}>{pct(r.ret, 0, true)}</td><td className="dim">{pct(r.vol, 0)}</td>
@@ -166,7 +166,7 @@ export default function Rsps({ nav }: { nav?: React.ReactNode }) {
         <Row label="Siła względem BTC" value="średnia 14/28/56 dni" />
         <Row label="Bramka szerokości" value="wejście ≥ 70%, wyjście < 60%" />
         <Row label="Pozycje / limit" value={`maks. ${s.topN} · ${s.cap}% na token`} />
-        <div className="note-text" style={{ padding: '4px 16px 14px' }}>Lista kandydatów = lista tokenów RSPS z kursu (handel na Hyperliquid). Backtest od 2020 (research/run70.py) na danych Binance, a dla tokenów bez Binance na perpach Hyperliquid (bez fundingu). Strategia jest wrażliwa na koszty: przy dziennym przeglądzie używaj zleceń z niską prowizją (≤ 0,1%).</div>
+        <div className="note-text" style={{ padding: '4px 16px 14px' }}>Lista kandydatów = lista tokenów RSPS z kursu (Hyperliquid) + dawna lista aplikacji, ta druga tylko gdy token jest na Bybit (sprawdzane przy każdym skanie; przy tokenie widać, gdzie jest notowany). Backtest połączonej listy (run70): portfel CAGR 85,9%, maks. obsunięcie −35,9%, Sharpe 2020–23 1,97, 2024→ 1,29 — sama lista z kursu: 85,9%, −31,7%, 1,92, 1,42. Backtest od 2020 (research/run70.py) na danych Binance, a dla tokenów bez Binance na perpach Hyperliquid (bez fundingu). Strategia jest wrażliwa na koszty: przy dziennym przeglądzie używaj zleceń z niską prowizją (≤ 0,1%).</div>
       </Card>
 
       <div className="section-title">Historia reżimów</div>

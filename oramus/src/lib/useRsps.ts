@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from '../components/ui';
 import { usePersisted } from './db';
-import { klines, klinesAny, lastClosedDay, hlPerps } from './market';
+import { klines, klinesAny, lastClosedDay, hlPerps, bybitListing } from './market';
 import { annVol, capWeights, ratios, linfit, vams3 } from './quant';
 import { leverageGate, PILLARS, isFresh } from './pyramid';
 import { usePyramid } from './pyramidStore';
@@ -14,7 +14,10 @@ import { composite, freshManual } from './sdcaModel';
 // RSPS candidates = the course's RSPS token list (2.35.0; user's screenshot, execution on Hyperliquid). research/run70.py:
 // against the app's former list restricted to coins tradable on Hyperliquid (≥ $10M/day), portfolio 2020–23 Sharpe
 // 1.87 → 1.92, CAGR 85.0 → 85.9%, max DD −31.1 → −31.7%; 2024→ 1.38 → 1.42. The scanner keeps the 10 most liquid.
-export const DEFAULT_TOKENS = ['ETH', 'SOL', 'AVAX', 'BNB', 'LTC', 'DOGE', 'SUI', 'PEPE', 'CRV', 'LINK', 'XRP', 'APT', 'AAVE', 'WLD', 'TRX', 'SHIB', 'UNI', 'DOT', 'ADA', 'PENDLE', 'NEAR', 'ONDO', 'TAO', 'ENA', 'HYPE', 'FARTCOIN', 'PUMP', 'XPL', 'WLFI', 'ASTER', 'ZEC', 'MON', 'AERO', 'LIT', 'XMR'];
+export const COURSE_TOKENS = ['ETH', 'SOL', 'AVAX', 'BNB', 'LTC', 'DOGE', 'SUI', 'PEPE', 'CRV', 'LINK', 'XRP', 'APT', 'AAVE', 'WLD', 'TRX', 'SHIB', 'UNI', 'DOT', 'ADA', 'PENDLE', 'NEAR', 'ONDO', 'TAO', 'ENA', 'HYPE', 'FARTCOIN', 'PUMP', 'XPL', 'WLFI', 'ASTER', 'ZEC', 'MON', 'AERO', 'LIT', 'XMR'];
+/** The app's list before 2.35; these count only while they trade on Bybit (user trades on Bybit and Hyperliquid). */
+export const LEGACY_TOKENS = ['ETH', 'HYPE', 'BNB', 'XRP', 'SOL', 'ADA', 'TRX', 'LINK', 'AVAX', 'DOT', 'LTC', 'BCH', 'XLM', 'ATOM', 'NEAR', 'UNI', 'AAVE', 'ETC', 'ICP', 'FIL', 'POL', 'ALGO', 'XTZ', 'VET', 'HBAR', 'APT', 'SUI', 'TON', 'ARB', 'OP', 'INJ', 'MANA'];
+export const DEFAULT_TOKENS = [...new Set([...COURSE_TOKENS, ...LEGACY_TOKENS])];
 /** Fixed coins (user's choice): always candidates, ranked by strength like every other coin, no priority. The rest are
  *  the most liquid tokens (point in time). Tiers from the notes (large vs small caps as groups) lowered the honest,
  *  point-in-time result (research/run57–58.py), so they are not used; adding these coins to the pool is neutral (run58). */
@@ -44,7 +47,7 @@ export const SPLIT_SDCA = 60;
 // 2020→: CAGR 51.0% → 54.2%, max drawdown −25.0% → −29.7%, Sharpe 2024→ 1.10 → 1.05.
 export const SPLIT_TILT = 40;
 export const splitTarget = (tilt: boolean, totalLtpi: number | undefined) => (tilt && (totalLtpi ?? 0) > 0 ? SPLIT_TILT : SPLIT_SDCA);
-export interface ScanRow { small?: boolean; hlVol?: number; core?: boolean; sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; bench?: boolean; sharpe?: number; sortino?: number; omega?: number; corrBtc?: number; }
+export interface ScanRow { venues?: string[]; small?: boolean; hlVol?: number; core?: boolean; sym: string; price: number; ret: number; vol: number; liq: number; ratioUp: boolean; trend: number; score: number; inUniverse?: boolean; error?: string; bench?: boolean; sharpe?: number; sortino?: number; omega?: number; corrBtc?: number; }
 export interface Scan { time: number; closeDate: string; rows: ScanRow[]; breadth: number; btcTrend: number; gateOpen: boolean; gateSince?: string; gold?: { price: number; trend: number; ratioUp?: boolean; ratioMom?: boolean } }
 interface LogEntry { time: number; regime: string; lev?: number; }
 
@@ -117,11 +120,19 @@ export function useRsps() {
       const rows: ScanRow[] = [];
       const smallList = (s.small ?? []).map((x) => x.toUpperCase()).filter((x) => !CORE.includes(x) && !s.tokens.includes(x));
       let perps: Map<string, { vol: number; delisted: boolean }> | null = null;
-      if (smallList.length) { try { perps = await hlPerps(); } catch { perps = null; } }
+      try { perps = await hlPerps(); } catch { perps = null; }
+      const bybit = await bybitListing();
+      const onHl = (x: string) => { const p = perps?.get(x) ?? perps?.get('K' + x); return !!p && !p.delisted; };
       await Promise.all([...new Set([...CORE, ...s.tokens, ...smallList])].filter((t) => !MEME.includes(t)).map(async (sym) => {
         const isSmall = smallList.includes(sym);
-        const hp = perps?.get(sym);
+        const hp = perps?.get(sym) ?? perps?.get('K' + sym);
+        const venues = [...(bybit?.has(sym) ? ['Bybit'] : []), ...(onHl(sym) ? ['Hyperliquid'] : [])];
         try {
+          // course tokens always count; the former list only while it trades on Bybit
+          if (!isSmall && !COURSE_TOKENS.includes(sym) && !CORE.includes(sym)) {
+            if (!bybit) throw new Error('nie udało się sprawdzić Bybit');
+            if (!bybit.has(sym)) throw new Error('brak na Bybit');
+          }
           if (isSmall) {
             if (!perps) throw new Error('brak danych z Hyperliquid');
             if (!hp || hp.delisted) throw new Error('brak perpów na Hyperliquid');
@@ -134,7 +145,7 @@ export function useRsps() {
           const r50 = ratio.slice(-51, -1).reduce((p, v) => p + v, 0) / 50;
           const vol = annVol(c, 30);
           rows.push({
-            small: isSmall || undefined, hlVol: hp?.vol, core: CORE.includes(sym), sym, price: c.at(-1)!, ret: (c.at(-1)! / c[c.length - 31] - 1) * 100, vol: vol * 100,
+            venues, small: isSmall || undefined, hlVol: hp?.vol, core: CORE.includes(sym), sym, price: c.at(-1)!, ret: (c.at(-1)! / c[c.length - 31] - 1) * 100, vol: vol * 100,
             liq: k.slice(-30).reduce((p, x) => p + (x.q ?? 0), 0) / 30, ratioUp: ratio.at(-1)! > r50, trend: trendOf(c),
             score: rsScore(ratio, vol),   // research definition: ratio log change / coin volatility, 14/28/56
             ...ratios(c, 365),
@@ -144,7 +155,7 @@ export function useRsps() {
               return linfit(ra, rb).r;
             })()
           });
-        } catch (e) { rows.push({ small: isSmall || undefined, hlVol: hp?.vol, sym, price: NaN, ret: NaN, vol: NaN, liq: 0, ratioUp: false, trend: 0, score: NaN, error: (e as Error).message }); }
+        } catch (e) { rows.push({ venues, small: isSmall || undefined, hlVol: hp?.vol, sym, price: NaN, ret: NaN, vol: NaN, liq: 0, ratioUp: false, trend: 0, score: NaN, error: (e as Error).message }); }
       }));
       // point-in-time universe: the N most liquid (30-day average quote volume)
       const ok = rows.filter((r) => !r.error && !r.small).sort((x, y) => y.liq - x.liq);   // short-list does not take top-N places
