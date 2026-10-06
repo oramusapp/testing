@@ -371,3 +371,8 @@ Epizodów trzymania altów: 171; trafne (coin lepszy od BTC w czasie trzymania):
 ETH +40%, XRP +27%, NEAR +23%, VET +18%, SUI +14%, LINK +14%, SOL +12%, AVAX +10%, UNI +10%. Ujemny wkład: ARB −15%, ETC −8%, LTC −7%,
 FIL −6%, OP −6%, POL −5%, XLM, INJ, DOT, BCH, HBAR (−2…−3%). Nigdy nie wybrane: ATOM, APT, TON, ALGO, AAVE. HYPE — brak danych w środowisku
 badań. Usuwanie „słabych” coinów z listy na podstawie tej tabeli byłoby dopasowaniem do historii (wiedza z przyszłości) — nie stosowane.
+
+## Kolejne pomysły RSPS (run69.py, reguła jak run60) — bez zmian
+Baza 2.33: IS Sharpe 2,02, CAGR 118,4, DD −25,4; 2024→ 1,31 / 53,7. Rotacja co 2 dni — 1,97, DD −31,4; zespół okien 7/14/21/28/42/56 —
+2,03 (+0,01, poniżej progu; 2024→ 1,35 / 56,1 — nie wolno brać pod uwagę); wymóg ratio nad średnią 50 d — 2,02 (bez zmian);
+szerokość jako odsetek coinów z dodatnią siłą — 1,83, DD −39,0. Żaden nie przeszedł.
