@@ -43,7 +43,7 @@ export function useValuation(auto?: Record<string, number>) {
   return { v, setV, zOf, manualFresh, longZ, medZ, filled, risk: longZ == null ? null : normCdf(-longZ) * 100 };
 }
 
-export function ValuationCard({ onUse, auto }: { onUse: (riskPct: number) => void; auto?: Record<string, number> }) {
+export function ValuationCard({ onUse, auto, mvrvAsOf, lastDate }: { onUse: (riskPct: number) => void; auto?: Record<string, number>; mvrvAsOf?: string | null; lastDate?: string }) {
   const val = useValuation(auto);
   const [txt, setTxt] = useState<Record<string, string>>({});
   const set = (id: string, t: string) => {
@@ -81,7 +81,7 @@ export function ValuationCard({ onUse, auto }: { onUse: (riskPct: number) => voi
       </div>
       {val.medZ != null && <div className="note-text mt8">Średni horyzont (osobno): {sz(val.medZ)}σ. Nie wchodzi do wyceny długoterminowej.</div>}
       <button className="btn block mt12" disabled={val.risk == null} onClick={() => { onUse(Math.round(val.risk! * 10) / 10); toast('Ustawiono jako wskaźnik ręczny'); }}>Użyj jako wskaźnik ręczny w Composite Risk</button>
-      <div className="note-text mt8">Wskaźniki oznaczone „auto” liczy aplikacja z ceny i MVRV (Coin Metrics); podaż i emisja według harmonogramu halvingów, z-score względem całej historii od 2011 — bez ręcznej oceny. Pozostałe wpisz ręcznie: z-score każdego wskaźnika (−3…+3, np. 1,5 lub −0,75). Konwencja TRW: plus = wysoka wartość (tanio, strefa akumulacji), minus = drogo (strefa sprzedaży); ±1,5–2σ to skrajności. Wszystkie wskaźniki mają równe wagi, więc błędy ocen się uśredniają. Wskaźniki o krótszym horyzoncie liczone są osobno. Wyższa jakość danych (on-chain, fundamenty) jest ważniejsza niż wskaźniki techniczne. Wynik zamieniany jest na ryzyko 0–100% wzorem Φ(−z) i może zasilić Composite Risk jako wskaźnik ręczny. {val.v.updated ? `Ostatnia zmiana: ${new Date(val.v.updated).toLocaleDateString('pl-PL')}.` : ''}</div>
+      <div className="note-text mt8">Wskaźniki oznaczone „auto” liczy aplikacja z ceny i MVRV (Coin Metrics); podaż i emisja to przybliżenie z harmonogramu halvingów (liniowo między halvingami, 144 bloki dziennie), z-score względem całej historii od 2011 — bez ręcznej oceny. Pozostałe wpisz ręcznie: z-score każdego wskaźnika (−3…+3, np. 1,5 lub −0,75). Konwencja TRW: plus = wysoka wartość (tanio, strefa akumulacji), minus = drogo (strefa sprzedaży); ±1,5–2σ to skrajności. Wszystkie wskaźniki mają równe wagi, więc błędy ocen się uśredniają. Wskaźniki o krótszym horyzoncie liczone są osobno. Wyższa jakość danych (on-chain, fundamenty) jest ważniejsza niż wskaźniki techniczne. Wynik zamieniany jest na ryzyko 0–100% wzorem Φ(−z) i może zasilić Composite Risk jako wskaźnik ręczny. {mvrvAsOf && lastDate && mvrvAsOf < lastDate ? `MVRV z Coin Metrics tylko do ${mvrvAsOf}; późniejsze dni szacowane z dzisiejszej ceny i ostatniej ceny zrealizowanej. ` : ''}{val.v.updated ? `Ostatnia zmiana: ${new Date(val.v.updated).toLocaleDateString('pl-PL')}.` : ''}</div>
     </Card>
   );
 }

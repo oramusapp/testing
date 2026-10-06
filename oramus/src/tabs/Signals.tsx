@@ -6,6 +6,7 @@ import { Chart } from '../components/Chart';
 import { stats, monthlyReport, monthOf, type Snapshot, type Flow, type MonthlyReport } from '../lib/performance';
 import { shareFile } from '../components/ui';
 import { useBtc } from '../lib/btcStore';
+import { lastClosedDay } from '../lib/market';
 import { composite, freshManual } from '../lib/sdcaModel';
 import { athSellSeries, backtest, belowProbableRange, curveRate, minBuyRate, probableRangeRate, safetyStep, slowBuyRate } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
@@ -100,7 +101,9 @@ export default function Signals() {
   const orders: Order[] = [];
   // SDCA reserve: the SDCA portfolio when it exists, otherwise the reserve and BTC entered in the SDCA tab (one value)
   const sdcaCash = H ? H.sdca[STABLE] : cfg.cash, sdcaBtc = H ? H.sdca.BTC : cfg.btcHeld;
-  if (sdcaState && (H || sdcaCash > 0 || sdcaBtc > 0)) {
+  // no orders on stale data: the model must be built on the last closed daily candle
+  const stale = !!sdcaState && sdcaState.date < lastClosedDay();
+  if (sdcaState && !stale && (H || sdcaCash > 0 || sdcaBtc > 0)) {
     const r = sdcaState.rate;
     if (r > 1e-6 && sdcaCash > 0) {
       const u = sdcaCash * r;
@@ -233,6 +236,7 @@ export default function Signals() {
     const p = amount && amount > 0 ? plan(amount) : null;
     return (
       <Screen title="Portfel" subtitle="Rozpisanie kapitału, codzienne zlecenia i rotacja">
+        {stale && <div className="warn-box mt12">Dane nieaktualne: model liczony na świecy {sdcaState!.date}, a ostatnia zamknięta to {lastClosedDay()}. Wskazówki wstrzymane do aktualizacji (sprawdź internet albo otwórz aplikację ponownie).</div>}
         <Card className="hero">
           <div className="eyebrow">Kwota na kryptowaluty</div>
           <NumInput value={amount} onChange={setAmount} placeholder="np. 10000" suffix="USD" />
@@ -263,6 +267,7 @@ export default function Signals() {
 
   return (
     <Screen title="Portfel" subtitle={`Codziennie po zamknięciu 00:00 UTC · dane ${sdcaState?.date ?? '—'}`}>
+      {stale && <div className="warn-box mt12">Dane nieaktualne: model liczony na świecy {sdcaState!.date}, a ostatnia zamknięta to {lastClosedDay()}. Wskazówki wstrzymane do aktualizacji (sprawdź internet albo otwórz aplikację ponownie).</div>}
       <Card className="hero">
         <div className="eyebrow">Kapitał na kryptowaluty</div>
         <div className="big-number">{usd(total, 0)}</div>

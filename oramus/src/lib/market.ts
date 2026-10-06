@@ -130,7 +130,7 @@ export async function refreshBtcHistory(h: BtcHistory, onProgress?: (msg: string
     }
     if (k.length) sources.push('Binance');
   } catch { /* offline */ }
-  const out = { rows, updated: Date.now(), source: sources.join(' + ') || h.source };
+  const out = { rows, updated: sources.length ? Date.now() : h.updated, source: sources.join(' + ') || h.source };   // updated stays old when nothing answered → 'offline' label
   if (sources.length) await set('btc', out, cacheStore);
   return out;
 }

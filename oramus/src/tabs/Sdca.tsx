@@ -3,7 +3,7 @@ import { Screen, Card, Row, Seg, Switch, NumInput, Sheet, Fold, shareFile, toast
 import { Chart, CurveEditor } from '../components/Chart';
 import { IcRefresh, IcInfo, IcPlus, IcTrash } from '../components/icons';
 import { useBtc, refresh } from '../lib/btcStore';
-import { freshToday } from '../lib/market';
+import { freshToday, lastClosedDay } from '../lib/market';
 import { askNotify, notifyPermission } from '../lib/notify';
 import { usePersisted } from '../lib/db';
 import type { Flow } from '../lib/performance';
@@ -47,7 +47,8 @@ const riskColor = (v: number) => ZONE_COLORS[riskZone(v).tone];
 
 export default function Sdca({ nav }: { nav?: React.ReactNode }) {
   const { model, status, busy, history } = useBtc();
-  const autoVal = useMemo(() => (history ? autoValuation(history.rows as [string, number, number | null][]).z : undefined), [history]);
+  const autoRes = useMemo(() => (history ? autoValuation(history.rows as [string, number, number | null][]) : undefined), [history]);
+  const autoVal = autoRes?.z;
   const [s, setS] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
   const [ltpi] = usePersisted<LtpiState>('signals.ltpi', { mode: 'proxy', manual: 0 });
   const [trades, setTrades] = usePersisted<Trade[]>('sdca.journal', []);
@@ -162,6 +163,7 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
       </>}>
 
       {/* ---- Today's model action ---- */}
+      {model.dates[last] < lastClosedDay() && !busy && <div className="warn-box">Dane nieaktualne: ostatnia świeca w modelu to {model.dates[last]}, a ostatnia zamknięta to {lastClosedDay()}. Akcja poniżej dotyczy starszego dnia — sprawdź internet albo odśwież.</div>}
       <Card className="hero">
         <div className="between"><div className="eyebrow" style={{ margin: 0 }}>Dzisiejsza akcja modelu</div><span className={'pill ' + zone.tone}><span className="dot" />{zone.label}</span></div>
         <div className={'mid-number mt12 ' + actionTone} style={{ fontSize: 28 }}>{actionTitle}</div>
@@ -256,7 +258,7 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
 
       </Fold>
       <Fold id="sdca.valuation" title="Wycena on-chain i narzędzia" hint="Arkusz z-score (część liczona automatycznie), tempo akumulacji, stożek wyników">
-      <ValuationCard auto={autoVal} onUse={(r) => upd({ manualRisk: r, manualUpdated: Date.now(), enabled: { ...cfg.enabled, manual: true } })} />
+      <ValuationCard auto={autoVal} mvrvAsOf={autoRes?.mvrvAsOf ?? null} lastDate={autoRes?.date} onUse={(r) => upd({ manualRisk: r, manualUpdated: Date.now(), enabled: { ...cfg.enabled, manual: true } })} />
       <AccumulationCalc cash={cash} />
 
       <div className="section-title">Poziomy pasm (na żywo)</div>
