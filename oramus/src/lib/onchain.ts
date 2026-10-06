@@ -55,12 +55,16 @@ function zLast(series: number[], dates: string[]): number | null {
   return sd > 0 ? Math.max(-3, Math.min(3, Math.round(-(last - m) / sd * 100) / 100)) : null;
 }
 
-export interface AutoValuation { z: Record<string, number>; raw: Record<string, number>; date: string; }
+export interface AutoValuation { z: Record<string, number>; raw: Record<string, number>; date: string; mvrvAsOf: string | null; }
 
 /** rows: [date, price, mvrv | null] */
 export function autoValuation(rows: [string, number, number | null][]): AutoValuation {
   const dates = rows.map((r) => r[0]), price = rows.map((r) => r[1]);
-  const mvrv = ema(rows.map((r) => (r[2] != null && r[2] > 0 ? r[2] : NaN)), 7);
+  // days without Coin Metrics MVRV (Binance-only closes): hold the realized price (slow-moving) and use today's price,
+  // instead of carrying MVRV itself (which would move realized cap with price)
+  let rp = NaN, mvrvAsOf: string | null = null;
+  const mvrvRaw = rows.map((r) => { if (r[2] != null && r[2] > 0) { rp = r[1] / r[2]; mvrvAsOf = r[0]; return r[2]; } return rp > 0 ? r[1] / rp : NaN; });
+  const mvrv = ema(mvrvRaw, 7);
   const supply = supplySeries(dates);
   const mc = price.map((p, i) => p * supply[i]);
   const nupl = mvrv.map((m) => (Number.isFinite(m) ? 1 - 1 / m : NaN));
@@ -81,7 +85,7 @@ export function autoValuation(rows: [string, number, number | null][]): AutoValu
     const v = zLast(s, dates); if (v != null) z[k] = v;
     const l = [...s].reverse().find(Number.isFinite); if (l != null) raw[k] = l;
   }
-  return { z, raw, date: dates[dates.length - 1] };
+  return { z, raw, date: dates[dates.length - 1], mvrvAsOf };
 }
 
 // Halving cycle clock (course slide: halving → cycle top took 778, 884 and 767 days; three cycles only).

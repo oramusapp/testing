@@ -49,7 +49,7 @@ export function usePyramid() {
       const m = manual[id];
       if ((overrides as Record<string, boolean>)[id] && m) return { z: m.z, updated: m.updated, manual: true, detail: 'ręczna korekta' };
       // auto values stay fresh as long as the data is at most a few days old
-      const base = { z: z != null && Number.isFinite(z) ? z : null, updated: at && now - at < 4 * 86400000 ? now : at, detail };
+      const base = { z: z != null && Number.isFinite(z) ? z : null, updated: auto && auto.date >= lastClosedDay(now) ? now : at, detail };   // stale data never counts as today's
       // manual supplements (data the app cannot fetch) blend in like extra components while fresh
       const def = PILLARS.find((d) => d.id === id), ex = extra[id];
       if (base.z == null || !def?.extra || !ex || !freshToday(ex.updated, now)) return base;
@@ -74,7 +74,7 @@ export function usePyramid() {
       onchain: autoVal('onchain', auto?.onchain, auto ? `ryzyko MVRV ${auto.mvrvRisk.toFixed(0)}% (percentyl)` : ''),
       stats: autoVal('stats', auto?.stats, auto ? `t(90d) ${auto.tStat90.toFixed(2)} · ADF ${auto.adfStat.toFixed(2)}` : ''),
       sentiment: (overrides.sentiment && manual.sentiment) ? { z: manual.sentiment.z, updated: manual.sentiment.updated, manual: true, detail: 'ręczna korekta' }
-        : fg && fg.mu != null && fg.sd ? { z: sentimentZ(fg.value, fg.mu, fg.sd), updated: fg.time + 86400000 > now - 3 * 86400000 ? now : fg.time, detail: `F&G ${fg.value} · ${fg.label} · μ ${fg.mu.toFixed(0)}, σ ${fg.sd.toFixed(0)} (n=${fg.n})` } : { z: null, updated: null, detail: 'brak danych F&G' },
+        : fg && fg.mu != null && fg.sd ? { z: sentimentZ(fg.value, fg.mu, fg.sd), updated: now - fg.time < 2 * 86400000 ? now : fg.time, detail: `F&G ${fg.value} · ${fg.label} · μ ${fg.mu.toFixed(0)}, σ ${fg.sd.toFixed(0)} (n=${fg.n})` } : { z: null, updated: null, detail: 'brak danych F&G' },
       ta: autoVal('ta', auto?.ta, auto ? `BB 1W ${auto.taParts.bbWeekly.toFixed(2)}σ · BB 1D(50) ${auto.taParts.bbDaily.toFixed(2)}σ · struktura ${auto.taParts.structure > 0 ? 'HH/HL' : auto.taParts.structure < 0 ? 'LH/LL' : 'mieszana'}` : '')
     };
   }, [auto, manual, overrides, fg, extra, m42]);

@@ -6,6 +6,7 @@ import { Chart } from '../components/Chart';
 import { stats, monthlyReport, monthOf, type Snapshot, type Flow, type MonthlyReport } from '../lib/performance';
 import { shareFile } from '../components/ui';
 import { useBtc } from '../lib/btcStore';
+import { lastClosedDay } from '../lib/market';
 import { composite, freshManual } from '../lib/sdcaModel';
 import { athSellSeries, backtest, belowProbableRange, curveRate, minBuyRate, probableRangeRate, safetyStep, slowBuyRate } from '../lib/quant';
 import { ltpiStateSeries } from '../lib/tpi';
@@ -33,7 +34,7 @@ export default function Signals() {
   const R = useRsps();
   const { tilt, setTilt } = R;
   const splitSdca = R.split;   // shared with the RSPS tab
-  const [sd] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
+  const [sd, setSd] = usePersisted<SdcaSettings>('sdca.settings', SDCA_DEFAULTS);
   const [pf, setPf] = usePersisted<Portfolio>('portfolio', { holdings: null, history: [] });
   const [snaps, setSnaps] = usePersisted<Snapshot[]>('portfolio.snapshots', []);
   const [flows, setFlows] = usePersisted<Flow[]>('portfolio.flows', []);
@@ -98,27 +99,31 @@ export default function Signals() {
 
   // ---------- today's orders ----------
   const orders: Order[] = [];
-  if (H && sdcaState) {
+  // SDCA reserve: the SDCA portfolio when it exists, otherwise the reserve and BTC entered in the SDCA tab (one value)
+  const sdcaCash = H ? H.sdca[STABLE] : cfg.cash, sdcaBtc = H ? H.sdca.BTC : cfg.btcHeld;
+  // no orders on stale data: the model must be built on the last closed daily candle
+  const stale = !!sdcaState && sdcaState.date < lastClosedDay();
+  if (sdcaState && !stale && (H || sdcaCash > 0 || sdcaBtc > 0)) {
     const r = sdcaState.rate;
-    if (r > 1e-6 && H.sdca[STABLE] > 0) {
-      const u = H.sdca[STABLE] * r;
+    if (r > 1e-6 && sdcaCash > 0) {
+      const u = sdcaCash * r;
       if (u >= MIN_TRADE_USD) orders.push({ id: 'sdca', sleeve: 'SDCA', side: 'buy', sym: 'BTC', usd: u, units: u / sdcaState.price, why: `krzywa ${(r * 100).toFixed(2)}% rezerwy przy ryzyku ${sdcaState.risk.toFixed(1)}%${sdcaState.slowed ? ` (LTPI ujemne: × ${cfg.slowBuy})` : ''}` });
-    } else if (r < -1e-6 && H.sdca.BTC > 0) {
-      const units = H.sdca.BTC * -r;
+    } else if (r < -1e-6 && sdcaBtc > 0) {
+      const units = sdcaBtc * -r;
       if (units * sdcaState.price >= MIN_TRADE_USD) orders.push({ id: 'sdca', sleeve: 'SDCA', side: 'sell', sym: 'BTC', usd: units * sdcaState.price, units, why: `krzywa ${(r * 100).toFixed(2)}% BTC przy ryzyku ${sdcaState.risk.toFixed(1)}%` });
     }
     if (cfg.safety) {
-      const st = safetyStep(sdcaState.risk, sdcaLtpi, H.sdca.BTC * sdcaState.price, H.sdca[STABLE], owed);
+      const st = safetyStep(sdcaState.risk, sdcaLtpi, sdcaBtc * sdcaState.price, sdcaCash, owed);
       if (st.kind === 'sell' && st.usd >= MIN_TRADE_USD)
         orders.push({ id: 'sdca-safety', sleeve: 'SDCA', side: 'sell', sym: 'BTC', usd: st.usd, units: st.usd / sdcaState.price, why: `bezpiecznik: LTPI ujemne przy ryzyku ${sdcaState.risk.toFixed(1)}% → 2% BTC do stablecoina` });
       else if (st.kind === 'rebuy' && st.usd >= MIN_TRADE_USD)
         orders.push({ id: 'sdca-rebuy', sleeve: 'SDCA', side: 'buy', sym: 'BTC', usd: st.usd, units: st.usd / sdcaState.price, why: `odkup po bezpieczniku: LTPI dodatnie, zostało ${usd(owed, 0)} do odkupienia` });
     }
-    if (sdcaState.athFrac > 0 && H.sdca.BTC > 0) {
-      const units = H.sdca.BTC * sdcaState.athFrac;
+    if (sdcaState.athFrac > 0 && sdcaBtc > 0) {
+      const units = sdcaBtc * sdcaState.athFrac;
       if (units * sdcaState.price >= MIN_TRADE_USD) orders.push({ id: 'sdca-ath', sleeve: 'SDCA', side: 'sell', sym: 'BTC', usd: units * sdcaState.price, units, why: `PROPOZYCJA · nowy szczyt (ATH) przy ryzyku ${sdcaState.risk.toFixed(1)}% → ${(sdcaState.athFrac * 100).toFixed(2)}% BTC (${sdcaState.athK + 1}. w cyklu)` });
     }
-    if (R.scanFresh && R.signalReady && rspsVal > 0) {
+    if (H && R.scanFresh && R.signalReady && rspsVal > 0) {
       const want: Record<string, number> = {};
       target.forEach((t) => (want[t.sym] = t.w * rspsVal));
       const syms = new Set([...Object.keys(want), ...Object.keys(H.rsps).filter((k) => k !== STABLE)]);
@@ -130,7 +135,7 @@ export default function Signals() {
           why: want[sym] ? `cel ${pct((want[sym] / rspsVal) * 100, 0)} części RSPS` : R.regime === 'rsps' ? 'wypadł z wyboru' : 'bramka zamknięta / LTPI' });
       }
     }
-    if (total > 0 && Math.abs(sdcaShare - splitSdca / 100) > BAND) {
+    if (H && total > 0 && Math.abs(sdcaShare - splitSdca / 100) > BAND) {
       const move = Math.abs(sdcaShare - splitSdca / 100) * total;
       orders.push({ id: 'rebal', sleeve: 'Rebalans', side: 'move', sym: STABLE, usd: move, units: move,
         why: `SDCA ${pct(sdcaShare * 100, 0)} poza pasmem ${splitSdca - 10}–${splitSdca + 10}%: przenieś ${usd(move, 0)} z ${sdcaShare > splitSdca / 100 ? 'SDCA do RSPS' : 'RSPS do SDCA'}` });
@@ -140,7 +145,19 @@ export default function Signals() {
   function execute(order: Order) {
     let o = order;
     let short = false;
-    if (!H) return;
+    // SDCA order: lowers (buy) or raises (sell) the SDCA cash reserve by the order amount — in the portfolio and in the SDCA tab
+    const nCash = order.side === 'buy' ? sdcaCash - order.usd : sdcaCash + order.usd;
+    const nBtc = order.side === 'buy' ? sdcaBtc + order.units : sdcaBtc - order.units;
+    if (order.sleeve === 'SDCA') setSd({ ...sd, cash: Math.max(0, Math.round(nCash * 100) / 100), btcHeld: Math.max(0, nBtc) });
+    if (!H) {
+      if (order.sleeve !== 'SDCA') return;
+      let nOwed0 = owed;
+      if (order.id === 'sdca-safety') nOwed0 += order.usd;
+      else if (order.side === 'buy') nOwed0 = Math.max(0, nOwed0 - order.usd);
+      setPf({ ...pf, safetyOwed: nOwed0 < MIN_TRADE_USD ? 0 : nOwed0, history: [{ time: Date.now(), text: `SDCA: ${order.side === 'buy' ? 'kupno' : 'sprzedaż'} BTC ${usd(order.usd, 0)} · rezerwa ${usd(Math.max(0, nCash), 0)}` }, ...pf.history].slice(0, 200) });
+      toast(`Zapisano · rezerwa SDCA: ${usd(Math.max(0, nCash), 0)}`);
+      return;
+    }
     const h: Holdings = { sdca: { ...H.sdca }, rsps: { ...H.rsps } };
     if (o.sleeve === 'SDCA') {
       if (o.side === 'buy') { h.sdca.BTC += o.units; h.sdca[STABLE] -= o.usd; } else { h.sdca.BTC -= o.units; h.sdca[STABLE] += o.usd; }
@@ -194,31 +211,6 @@ export default function Signals() {
   const perf = snaps.length >= 2 ? stats(snaps, flows) : null;
   const liveMonth = snaps.length >= 2 ? monthlyReport(monthOf(snaps[snaps.length - 1].date), snaps, flows, { history: pf.history, regimes: load('rsps.log', []), pyramid: load('pyramid.history', []) }) : null;
 
-  if (!H) {
-    const p = amount && amount > 0 ? plan(amount) : null;
-    return (
-      <Screen title="Portfel" subtitle="Rozpisanie kapitału, codzienne zlecenia i rotacja">
-        <Card className="hero">
-          <div className="eyebrow">Kwota na kryptowaluty</div>
-          <NumInput value={amount} onChange={setAmount} placeholder="np. 10000" suffix="USD" />
-          <div className="note-text mt8">System podzieli kwotę na dwa oddzielne portfele — SDCA {splitSdca}% i RSPS {100 - splitSdca}% — i rozpisze je według dzisiejszego stanu modeli (zamknięcie {sdcaState?.date ?? '—'}).</div>
-        </Card>
-        {p && <PlanTable h={p} px={px} />}
-        {p && <button className="btn primary block" onClick={() => {
-          setPf({ holdings: p, history: [{ time: Date.now(), text: `Start: ${usd(amount!, 0)}` }] });
-          setFlows([]); setReports([]);
-          const sv = val('BTC', p.sdca.BTC) + p.sdca[STABLE], rv = Object.entries(p.rsps).reduce((a, [k, u]) => a + (val(k, u) || 0), 0);
-          setSnaps(sdcaState ? [{ date: sdcaState.date, time: Date.now(), total: sv + rv, sdca: sv, rsps: rv, stable: p.sdca[STABLE] + (p.rsps[STABLE] ?? 0), btcPrice: sdcaState.price }] : []);
-          toast('Portfele utworzone — start śledzenia wyników');
-        }}>Kupiłem według planu — utwórz oba portfele</button>}
-        {!R.scanFresh && <div className="warn-box mt12">Skan RSPS nieaktualny — otwórz Strategia → RSPS lub poczekaj na skan, aby plan RSPS był aktualny.</div>}
-        <Fold id="pf.paper" title="Live testing" hint="Wirtualny portfel od startu wykonuje sygnały · statystyki, tygodnie, miesiące" defaultOpen>
-          <PaperCard inputs={paperInputs} />
-        </Fold>
-      </Screen>
-    );
-  }
-
   const sdcaOrders = orders.filter((o) => o.sleeve === 'SDCA');
   const rspsOrders = orders.filter((o) => o.sleeve === 'RSPS');
   const transfer = orders.find((o) => o.sleeve === 'Rebalans');
@@ -240,8 +232,42 @@ export default function Signals() {
     <Row className="compact" label={<span style={{ paddingLeft: 16 }}>{sym}</span>} value={<span className="num" style={{ paddingRight: 16 }}>{sym === STABLE ? usd(units, 0) : `${units.toPrecision(6)} · ${usd(val(sym, units), 0)}`}</span>} />
   );
 
+  if (!H) {
+    const p = amount && amount > 0 ? plan(amount) : null;
+    return (
+      <Screen title="Portfel" subtitle="Rozpisanie kapitału, codzienne zlecenia i rotacja">
+        {stale && <div className="warn-box mt12">Dane nieaktualne: model liczony na świecy {sdcaState!.date}, a ostatnia zamknięta to {lastClosedDay()}. Wskazówki wstrzymane do aktualizacji (sprawdź internet albo otwórz aplikację ponownie).</div>}
+        <Card className="hero">
+          <div className="eyebrow">Kwota na kryptowaluty</div>
+          <NumInput value={amount} onChange={setAmount} placeholder="np. 10000" suffix="USD" />
+          <div className="note-text mt8">System podzieli kwotę na dwa oddzielne portfele — SDCA {splitSdca}% i RSPS {100 - splitSdca}% — i rozpisze je według dzisiejszego stanu modeli (zamknięcie {sdcaState?.date ?? '—'}).</div>
+        </Card>
+        {(cfg.cash > 0 || cfg.btcHeld > 0) && <>
+          <div className="section-title">Sygnał SDCA · rezerwa {usd(cfg.cash, 0)}{cfg.btcHeld > 0 ? ` · ${cfg.btcHeld.toPrecision(6)} BTC` : ''}</div>
+          <Card className="tight">
+            <OrderList list={sdcaOrders} empty={sdcaState ? `Dziś bez transakcji (krzywa ${(sdcaState.rate * 100).toFixed(2)}% przy ryzyku ${sdcaState.risk.toFixed(1)}%${sdcaState.rate > 0 ? '; zakup dopiero powyżej 1% rezerwy' : ''}).` : 'Ładowanie modelu…'} />
+            <div className="note-text" style={{ padding: '4px 16px 12px' }}>Z rezerwy wpisanej w zakładce SDCA. „Wykonano” odejmuje kwotę od rezerwy i dopisuje kupione BTC.</div>
+          </Card>
+        </>}
+        {p && <PlanTable h={p} px={px} />}
+        {p && <button className="btn primary block" onClick={() => {
+          setPf({ holdings: p, history: [{ time: Date.now(), text: `Start: ${usd(amount!, 0)}` }] });
+          setFlows([]); setReports([]);
+          const sv = val('BTC', p.sdca.BTC) + p.sdca[STABLE], rv = Object.entries(p.rsps).reduce((a, [k, u]) => a + (val(k, u) || 0), 0);
+          setSnaps(sdcaState ? [{ date: sdcaState.date, time: Date.now(), total: sv + rv, sdca: sv, rsps: rv, stable: p.sdca[STABLE] + (p.rsps[STABLE] ?? 0), btcPrice: sdcaState.price }] : []);
+          toast('Portfele utworzone — start śledzenia wyników');
+        }}>Kupiłem według planu — utwórz oba portfele</button>}
+        {!R.scanFresh && <div className="warn-box mt12">Skan RSPS nieaktualny — otwórz Strategia → RSPS lub poczekaj na skan, aby plan RSPS był aktualny.</div>}
+        <Fold id="pf.paper" title="Live testing" hint="Wirtualny portfel od startu wykonuje sygnały · statystyki, tygodnie, miesiące" defaultOpen>
+          <PaperCard inputs={paperInputs} />
+        </Fold>
+      </Screen>
+    );
+  }
+
   return (
     <Screen title="Portfel" subtitle={`Codziennie po zamknięciu 00:00 UTC · dane ${sdcaState?.date ?? '—'}`}>
+      {stale && <div className="warn-box mt12">Dane nieaktualne: model liczony na świecy {sdcaState!.date}, a ostatnia zamknięta to {lastClosedDay()}. Wskazówki wstrzymane do aktualizacji (sprawdź internet albo otwórz aplikację ponownie).</div>}
       <Card className="hero">
         <div className="eyebrow">Kapitał na kryptowaluty</div>
         <div className="big-number">{usd(total, 0)}</div>

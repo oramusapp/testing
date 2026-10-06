@@ -14,6 +14,8 @@ export function TvTotalCard() {
   const ageDays = lastTv ? Math.floor((Date.now() - Date.parse(lastTv)) / 86400000) : NaN;
   const stale = !tv || ageDays > 7;
   const ag = snapAgreement(st.snaps ?? [], st.total);
+  const lastTot = eff?.rows.at(-1)?.[0], lastBtc = st.model?.dates.at(-1);
+  const trackBtcFrom = lastTot && lastBtc && lastTot < lastBtc ? st.model!.dates.find((d) => d > lastTot) ?? null : null;
   const pl = (x: number, d = 1) => x.toFixed(d).replace('.', ',');
   async function onFile(f: File) {
     try {
@@ -26,11 +28,11 @@ export function TvTotalCard() {
     <Card>
       <div className="between"><div className="eyebrow" style={{ margin: 0 }}>Źródło $TOTAL</div>
         <span className="pill" style={{ color: stale ? 'var(--amber)' : 'var(--green)', background: 'var(--surface-3)' }}><span className="dot" />{tv ? (stale ? `TradingView · ${ageDays} dni temu` : 'TradingView') : 'indeks wbudowany'}</span></div>
-      <div className="note-text mt8">{eff?.source ?? '—'}.</div>
+      <div className="note-text mt8">{eff?.source ?? '—'}.{eff?.approxFrom ? ` Od ${fmtDate(eff.approxFrom)} szacunek.` : ''}{trackBtcFrom ? ` Uwaga: od ${fmtDate(trackBtcFrom)} brak danych $TOTAL — TPI używa wtedy ruchu BTC.` : ''}</div>
       <div className="note-text mt8">
         {tv
-          ? `Dane TradingView do ${fmtDate(lastTv!)} (plik ${tv.file}). Kolejne dni do następnego importu wylicza własny indeks z 45 aktywów Coin Metrics, przypięty do poziomu TradingView. Importuj co tydzień, żeby TPI liczyło się na oficjalnej serii.`
-          : 'Teraz TPI liczy się na własnym indeksie z 45 aktywów Coin Metrics (ok. 90% oficjalnego $TOTAL). Oficjalny CRYPTOCAP:TOTAL z TradingView możesz zaimportować: TradingView nie udostępnia publicznego API, więc dane pochodzą z Twojego eksportu.'}
+          ? `Dane TradingView do ${fmtDate(lastTv!)} (plik ${tv.file}). Kolejne dni do następnego importu wylicza własny indeks z 39 aktywów Coin Metrics, przypięty do poziomu TradingView. Importuj co tydzień, żeby TPI liczyło się na oficjalnej serii.`
+          : 'Teraz TPI liczy się na własnym indeksie z 39 aktywów Coin Metrics (część oficjalnego $TOTAL — o ile mniejsza, pokaże porównanie z codziennymi zapisami niżej). Oficjalny CRYPTOCAP:TOTAL z TradingView możesz zaimportować: TradingView nie udostępnia publicznego API, więc dane pochodzą z Twojego eksportu.'}
       </div>
       <div className="hr" />
       <div className="eyebrow">Oficjalna kapitalizacja · codzienny zapis</div>
