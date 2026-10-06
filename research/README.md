@@ -341,3 +341,13 @@ $TOTAL — 2,01, ale CAGR niższy; R6b silny impuls − blokuje RSPS — 1,98. R
 2024→: CAGR 55,0 → 53,7%, Sharpe 1,32 → 1,31 (bez poprawy). SDCA, 21 startów 2018–2023 (do końca 2023): mediana CAGR 48,5 → 54,0%,
 mediana DD bez zmian (−33,2%), najgorsze −40,9 → −41,4%, Sharpe lepszy 21/21. Niewykonalne tu (brak danych w środowisku):
 weto płynności z dolara i rentowności (FRED), filtr zatłoczenia z funding rate, rynkowa macierz reżimów (SPX, DXY, VIX).
+
+## Notatki vs system 2.32 (run65.py) — bez zmian w strategii; poprawka MVRV w modelu SDCA (2.33.0)
+Audyt notatek wskazał błąd: model SDCA (sdcaModel.ts) przenosił stare MVRV w dni bez Coin Metrics — teraz trzyma cenę zrealizowaną
+(jak onchain.ts od 2.31). Backtest nie jest dotknięty (historia ma MVRV; brakuje go tylko w ostatnich dniach na żywo).
+Testy (baza 2.32: IS Sharpe 2,02, CAGR 118,4, DD −25,4; 2024→ 1,31 / 53,7): T1 spójny czasowo wynik trendu zamiast SMA20/50/100/200
+(wybrane wg zmian 3–10/rok w 2018–23: SMA150, SMA200, EMA20>50, EMA30>60, Donchian 50) — dla BTC 2,01 / DD −29,2; dla wszystkich 1,96 →
+odrzucone; T2 LTPI z BTC+ETH+$TOTAL — 2,00; T3 szybszy bezpiecznik SDCA 5%/10% dziennie — bez zmian w IS; T4 barbell jednokierunkowy
+(pieniądze tylko z RSPS do SDCA, zgodnie z notatkami) — Sharpe 2,07 i DD −22,0, ale CAGR 107,6 (niższy) → odrzucone regułą (2024→ 44,8%);
+T6 wyczerpanie MTPI → alty × 0,5 — 2,00. Nietestowane: agregacja wyceny przez z zamiast percentyli (wymaga przebudowy silnika badań),
+kierowanie nowych wpłat w małe coiny (brak modelu wpłat), tematy makro S&P/TLT/DXY (brak danych).

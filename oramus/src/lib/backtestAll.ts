@@ -88,8 +88,8 @@ export function rsScore(ratio: number[], coinVol: number, lbs: number[] = RS_LOO
 
 export interface RspsOpts { universe: number; topN: number; cap: number; parking: 'stable' | 'btc' | 'hybrid'; hybridMax: number; every?: number; reserve?: 'stable' | 'gold' | 'goldTrend' | 'hierarchy' }
 
-/** Weekly relative-strength rotation with the live rules: point-in-time liquidity universe, VAMS of the coin/BTC ratio
- *  (30/60/90), breadth gate 70%/60%, own trend ≥ 0.5, LTPI < 0 → all stablecoin, parking per choice when the gate is closed. */
+/** Relative-strength rotation with the live rules (daily in the app, `every`): point-in-time liquidity universe, strength
+ *  of the coin/BTC ratio over RS_LOOKBACKS (14/28/56), breadth gate 70%/60%, own trend ≥ 0.5, LTPI < 0 → all stablecoin, parking per choice when the gate is closed. */
 export function rspsRun(dates: string[], btc: number[], coins: CoinSeries[], ltpi: number[], risk: number[], start: number, o: RspsOpts): Run {
   const every = o.every ?? 7;
   const n = dates.length;

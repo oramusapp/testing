@@ -296,7 +296,7 @@ export default function Sdca({ nav }: { nav?: React.ReactNode }) {
             <div className="grow">
               <div>{ind.name}</div>
               <div className="faint" style={{ fontSize: 12, marginTop: 2 }}>{ind.note}</div>
-              {ind.id !== 'manual' && <div className="dim num" style={{ fontSize: 12.5, marginTop: 4 }}>Ryzyko {pct(model.risk[ind.id][last])} · z {signed(model.z[ind.id][last])}{ind.id === 'mvrv' && model.mvrvStaleFrom ? ` · MVRV z ${model.mvrvStaleFrom} (przeniesione)` : ''}</div>}
+              {ind.id !== 'manual' && <div className="dim num" style={{ fontSize: 12.5, marginTop: 4 }}>Ryzyko {pct(model.risk[ind.id][last])} · z {signed(model.z[ind.id][last])}{ind.id === 'mvrv' && model.mvrvStaleFrom ? ` · od ${model.mvrvStaleFrom} MVRV szacowane z ceny zrealizowanej` : ''}</div>}
               {ind.id === 'manual' && cfg.enabled.manual && <div className="flex mt8"><span className="dim" style={{ fontSize: 13 }}>Ryzyko</span><NumInput className="input" value={cfg.manualRisk} placeholder="np. 43.6" onChange={(v) => upd({ manualUpdated: Date.now(), manualRisk: v == null ? null : Math.min(100, Math.max(0, v)) })} suffix="%" /></div>}
             </div>
             <Switch checked={!!cfg.enabled[ind.id]} onChange={(v) => upd({ enabled: { ...cfg.enabled, [ind.id]: v } })} />

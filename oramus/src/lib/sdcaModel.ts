@@ -41,12 +41,13 @@ export function buildModel(rows: Row[]): SdcaModel {
   const railsPerDay = dates.map((d) => { const m = modelFor(d); if (!m) return railIdx.map(() => NaN); const r = rails(m, d); return railIdx.map((i) => r[i]); });
   const m = models.get(lastYear) ?? fitCurvature(dates, prices);
 
-  // MVRV: carry the last known value forward for days without on-chain data yet.
-  let lastM = NaN, staleFrom: string | null = null;
+  // MVRV on days without on-chain data yet: hold the last realized price (slow-moving) and use today's close, instead of
+  // carrying MVRV itself (which would hold the market/realized ratio fixed while the price moves)
+  let lastRp = NaN, staleFrom: string | null = null;
   const mv = rows.map((r) => {
-    if (r[2] != null) { lastM = r[2]; staleFrom = null; return r[2]; }
-    if (!staleFrom && Number.isFinite(lastM)) staleFrom = r[0];
-    return lastM;
+    if (r[2] != null && r[2] > 0) { lastRp = r[1] / r[2]; staleFrom = null; return r[2]; }
+    if (!staleFrom && Number.isFinite(lastRp)) staleFrom = r[0];
+    return lastRp > 0 ? r[1] / lastRp : NaN;
   });
   const mvr = detrendedRiskExpanding(dates, ema(mv, 7), FIRST_FIT_YEAR);
   const sh = ema(rollingSharpe(prices), 14);

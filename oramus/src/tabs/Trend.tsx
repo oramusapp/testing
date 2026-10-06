@@ -56,7 +56,7 @@ export default function Trend({ nav }: { nav?: React.ReactNode }) {
         </Card>
       )}
 
-      {a && <TpiCard title="LTPI · składniki (7 wskaźników, spójny horyzont)" res={a.ltpiTpi} stateLabel
+      {a && <TpiCard title="LTPI · składniki (7 wskaźników, spójny horyzont; nowy stan po 5 dniach)" res={a.ltpiTpi} stateLabel
         note={tpi.ltpiSource === 'ensemble' ? 'Steruje bezpiecznikiem SDCA i reżimem RSPS.' : 'Informacyjnie: wybrane źródło LTPI to cena vs SMA 200.'} />}
       {a && <TpiCard title="MTPI · średnioterminowy (10 wskaźników)" res={a.mtpi}
         note={tpi.mtpiSizing === 'ensemble' ? 'Steruje skalowaniem BTC w części RSPS (MTPI przeliczony na 0…1).' : 'Informacyjnie: skalowanie BTC używa 4 średnich (wariant z backtestu).'} />}
