@@ -364,3 +364,10 @@ więc jego przewaga jest zawyżona. Większy udział RSPS to wymiana zwrotu na r
 Okna 365 d (n=71): wyższy zwrot w 61% okien, ale mediana 54% → 42%; okna 730 d (n=58): 53% okien, mediana 148% → 142%, najgorsze
 +11% → 0%; DD zawsze gorsze (najgorsze −25,4 → −29,7%). Przewaga za cały okres głównie z 2021 (347% → 557%), gdzie RSPS jest najbardziej
 zawyżone błędem przeżywalności. Zostaje 60/40 → 40/60.
+
+## Trafność RSPS dla każdego coina (run68.py, ustawienia 2.33, od 2020 lub od pierwszego dnia danych)
+Epizodów trzymania altów: 171; trafne (coin lepszy od BTC w czasie trzymania): 42% — mniej niż połowa, ale wygrane są duże, a straty małe
+(wkład altów łącznie +296%, BTC w RSPS +255%, PAXG +58%; wkład = suma waga × dzienny zwrot). Najwięcej dały: BNB +119%, ADA +53%,
+ETH +40%, XRP +27%, NEAR +23%, VET +18%, SUI +14%, LINK +14%, SOL +12%, AVAX +10%, UNI +10%. Ujemny wkład: ARB −15%, ETC −8%, LTC −7%,
+FIL −6%, OP −6%, POL −5%, XLM, INJ, DOT, BCH, HBAR (−2…−3%). Nigdy nie wybrane: ATOM, APT, TON, ALGO, AAVE. HYPE — brak danych w środowisku
+badań. Usuwanie „słabych” coinów z listy na podstawie tej tabeli byłoby dopasowaniem do historii (wiedza z przyszłości) — nie stosowane.
