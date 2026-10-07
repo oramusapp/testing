@@ -26,7 +26,7 @@ const STABLE = 'USDT';
 const MIN_TRADE_USD = 10, MIN_TRADE_FRAC = 0.01;
 
 interface Holdings { sdca: { BTC: number; [STABLE]: number }; rsps: Record<string, number>; }
-interface Portfolio { holdings: Holdings | null; history: { time: number; text: string }[]; safetyOwed?: number; }
+interface Portfolio { holdings: Holdings | null; history: { time: number; text: string }[]; safetyOwed?: number; done?: { date: string; ids: string[] }; }
 interface Order { id: string; sleeve: 'SDCA' | 'RSPS' | 'Rebalans'; side: 'buy' | 'sell' | 'move'; sym: string; usd: number; units: number; why: string; }
 
 export default function Signals() {
@@ -148,6 +148,9 @@ export default function Signals() {
     }
   }
 
+  // SDCA orders are once per daily close: after 'Wykonano' the order is gone until the next close
+  const doneToday = sdcaState && pf.done?.date === sdcaState.date ? pf.done.ids : [];
+  const markDone = (id: string) => (sdcaState ? { date: sdcaState.date, ids: [...(pf.done?.date === sdcaState.date ? pf.done.ids : []), id] } : pf.done);
   function execute(order: Order) {
     let o = order;
     let short = false;
@@ -160,7 +163,7 @@ export default function Signals() {
       let nOwed0 = owed;
       if (order.id === 'sdca-safety') nOwed0 += order.usd;
       else if (order.side === 'buy') nOwed0 = Math.max(0, nOwed0 - order.usd);
-      setPf({ ...pf, safetyOwed: nOwed0 < MIN_TRADE_USD ? 0 : nOwed0, history: [{ time: Date.now(), text: `SDCA: ${order.side === 'buy' ? 'kupno' : 'sprzedaż'} BTC ${usd(order.usd, 0)} · rezerwa ${usd(Math.max(0, nCash), 0)}` }, ...pf.history].slice(0, 200) });
+      setPf({ ...pf, done: markDone(order.id), safetyOwed: nOwed0 < MIN_TRADE_USD ? 0 : nOwed0, history: [{ time: Date.now(), text: `SDCA: ${order.side === 'buy' ? 'kupno' : 'sprzedaż'} BTC ${usd(order.usd, 0)} · rezerwa ${usd(Math.max(0, nCash), 0)}` }, ...pf.history].slice(0, 200) });
       toast(`Zapisano · rezerwa SDCA: ${usd(Math.max(0, nCash), 0)}`);
       return;
     }
@@ -188,7 +191,7 @@ export default function Signals() {
     else if (o.id === 'sdca-rebuy' || (o.sleeve === 'SDCA' && o.side === 'buy')) nOwed = Math.max(0, nOwed - o.usd);
     else if ((o.id === 'sdca' || o.id === 'sdca-ath') && o.side === 'sell') nOwed *= H.sdca.BTC > 0 ? Math.max(0, 1 - o.units / H.sdca.BTC) : 0;
     if (nOwed < MIN_TRADE_USD) nOwed = 0;
-    setPf({ holdings: h, safetyOwed: nOwed, history: [{ time: Date.now(), text: `${o.sleeve}: ${o.side === 'buy' ? 'kupno' : o.side === 'sell' ? 'sprzedaż' : 'przeniesienie'} ${o.sym} ${usd(o.usd, 0)}` }, ...pf.history].slice(0, 200) });
+    setPf({ ...pf, holdings: h, safetyOwed: nOwed, done: o.sleeve === 'SDCA' ? markDone(o.id) : pf.done, history: [{ time: Date.now(), text: `${o.sleeve}: ${o.side === 'buy' ? 'kupno' : o.side === 'sell' ? 'sprzedaż' : 'przeniesienie'} ${o.sym} ${usd(o.usd, 0)}` }, ...pf.history].slice(0, 200) });
     if (!short) toast('Zapisano wykonanie');
   }
 
@@ -217,7 +220,7 @@ export default function Signals() {
   const perf = snaps.length >= 2 ? stats(snaps, flows) : null;
   const liveMonth = snaps.length >= 2 ? monthlyReport(monthOf(snaps[snaps.length - 1].date), snaps, flows, { history: pf.history, regimes: load('rsps.log', []), pyramid: load('pyramid.history', []) }) : null;
 
-  const sdcaOrders = orders.filter((o) => o.sleeve === 'SDCA');
+  const sdcaOrders = orders.filter((o) => o.sleeve === 'SDCA' && !doneToday.includes(o.id));
   const rspsOrders = orders.filter((o) => o.sleeve === 'RSPS');
   const transfer = orders.find((o) => o.sleeve === 'Rebalans');
   const OrderList = ({ list, empty }: { list: Order[]; empty: string }) => (
@@ -251,7 +254,7 @@ export default function Signals() {
         {(cfg.cash > 0 || cfg.btcHeld > 0) && <>
           <div className="section-title">Sygnał SDCA · rezerwa {usd(cfg.cash, 0)}{cfg.btcHeld > 0 ? ` · ${cfg.btcHeld.toPrecision(6)} BTC` : ''}</div>
           <Card className="tight">
-            <OrderList list={sdcaOrders} empty={sdcaState ? `Dziś bez transakcji (krzywa ${(sdcaState.rate * 100).toFixed(2)}% przy ryzyku ${sdcaState.risk.toFixed(1)}%${sdcaState.rate > 0 ? '; zakup dopiero powyżej 1% rezerwy' : ''}).` : 'Ładowanie modelu…'} />
+            <OrderList list={sdcaOrders} empty={doneToday.length ? 'Dzisiejszy sygnał SDCA wykonany ✓ — następny po zamknięciu dnia (00:00 UTC, 02:00 w Polsce).' : sdcaState ? `Dziś bez transakcji (krzywa ${(sdcaState.rate * 100).toFixed(2)}% przy ryzyku ${sdcaState.risk.toFixed(1)}%${sdcaState.rate > 0 ? '; zakup dopiero powyżej 1% rezerwy' : ''}).` : 'Ładowanie modelu…'} />
             <div className="note-text" style={{ padding: '4px 16px 12px' }}>Z rezerwy wpisanej w zakładce SDCA. „Wykonano” odejmuje kwotę od rezerwy i dopisuje kupione BTC.</div>
           </Card>
         </>}
@@ -341,7 +344,7 @@ export default function Signals() {
         <Holding sym={STABLE} units={H.sdca[STABLE]} />
         <div className="hr" style={{ margin: '4px 0' }} />
         <div className="eyebrow" style={{ padding: '6px 16px 0', margin: 0 }}>Dzisiejsze wskazówki</div>
-        <OrderList list={sdcaOrders} empty={sdcaState ? `Krzywa ≈ 0% przy ryzyku ${sdcaState.risk.toFixed(1)}% — bez transakcji.` : 'Ładowanie modelu…'} />
+        <OrderList list={sdcaOrders} empty={doneToday.length ? 'Dzisiejszy sygnał SDCA wykonany ✓ — następny po zamknięciu dnia (00:00 UTC, 02:00 w Polsce).' : sdcaState ? `Krzywa ≈ 0% przy ryzyku ${sdcaState.risk.toFixed(1)}% — bez transakcji.` : 'Ładowanie modelu…'} />
       </Card>
 
       <div className="section-title">Portfel RSPS · {usd(rspsVal, 0)} · {pct((1 - sdcaShare) * 100, 0)}</div>
