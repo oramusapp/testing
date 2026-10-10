@@ -17,6 +17,12 @@ npm start         # tryb „czysty”: pusta baza, zakładanie planu na stronie 
 
 Na stronie startowej w trybie demo są linki do wszystkich ról (Anna – właścicielka, Marta, Piotr, Ewa, Tomek, karta QR) i scenariusz krok po kroku. Otwieraj je w osobnych kartach. Pasek na górze przewija czas serwera (+5 min, +20 min, +1 h, +1 dzień), żeby eskalację było widać bez czekania. Reset demo: zatrzymaj serwer i usuń `data/demo.json`.
 
+### Wersja demo w przeglądarce (bez serwera)
+
+Katalog `demo/` to ta sama aplikacja przerobiona tak, by działała w całości w przeglądarce. Można ją opublikować jako zwykłe pliki statyczne, np. na GitHub Pages pod adresem `…/planb/` (strona `planb/index.html` przekierowuje do `demo/`). Wszystkie role są symulowane na jednym urządzeniu. Dane trzyma `localStorage` i **nie są szyfrowane**. Karty przeglądarki synchronizują się na żywo. Przycisk „Reset demo” zaczyna od nowa.
+
+Wersję buduje `npm run build:web`. Skrypt kopiuje `public/`, logikę z `src/` (`domain.js`, `app.js`, `plans.js`, `demo.js`) i zamienniki z `web/` (magazyn w przeglądarce i atrapę szyfrowania). Po każdej zmianie w `public/` lub `src/` zbuduj ją ponownie i zatwierdź `demo/`.
+
 Zmienne środowiskowe: `PORT`, `PLANB_KEY` (klucz szyfrujący, 32 bajty w base64: `openssl rand -base64 32`), `PLANB_DATA_DIR`, `PLANB_ALLOW_SIGNUP=0`, `PLANB_DEMO=1`.
 
 ## Jak to działa
