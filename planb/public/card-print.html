@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Plan B – karta do portfela</title>
+<link rel="stylesheet" href="/style.css">
+<style>
+  .wallet { width: 85.6mm; height: 54mm; border: 1px dashed #888; border-radius: 3mm; padding: 3mm; display: flex; gap: 3mm; background: #fff; color: #000; font-size: 8pt; line-height: 1.25; }
+  .wallet .qr { width: 30mm; height: 30mm; flex: none; }
+  .wallet .qr img, .wallet .qr canvas { width: 30mm !important; height: 30mm !important; }
+  .wallet h2 { font-size: 11pt; margin: 0 0 1mm; color: #000; }
+  @media print { .noprint { display: none; } body { background: #fff; } main { padding: 0; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="noprint"><h1>Karta do portfela</h1><p>Wydrukuj w skali 100% i wytnij. Jeśli kod QR się nie pojawił, poniższy link zawsze działa tak samo.</p><button class="primary" id="print">Drukuj</button></div>
+  <div class="wallet" id="wallet"><p>Ładowanie…</p></div>
+  <p class="noprint"><small>Link z karty: <span id="url" class="secret"></span></small></p>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script type="module" src="/card-print.js"></script>
+</body>
+</html>
