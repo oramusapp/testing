@@ -1,6 +1,6 @@
 // Strona otwierana po zeskanowaniu karty QR z portfela. Osoba obca widzi tylko imię
 // i formularz zgłoszenia – żadnych danych o bliskich, adresów ani kodów.
-import { $, esc, api, fmtTime } from './common.js'
+import { $, esc, api, fmtTime, toast } from './common.js'
 
 async function main() {
   let v
@@ -27,7 +27,7 @@ async function main() {
         ${r.ice ? `<p>Osoba kontaktowa: <b>${esc(r.ice.name)}</b>, tel. <a href="tel:${esc(r.ice.phone)}">${esc(r.ice.phone)}</a></p>` : ''}</div>`
     } catch (err) {
       e.target.querySelector('button').disabled = false
-      alert(err.message)
+      toast(err.message, true)
     }
   })
 }

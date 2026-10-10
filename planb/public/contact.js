@@ -1,4 +1,4 @@
-import { $, esc, api, live, board, toast, fmtDate, fmtDateTime, fmtTime, left, syncClock, demoBar, liveBadge, serverNow } from './common.js'
+import { $, esc, api, ask, live, board, toast, fmtDate, fmtDateTime, fmtTime, left, syncClock, demoBar, liveBadge, serverNow } from './common.js'
 
 let V = null
 const revealed = {} // instanceId -> { secrets, until } (tylko w pamięci karty przeglądarki)
@@ -102,13 +102,13 @@ document.addEventListener('click', async e => {
     return
   }
   switch (b.dataset.act) {
-    case 'confirm': if (confirm('Uruchomić plan teraz?')) return act(() => api('/api/contact/confirm', { method: 'POST' }), 'Plan uruchomiony')
+    case 'confirm': if (await ask('Uruchomić plan teraz?', { ok: 'Uruchom plan', danger: true })) return act(() => api('/api/contact/confirm', { method: 'POST' }), 'Plan uruchomiony')
       return
-    case 'cancel': if (confirm('Anulować zgłoszenie jako fałszywy alarm?')) return act(() => api('/api/contact/cancel', { method: 'POST' }), 'Anulowano')
+    case 'cancel': if (await ask('Anulować zgłoszenie jako fałszywy alarm?', { ok: 'Anuluj zgłoszenie' })) return act(() => api('/api/contact/cancel', { method: 'POST' }), 'Anulowano')
       return
-    case 'end': if (confirm('Zakończyć plan? Wszystkie dostępy wygasną.')) return act(() => api('/api/contact/end', { method: 'POST' }), 'Plan zakończony')
+    case 'end': if (await ask('Zakończyć plan? Wszystkie dostępy wygasną.', { ok: 'Zakończ plan' })) return act(() => api('/api/contact/end', { method: 'POST' }), 'Plan zakończony')
       return
-    case 'trigger': if (confirm('Zgłosić uruchomienie planu?')) return act(() => api('/api/contact/trigger', { method: 'POST', body: { reason: $('#reason').value } }), 'Zgłoszono. Właściciel ma czas na anulowanie.')
+    case 'trigger': if (await ask('Zgłosić uruchomienie planu? Właściciel i inne zaufane osoby dostaną wiadomość.', { ok: 'Zgłoś', danger: true })) return act(() => api('/api/contact/trigger', { method: 'POST', body: { reason: $('#reason').value } }), 'Zgłoszono. Właściciel ma czas na anulowanie.')
       return
     case 'details': return act(() => api('/api/contact/confirm-details', { method: 'POST' }), 'Dziękujemy')
   }

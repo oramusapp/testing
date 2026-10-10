@@ -65,6 +65,20 @@ export function left(ms) {
   return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m}:${String(s % 60).padStart(2, '0')}`
 }
 
+// Potwierdzenie wewnątrz strony (zamiast confirm(), które nie działa w osadzonych widokach).
+export function ask(message, { ok = 'Tak', danger = false } = {}) {
+  return new Promise(resolve => {
+    const box = document.createElement('div')
+    box.className = 'modal'
+    box.innerHTML = `<div class="modal-card" role="dialog" aria-modal="true"><p>${esc(message)}</p>
+      <div class="row-end"><button type="button" data-no>Anuluj</button><button type="button" class="${danger ? 'danger' : 'primary'}" data-yes>${esc(ok)}</button></div></div>`
+    const done = v => { box.remove(); resolve(v) }
+    box.addEventListener('click', e => { if (e.target.closest('[data-yes]')) done(true); else if (e.target.closest('[data-no]') || e.target === box) done(false) })
+    document.body.append(box)
+    box.querySelector('[data-yes]').focus()
+  })
+}
+
 export function toast(msg, bad = false) {
   let el = $('#toast')
   if (!el) { el = document.createElement('div'); el.id = 'toast'; document.body.append(el) }
@@ -120,13 +134,19 @@ export async function demoBar() {
   bar.className = 'demobar'
   bar.innerHTML = `<b>TRYB DEMO</b> · czas serwera: <span id="srvclock"></span> ·
     przewiń: <button data-adv="5">+5 min</button><button data-adv="20">+20 min</button><button data-adv="60">+1 h</button><button data-adv="1440">+1 dzień</button>
-    · <a href="outbox.html" target="_blank">📨 symulowane SMS-y</a> · <a href="index.html" target="_blank">linki ról</a>
+    <span id="roles"></span> · <a href="outbox.html">📨 symulowane SMS-y</a> · <a href="index.html">start</a>
     ${info.browser ? ' · <button data-reset="1">Reset demo</button>' : ''}`
   document.body.prepend(bar)
   const clock = () => { $('#srvclock').textContent = new Date(serverNow()).toLocaleString('pl-PL', { weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }) }
   syncClock(info.now); clock(); setInterval(clock, 1000)
+  // Szybkie przełączanie ról w jednym oknie.
+  try {
+    const L = (await api('/api/demo', { auth: '' })).links
+    if (L) $('#roles').innerHTML = '<br>rola: ' + [['Anna', L.owner], ...L.contacts.map(c => [c.name.split(' ')[0], c.link]), ['Karta QR', L.card]]
+      .map(([n, l]) => `<a href="${esc(l)}" class="${location.hash && l.endsWith(location.hash) ? 'cur' : ''}">${esc(n)}</a>`).join(' · ') + ' '
+  } catch {}
   bar.addEventListener('click', async e => {
-    if (e.target.dataset.reset) { if (confirm('Usunąć dane demo i zacząć od nowa?')) globalThis.planbLocal.reset(); return }
+    if (e.target.dataset.reset) { if (await ask('Usunąć dane demo i zacząć od nowa?', { ok: 'Resetuj', danger: true })) globalThis.planbLocal.reset(); return }
     const m = e.target.dataset.adv
     if (!m) return
     e.target.disabled = true

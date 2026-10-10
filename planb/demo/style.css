@@ -4,9 +4,11 @@
   --bad: #b3261e; --badbg: #fde7e5; --donebg: #eceff3;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #14171b; --card: #1d2228; --ink: #e9ecef; --muted: #9aa4ae; --line: #2e353d;
-    --accent: #7aa2ff; --ok: #6fd39b; --okbg: #183526; --wait: #ffcf70; --waitbg: #3a2e12; --bad: #ff8a80; --badbg: #3d1c1a; --donebg: #262c33; }
+  :root:not([data-theme="light"]) { --bg: #14171b; --card: #1d2228; --ink: #e9ecef; --muted: #9aa4ae; --line: #2e353d;
+    --accent: #7aa2ff; --ok: #6fd39b; --okbg: #183526; --wait: #ffcf70; --waitbg: #3a2e12; --bad: #ff8a80; --badbg: #3d1c1a; --donebg: #262c33; color-scheme: dark; }
 }
+:root[data-theme="dark"] { --bg: #14171b; --card: #1d2228; --ink: #e9ecef; --muted: #9aa4ae; --line: #2e353d;
+    --accent: #7aa2ff; --ok: #6fd39b; --okbg: #183526; --wait: #ffcf70; --waitbg: #3a2e12; --bad: #ff8a80; --badbg: #3d1c1a; --donebg: #262c33; color-scheme: dark; }
 * { box-sizing: border-box; }
 body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); }
 main { max-width: 860px; margin: 0 auto; padding: 16px; }
@@ -20,8 +22,8 @@ a { color: var(--accent); }
 .muted { color: var(--muted); }
 small { font-size: .85em; }
 button, .btn { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 8px 14px; border-radius: 8px; cursor: pointer; text-decoration: none; display: inline-block; margin: 2px 4px 2px 0; }
-button.primary, .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-button.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
+button.primary, .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+button.danger { background: var(--bad); border-color: var(--bad); color: var(--bg); }
 button.big { font-size: 1.15rem; padding: 14px 22px; }
 button:disabled { opacity: .5; cursor: default; }
 input, select, textarea { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px; width: 100%; }
@@ -44,10 +46,17 @@ label > span { display: block; font-size: .9em; color: var(--muted); }
 .tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
 .tabs button.on { background: var(--ink); color: var(--bg); }
 .secret { font-family: ui-monospace, monospace; background: var(--bg); padding: 8px; border-radius: 6px; white-space: pre-wrap; }
-.demobar { background: #2b2b2b; color: #fff; padding: 6px 12px; font-size: .9rem; position: sticky; top: 0; z-index: 10; }
+.demobar { background: #2b2b2b; color: #fff; padding: 6px 12px; font-size: .9rem; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; }
 .demobar a { color: #9cc0ff; } .demobar button { padding: 2px 8px; font-size: .85rem; }
 .live { font-size: .85em; color: var(--muted); } .live.on { color: var(--ok); }
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; z-index: 20; }
 .toast.show { opacity: 1; } .toast.bad { background: var(--bad); color: #fff; }
 .note { border-left: 4px solid var(--wait); padding: 6px 10px; background: var(--waitbg); border-radius: 4px; margin: 8px 0; }
 pre.msg { white-space: pre-wrap; margin: 0; font: inherit; }
+[hidden] { display: none !important; }
+.modal { position: fixed; inset: 0; background: rgb(0 0 0 / .45); display: grid; place-items: center; padding: 16px; z-index: 30; }
+.modal-card { background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 18px; max-width: 420px; width: 100%; }
+.row-end { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.demobar a.cur { color: #fff; font-weight: 700; text-decoration: none; border-bottom: 2px solid #9cc0ff; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }

@@ -1,4 +1,4 @@
-import { $, esc, api, demoBar } from './common.js'
+import { $, esc, api, demoBar, toast } from './common.js'
 const info = await api('/api/info', { auth: '' })
 let html = `<h1>Plan B</h1>
   <p><b>Plan zastępstwa na wypadek, gdy nagle znikasz z życia osób, które od Ciebie zależą</b> – szpital, wypadek, brak kontaktu.
@@ -7,12 +7,12 @@ if (info.browser) html += `<div class="card alert bad"><b>Wersja demonstracyjna 
 if (info.demo) {
   const d = await api('/api/demo', { auth: '' })
   const L = d.links
-  html += `<div class="card alert wait"><h2>Tryb demo – otwórz role w osobnych kartach</h2>
+  html += `<div class="card alert wait"><h2>Tryb demo – wybierz rolę</h2><p><small>Rolę zmienisz też w każdej chwili paskiem na górze.</small></p>
     <ul>
-      <li><a href="${esc(L.owner)}" target="_blank"><b>Anna – właścicielka planu</b></a> (konfiguracja, próbny alarm, anulowanie)</li>
-      ${L.contacts.map(c => `<li><a href="${esc(c.link)}" target="_blank">${esc(c.name)}</a></li>`).join('')}
-      <li><a href="${esc(L.card)}" target="_blank">Karta QR – widok personelu SOR</a></li>
-      <li><a href="outbox.html" target="_blank">📨 Symulowane SMS-y</a></li>
+      <li><a href="${esc(L.owner)}"><b>Anna – właścicielka planu</b></a> (konfiguracja, próbny alarm, anulowanie)</li>
+      ${L.contacts.map(c => `<li><a href="${esc(c.link)}">${esc(c.name)}</a></li>`).join('')}
+      <li><a href="${esc(L.card)}">Karta QR – widok personelu SOR</a></li>
+      <li><a href="outbox.html">📨 Symulowane SMS-y</a></li>
     </ul>
     <h3>Scenariusz do przejścia</h3>
     <ol>
@@ -34,6 +34,6 @@ $('#f')?.addEventListener('submit', async e => {
     const r = await api('/api/accounts', { method: 'POST', body: Object.fromEntries(new FormData(e.target)), auth: '' })
     const url = new URL(r.ownerLink, location.href).href
     e.target.outerHTML = `<div class="card alert ok"><h2>Plan utworzony</h2><p><b>Zapisz ten link – to Twój jedyny klucz do planu</b> (prototyp nie ma logowania hasłem):</p><p class="secret">${esc(url)}</p><a class="btn primary" href="${esc(r.ownerLink)}">Przejdź do planu</a></div>`
-  } catch (err) { alert(err.message) }
+  } catch (err) { toast(err.message, true) }
 })
 demoBar()

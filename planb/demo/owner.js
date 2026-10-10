@@ -1,4 +1,4 @@
-import { $, $$, esc, api, live, board, toast, fmtDate, fmtDateTime, fmtTime, left, syncClock, demoBar, liveBadge } from './common.js'
+import { $, $$, esc, api, ask, live, board, toast, fmtDate, fmtDateTime, fmtTime, left, syncClock, demoBar, liveBadge } from './common.js'
 
 let V = null            // ostatni widok z serwera
 let tab = 'tasks'
@@ -237,7 +237,7 @@ document.addEventListener('click', async e => {
     return
   }
   if (b.dataset.del) {
-    if (!confirm('Na pewno usunąć?')) return
+    if (!(await ask('Na pewno usunąć?', { ok: 'Usuń', danger: true }))) return
     return act(() => api(`/api/owner/${b.dataset.del}/${b.dataset.id}`, { method: 'DELETE' }), 'Usunięto')
   }
   if (b.dataset.invite) {
@@ -249,14 +249,14 @@ document.addEventListener('click', async e => {
   switch (b.dataset.act) {
     case 'cancelEdit': editing = null; return render()
     case 'cancel': return act(() => api('/api/owner/cancel', { method: 'POST' }), 'Zgłoszenie anulowane. Zaufane osoby dostały informację.')
-    case 'end': if (confirm('Zakończyć? Wszystkie dostępy wygasną.')) return act(() => api('/api/owner/end', { method: 'POST' }), 'Zakończono')
+    case 'end': if (await ask('Zakończyć? Wszystkie dostępy wygasną.', { ok: 'Zakończ' })) return act(() => api('/api/owner/end', { method: 'POST' }), 'Zakończono')
       return
     case 'ok': return act(() => api('/api/owner/checkin/ok', { method: 'POST' }), 'Dzięki! Potwierdzono „jestem OK”.')
     case 'review': return act(() => api('/api/owner/review', { method: 'POST' }), 'Zapisano datę przeglądu')
-    case 'drill': if (confirm('Rozpocząć próbny alarm? Zaufane osoby dostaną wiadomości oznaczone [ĆWICZENIE].')) return act(() => api('/api/owner/drill', { method: 'POST' }), 'Próbny alarm rozpoczęty')
+    case 'drill': if (await ask('Rozpocząć próbny alarm? Zaufane osoby dostaną wiadomości oznaczone [ĆWICZENIE].', { ok: 'Rozpocznij' })) return act(() => api('/api/owner/drill', { method: 'POST' }), 'Próbny alarm rozpoczęty')
       return
-    case 'printCard': return window.open('card-print.html#t=' + encodeURIComponent((location.hash.match(/t=([\w-]+)/) || [])[1]), '_blank', 'noopener')
-    case 'rotateCard': if (confirm('Stara karta przestanie działać. Kontynuować?')) return act(() => api('/api/owner/card/rotate', { method: 'POST' }), 'Wydano nową kartę – wydrukuj ją ponownie')
+    case 'printCard': location.href = 'card-print.html#t=' + encodeURIComponent((location.hash.match(/t=([\w-]+)/) || [])[1]); return
+    case 'rotateCard': if (await ask('Stara karta przestanie działać. Kontynuować?', { ok: 'Wydaj nową kartę', danger: true })) return act(() => api('/api/owner/card/rotate', { method: 'POST' }), 'Wydano nową kartę – wydrukuj ją ponownie')
   }
 })
 
