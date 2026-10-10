@@ -1,0 +1,13 @@
+{
+  "name": "plan-b",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plan B – plan zastępstwa uruchamiany, gdy opiekun nagle znika (prototyp).",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.js",
+    "demo": "node src/server.js --demo",
+    "test": "node --test test/*.test.js"
+  }
+}
