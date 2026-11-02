@@ -56,7 +56,10 @@ Bez tego kroku skrypt łatwo obejść, otwierając zwykłą aplikację.
 - Albo **Ustawienia → Czas przed ekranem → Limity aplikacji** dla Instagrama i TikToka (np. 1 minuta dziennie).
   Ustaw kod Czasu przed ekranem, najlepiej taki, którego nie pamiętasz, np. niech wpisze go ktoś inny.
 - Dodaj skróty instagram.com i tiktok.com na ekran początkowy: Safari → Udostępnij → „Do ekranu początkowego”.
-  Upewnij się, że otwierają się w Safari z włączonym rozszerzeniem.
+  **Wyłącz przełącznik „Otwórz jako aplikacja webowa” („Open as Web App”, iOS 26).**
+  Wtedy ikona otwiera stronę w zwykłym Safari, gdzie działa rozszerzenie.
+  Jeśli przełącznik zostanie włączony, strona otworzy się jako osobna aplikacja webowa, a rozszerzenia Safari najpewniej tam nie działają. Blokada nie zadziała.
+  Sprawdź po dodaniu: ikona powinna otwierać kartę Safari z paskiem adresu.
 
 ## Aktualizacja i testy (dla programisty)
 
