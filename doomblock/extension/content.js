@@ -12,7 +12,7 @@
     igBlockReelsFeed: true,     // /reels/... (przewijany feed Rolek)
     igAllowSingleReel: true,    // /reel/<id> (pojedyncza rolka np. z wiadomości) – true = pozwól
     igBlockExplore: false,      // /explore/ (Eksploruj) – też potrafi wciągać
-    igHideReelsInFeed: false,   // ukrywaj posty-wideo w głównym feedzie (eksperymentalne)
+    igHideReelsInFeed: true,    // ukrywaj rolki/posty-wideo w głównym feedzie
     // TikTok
     ttBlockForYou: true,        // strona główna, /foryou, /en/ itp.
     ttBlockFollowing: false,    // /following
@@ -133,7 +133,7 @@
     if ((location.pathname.replace(/\/+$/, '') || '/') !== '/') return;
     document.querySelectorAll('article').forEach(function (a) {
       if (a.dataset.doomblock) return;
-      if (a.querySelector('video')) {
+      if (a.querySelector('video, a[href*="/reel/"], a[href*="/reels/"]')) {
         a.dataset.doomblock = '1';
         a.style.setProperty('display', 'none', 'important');
       }

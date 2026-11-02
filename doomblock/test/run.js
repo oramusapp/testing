@@ -31,6 +31,15 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) failed+
   ok(await vis('#home'), 'IG link Home widoczny');
   await p.click('#spaReels'); await p.waitForTimeout(900);
   ok(new URL(p.url()).pathname === '/', 'IG nawigacja SPA do /reels -> przekierowanie (' + p.url() + ')');
+  await p.evaluate(() => {
+    const mk = (id, html) => { const a = document.createElement('article'); a.id = id; a.innerHTML = html; document.body.appendChild(a); };
+    mk('photo', '<img src="data:,"><a href="/p/XYZ/">post</a>');
+    mk('reelvid', '<video src="data:,"></video>');
+    mk('reellink', '<a href="/reel/QWE/">reel</a>');
+  });
+  await p.waitForTimeout(900);
+  ok(await vis('#photo'), 'IG feed: zwykły post widoczny');
+  ok(!(await vis('#reelvid')) && !(await vis('#reellink')), 'IG feed: rolki ukryte');
   await p.goto('https://www.instagram.com/reel/ABC123/'); await p.waitForTimeout(500);
   ok(p.url().includes('/reel/ABC123'), 'IG pojedyncza rolka /reel/<id> dozwolona');
   await p.goto('https://www.instagram.com/direct/inbox/'); await p.waitForTimeout(500);
