@@ -9,7 +9,9 @@ VERSION=$(python3 -c "import json;print(json.load(open('extension/manifest.json'
 // @name         DoomBlock
 // @description  Blokuje Rolki na Instagramie i stronę główną TikToka.
 // @version      ${VERSION}
+// @match        *://instagram.com/*
 // @match        *://*.instagram.com/*
+// @match        *://tiktok.com/*
 // @match        *://*.tiktok.com/*
 // @run-at       document-start
 // @inject-into  content

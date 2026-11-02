@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "DoomBlock",
   "description": "Blokuje Rolki na Instagramie i stronę główną TikToka.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "icons": {
     "48": "images/icon-48.png",
     "96": "images/icon-96.png",
@@ -13,7 +13,9 @@
   "content_scripts": [
     {
       "matches": [
+        "*://instagram.com/*",
         "*://*.instagram.com/*",
+        "*://tiktok.com/*",
         "*://*.tiktok.com/*"
       ],
       "js": ["content.js"],

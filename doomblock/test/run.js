@@ -29,6 +29,7 @@ const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) failed+
   ok(new URL(p.url()).pathname === '/', 'IG /reels/xyz -> przekierowanie na /  (' + p.url() + ')');
   ok(!(await vis('#reels')), 'IG link do Rolek ukryty');
   ok(await vis('#home'), 'IG link Home widoczny');
+  ok((await p.locator('#doomblock-badge').count()) === 1, 'Plakietka "DoomBlock aktywny" widoczna');
   await p.click('#spaReels'); await p.waitForTimeout(900);
   ok(new URL(p.url()).pathname === '/', 'IG nawigacja SPA do /reels -> przekierowanie (' + p.url() + ')');
   await p.evaluate(() => {

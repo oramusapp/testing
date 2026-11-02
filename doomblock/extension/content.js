@@ -18,6 +18,8 @@
     ttBlockFollowing: false,    // /following
     ttBlockExplore: true,       // /explore
     ttAllowSingleVideo: true,   // /@user/video/<id> – true = pozwól (linki od znajomych)
+    // Diagnostyka
+    showBadge: true,            // pokaż na 3 s plakietkę "DoomBlock aktywny" po wejściu na stronę
   };
 
   if (window.__doomblockLoaded) return;
@@ -140,6 +142,18 @@
     });
   }
 
+  function showBadge() {
+    if (!CONFIG.showBadge || document.getElementById('doomblock-badge') || !document.body) return;
+    const b = document.createElement('div');
+    b.id = 'doomblock-badge';
+    b.textContent = 'DoomBlock aktywny';
+    b.style.cssText = 'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:2147483647;' +
+      'background:#1f8f4e;color:#fff;padding:8px 14px;border-radius:999px;pointer-events:none;' +
+      'font:600 14px -apple-system,BlinkMacSystemFont,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.3)';
+    document.body.appendChild(b);
+    setTimeout(function () { b.remove(); }, 3000);
+  }
+
   let lastPath = null;
 
   function check() {
@@ -158,6 +172,7 @@
     }
     lastPath = location.pathname;
     hideIgFeedVideos();
+    showBadge();
   }
 
   // Natychmiastowe przekierowanie jeszcze przed załadowaniem strony.
